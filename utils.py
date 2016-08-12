@@ -1,4 +1,5 @@
 # 2016-08-11
+from __future__ import division
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D

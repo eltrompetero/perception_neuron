@@ -1,5 +1,5 @@
 # 2016-08-11
-
+from __future__ import division
 import pandas as pd
 import numpy as np
 
@@ -23,9 +23,12 @@ def load(fname,includeDisplacement=False,removeBlank=True):
     dt (float)
         Frame rate.
     """
-    # Find the line where data starts and get skeleton parts.
     from itertools import chain
+    from pyparsing import nestedExpr
+    
+    # Parse skeleton.
     bodyParts = []
+    indents = []
     with open(fname) as f:
         i = 0
         ln = f.readline()
@@ -35,6 +38,7 @@ def load(fname,includeDisplacement=False,removeBlank=True):
         bodyParts.append( ''.join(a for a in ln.split(' ')[1] if a.isalnum()) )
         while not 'Frames' in ln:
             if 'JOINT' in ln:
+                indents = (len(ln)-len(ln.lstrip(' ')))/4
                 ix = ln.find('JOINT')
                 bodyParts.append( ''.join(a for a in ln[ix:].split(' ')[1] if a.isalnum()) )
             ln = f.readline()
@@ -45,9 +49,10 @@ def load(fname,includeDisplacement=False,removeBlank=True):
             ln = f.readline()
         dt = float( ln.split(' ')[-1][:-2] )
 
+    # Parse motion.
     df = pd.read_csv(fname,skiprows=i+2,delimiter=' ',header=None)
     df = df.iloc[:,:-1]  # remove bad last col
-    
+
     if includeDisplacement:
         df.columns = pd.MultiIndex.from_arrays([list(chain.from_iterable([[b]*6 for b in bodyParts])),
                                             ['xx','yy','zz','y','x','z']*len(bodyParts)])
@@ -55,7 +60,9 @@ def load(fname,includeDisplacement=False,removeBlank=True):
         df.columns = pd.MultiIndex.from_arrays([[bodyParts[0]]*6 + 
                                                  list(chain.from_iterable([[b]*3 for b in bodyParts[1:]])),
                                             ['xx','yy','zz']+['y','x','z']*len(bodyParts)])
-    
+   
+
+    # Filtering.
     if removeBlank:
         # Only keep entries that change at all.
         df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
