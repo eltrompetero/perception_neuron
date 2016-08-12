@@ -61,3 +61,36 @@ def load(fname,includeDisplacement=False,removeBlank=True):
         df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
     return df,dt
 
+
+class Node(object):
+    def __init__(self,name=None,parents=[],children=[]):
+        self.name = name
+        self.parents = parents
+        self.children = children
+
+    def add_child(self,child):
+        self.children.append(child)
+
+class Tree(object):
+    def __init__(self,nodes):
+        self.nodes = nodes
+        names = [n.name for n in nodes]
+        if len(np.unique(names))<len(names):
+            raise Exception("Nodes have duplicate names.")
+
+        self.adjacency = np.zeros((len(nodes),len(nodes)))
+        for i,n in enumerate(nodes):
+            for c in n.children:
+                try:
+                    self.adjacency[i,names.index(c)] = 1
+                # automatically insert missing nodes (these should all be dangling)
+                except ValueError:
+                    self.adjacency = np.pad( self.adjacency, ((0,1),(0,1)), mode='constant', constant_values=0)
+                    self.nodes.append( Node(c) )
+                    names.append(c)
+
+                    self.adjacency[i,names.index(c)] = 1
+        
+    def print_tree(self):
+        print self.adjacency
+
