@@ -25,17 +25,21 @@ def load(fname,includeDisplacement=False,removeBlank=True):
     """
     from itertools import chain
     from pyparsing import nestedExpr
-    
+    import string
+
     # Parse skeleton.
     # Find the line where data starts and get skeleton tree lines.
     s = ''
     lineix = 0
+    bodyParts = ['Hips']  # for keeping track of order of body parts
     with open(fname) as f:
         f.readline()
         f.readline()
         ln = f.readline()
         lineix += 3
         while not 'MOTION' in ln:
+            if 'JOINT' in ln:
+                bodyParts.append( ln.lstrip(' ').split(' ')[1][:-2] )
             s += ln
             ln = f.readline()
             lineix += 1
@@ -45,7 +49,7 @@ def load(fname,includeDisplacement=False,removeBlank=True):
             ln = f.readline()
             lineix += 1
         dt = float( ln.split(' ')[-1][:-2] )
-    
+    print bodyParts 
     s = nestedExpr('{','}').parseString(s).asList()
     nodes = []
 
@@ -67,9 +71,13 @@ def load(fname,includeDisplacement=False,removeBlank=True):
                 if len(children)>0:
                     parse(thisNode,children[-1],ln)
         nodes.append( Node(thisNode,parents=[parent],children=children) )
-
+    
+    # Parse skeleton.
     parse('','Hips',s[0])
-    bodyParts = [n.name for n in nodes]
+    # Resort into order of motion data.
+    nodesNames = [n.name for n in nodes]
+    bodyPartsIx = [nodesNames.index(n) for n in bodyParts]
+    nodes = [nodes[i] for i in bodyPartsIx]
     skeleton = Tree(nodes) 
    
     # Parse motion.
