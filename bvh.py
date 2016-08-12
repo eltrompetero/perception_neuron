@@ -39,7 +39,7 @@ def load(fname,includeDisplacement=False,removeBlank=True):
         lineix += 3
         while not 'MOTION' in ln:
             if 'JOINT' in ln:
-                bodyParts.append( ln.lstrip(' ').split(' ')[1][:-2] )
+                bodyParts.append( ''.join(a for a in ln.lstrip(' ').split(' ')[1] if a.isalnum()) )
             s += ln
             ln = f.readline()
             lineix += 1
@@ -49,7 +49,7 @@ def load(fname,includeDisplacement=False,removeBlank=True):
             ln = f.readline()
             lineix += 1
         dt = float( ln.split(' ')[-1][:-2] )
-    print bodyParts 
+    
     s = nestedExpr('{','}').parseString(s).asList()
     nodes = []
 
@@ -83,7 +83,7 @@ def load(fname,includeDisplacement=False,removeBlank=True):
     # Parse motion.
     df = pd.read_csv(fname,skiprows=lineix+2,delimiter=' ',header=None)
     df = df.iloc[:,:-1]  # remove bad last col
-
+    
     if includeDisplacement:
         df.columns = pd.MultiIndex.from_arrays([list(chain.from_iterable([[b]*6 for b in bodyParts])),
                                             ['xx','yy','zz','y','x','z']*len(bodyParts)])
