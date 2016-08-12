@@ -3,7 +3,7 @@
 import pandas as pd
 import numpy as np
 
-def load(fname,includeDisplacement=False):
+def load(fname,includeDisplacement=False,removeBlank=True):
     """
     Load data from BVD file.
     2016-08-11
@@ -14,6 +14,8 @@ def load(fname,includeDisplacement=False):
         Name of file to load
     includeDisplacement (bool=False)
         If displacement data is included for everything including root.
+    removeBlank (bool=True)
+        Remove entries where nothing changes over the entire recording session. This should mean that there was nothing being recorded in that field.
     """
     # Find the line where data starts and get skeleton parts.
     from itertools import chain
@@ -42,7 +44,8 @@ def load(fname,includeDisplacement=False):
                                                  list(chain.from_iterable([[b]*3 for b in bodyParts[1:]])),
                                             ['xx','yy','zz']+['y','x','z']*len(bodyParts)])
     
-    # Only keep entries that change at all.
-    df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
+    if removeBlank:
+        # Only keep entries that change at all.
+        df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
     return df 
 
