@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 # ------------------- #
 # Plotting functions. #
@@ -20,9 +21,9 @@ def plot_hips_drift(hips,dt):
     ax[0].set(xlabel='front-back (m)',ylabel='sideways (m)')
     
     tmax = len(hips['xx'])*dt
-    ax[1].plot(arange(len(hips['xx']))*dt,hips['xx']/100)
+    ax[1].plot(np.arange(len(hips['xx']))*dt,hips['xx']/100)
     ax[1].set(xticklabels=[],xlim=[0,tmax])
-    ax[2].plot(arange(len(hips['xx']))*dt,-hips['zz']/100)
+    ax[2].plot(np.arange(len(hips['xx']))*dt,-hips['zz']/100)
     ax[2].set(xlabel='time (s)',xlim=[0,tmax])
     # ax.set(xlabel='x (forward)',ylabel='y (sideways)')
     
