@@ -27,30 +27,53 @@ def load(fname,includeDisplacement=False,removeBlank=True):
     from pyparsing import nestedExpr
     
     # Parse skeleton.
-    bodyParts = []
-    indents = []
+    # Find the line where data starts and get skeleton tree lines.
+    s = ''
+    lineix = 0
     with open(fname) as f:
-        i = 0
+        f.readline()
+        f.readline()
         ln = f.readline()
-        while not 'ROOT' in ln:
+        lineix += 3
+        while not 'MOTION' in ln:
+            s += ln
             ln = f.readline()
-            i += 1
-        bodyParts.append( ''.join(a for a in ln.split(' ')[1] if a.isalnum()) )
-        while not 'Frames' in ln:
-            if 'JOINT' in ln:
-                indents = (len(ln)-len(ln.lstrip(' ')))/4
-                ix = ln.find('JOINT')
-                bodyParts.append( ''.join(a for a in ln[ix:].split(' ')[1] if a.isalnum()) )
-            ln = f.readline()
-            i += 1
-
+            lineix += 1
+        
         # Read in the frame rate.
         while 'Frame Time' not in ln:
             ln = f.readline()
+            lineix += 1
         dt = float( ln.split(' ')[-1][:-2] )
+    
+    s = nestedExpr('{','}').parseString(s).asList()
+    nodes = []
 
+    def parse(parent,thisNode,skeleton):
+        """
+        Keep track of traversed nodes in nodes list.
+
+        Params:
+        -------
+        parent (str)
+        skeleton (list)
+            As returned by pyparsing
+        """
+        children = []
+        for i,ln in enumerate(skeleton):
+            if (not type(ln) is list) and 'JOINT' in ln:
+                children.append(skeleton[i+1])
+            elif type(ln) is list:
+                if len(children)>0:
+                    parse(thisNode,children[-1],ln)
+        nodes.append( Node(thisNode,parents=[parent],children=children) )
+
+    parse('','Hips',s[0])
+    bodyParts = [n.name for n in nodes]
+    skeleton = Tree(nodes) 
+   
     # Parse motion.
-    df = pd.read_csv(fname,skiprows=i+2,delimiter=' ',header=None)
+    df = pd.read_csv(fname,skiprows=lineix+2,delimiter=' ',header=None)
     df = df.iloc[:,:-1]  # remove bad last col
 
     if includeDisplacement:
@@ -66,7 +89,7 @@ def load(fname,includeDisplacement=False,removeBlank=True):
     if removeBlank:
         # Only keep entries that change at all.
         df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
-    return df,dt
+    return df,dt,skeleton
 
 
 class Node(object):
@@ -80,7 +103,8 @@ class Node(object):
 
 class Tree(object):
     def __init__(self,nodes):
-        self.nodes = nodes
+        self._nodes = nodes
+        self.nodes = [n.name for n in nodes]
         names = [n.name for n in nodes]
         if len(np.unique(names))<len(names):
             raise Exception("Nodes have duplicate names.")
@@ -93,7 +117,7 @@ class Tree(object):
                 # automatically insert missing nodes (these should all be dangling)
                 except ValueError:
                     self.adjacency = np.pad( self.adjacency, ((0,1),(0,1)), mode='constant', constant_values=0)
-                    self.nodes.append( Node(c) )
+                    self._nodes.append( Node(c) )
                     names.append(c)
 
                     self.adjacency[i,names.index(c)] = 1
