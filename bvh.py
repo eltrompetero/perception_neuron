@@ -16,6 +16,12 @@ def load(fname,includeDisplacement=False,removeBlank=True):
         If displacement data is included for everything including root.
     removeBlank (bool=True)
         Remove entries where nothing changes over the entire recording session. This should mean that there was nothing being recorded in that field.
+
+    Value:
+    ------
+    df (dataFrame)
+    dt (float)
+        Frame rate.
     """
     # Find the line where data starts and get skeleton parts.
     from itertools import chain
@@ -33,6 +39,12 @@ def load(fname,includeDisplacement=False,removeBlank=True):
                 bodyParts.append( ''.join(a for a in ln[ix:].split(' ')[1] if a.isalnum()) )
             ln = f.readline()
             i += 1
+
+        # Read in the frame rate.
+        while 'Frame Time' not in ln:
+            ln = f.readline()
+        dt = float( ln.split(' ')[-1][:-2] )
+
     df = pd.read_csv(fname,skiprows=i+2,delimiter=' ',header=None)
     df = df.iloc[:,:-1]  # remove bad last col
     
@@ -47,5 +59,5 @@ def load(fname,includeDisplacement=False,removeBlank=True):
     if removeBlank:
         # Only keep entries that change at all.
         df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
-    return df 
+    return df,dt
 
