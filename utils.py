@@ -119,3 +119,29 @@ def plot_euler_angles(bp):
            ylim=[bp['z'].min()/100,bp['z'].max()/100],
            zlim=[bp['y'].min()/100,bp['y'].max()/100])
     return fig
+
+def plot_polar_angles(phis,thetas,dt):
+    """
+    2016-08-12
+    
+    Params:
+    -------
+    phis (ndarray)
+        Azimuthal angles
+    thetas (ndarray)
+        Polar angles
+    dt (float)
+        Timestep between phi and theta data points.
+    """
+    gs = gridspec.GridSpec(2,2,height_ratios=(1,3))
+    fig = plt.figure(figsize=(10,4))
+    ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,:])]
+
+    ax[0].plot(dt*np.arange(len(phis)),phis)
+    ax[0].set(xlim=[0,len(phis)*dt],ylim=[-np.pi,np.pi])
+    ax[1].plot(dt*np.arange(len(phis)),thetas)
+    ax[1].set(xlim=[0,len(phis)*dt],ylim=[0,np.pi])
+
+    ax[2].plot(phis,thetas,'.',alpha=.2)
+    ax[2].set(xlim=[-np.pi,np.pi],ylim=[0,np.pi],xlabel=r'$\phi$',ylabel=r'$\theta$');
+    return fig
