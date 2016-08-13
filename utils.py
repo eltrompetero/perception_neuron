@@ -32,7 +32,7 @@ def polar_angles(v0,a,b,c):
     theta = np.arccos( v1[2] )
     return v1,phi,theta
 
-def convert(yxz):
+def convert_euler_to_polar(yxz):
     """
     Convert Euler angles into polar/azimuthal angles.
     2016-08-12
