@@ -60,8 +60,8 @@ def convert_euler_to_polar(yxz):
 # Plotting functions. #
 # ------------------- #
 def plot_hips_drift(hips,dt):
-    gs = gridspec.GridSpec(2,3)
-    gs.update(wspace=.3)
+    gs = gridspec.GridSpec(2,3,wspace=.3)
+    gs.update(wspace=.4)
 
     fig = plt.figure(figsize=(12,4))
     ax = [fig.add_subplot(gs[:,:-1]),fig.add_subplot(gs[0,-1]),fig.add_subplot(gs[1,-1])]
@@ -74,10 +74,11 @@ def plot_hips_drift(hips,dt):
     
     tmax = len(hips['xx'])*dt
     ax[1].plot(np.arange(len(hips['xx']))*dt,hips['xx']/100)
-    ax[1].set(xticklabels=[],xlim=[0,tmax])
+    ax[1].set(xticklabels=[],xlim=[0,tmax],ylabel='front-back')
+    [l.set_fontsize(10) for l in ax[1].get_yticklabels()]
     ax[2].plot(np.arange(len(hips['xx']))*dt,-hips['zz']/100)
-    ax[2].set(xlabel='time (s)',xlim=[0,tmax])
-    # ax.set(xlabel='x (forward)',ylabel='y (sideways)')
+    ax[2].set(xlabel='time (s)',xlim=[0,tmax],ylabel='sideways')
+    [l.set_fontsize(10) for l in ax[2].get_yticklabels()]
     
     print "Drift front-back: %1.3f m"%( (hips['xx'].iloc[-1]-hips['xx'].iloc[0])/100 )
     print "Drift sideways: %1.3f m"%( -(hips['zz'].iloc[-1]-hips['zz'].iloc[0])/100 )
@@ -133,15 +134,26 @@ def plot_polar_angles(phis,thetas,dt):
     dt (float)
         Timestep between phi and theta data points.
     """
-    gs = gridspec.GridSpec(2,2,height_ratios=(1,3))
+    gs = gridspec.GridSpec(2,2,height_ratios=(1,3),wspace=.2,hspace=.4)
     fig = plt.figure(figsize=(10,4))
     ax = [fig.add_subplot(gs[0,0]),fig.add_subplot(gs[0,1]),fig.add_subplot(gs[1,:])]
 
     ax[0].plot(dt*np.arange(len(phis)),phis)
-    ax[0].set(xlim=[0,len(phis)*dt],ylim=[-np.pi,np.pi])
+    ax[0].set(xlim=[0,len(phis)*dt],ylim=[-np.pi,np.pi],
+              xlabel='time (s)',ylabel=r'$\phi$',
+              yticks=[-np.pi,0,np.pi],yticklabels=[r'$-\pi$',r'$0$',r'$\pi$'])
+    [l.set_fontsize(10) for l in ax[0].get_yticklabels()]
+    [l.set_fontsize(10) for l in ax[0].get_xticklabels()]
+    ax[0].xaxis.get_label().set_fontsize(10)
     ax[1].plot(dt*np.arange(len(phis)),thetas)
-    ax[1].set(xlim=[0,len(phis)*dt],ylim=[0,np.pi])
+    ax[1].set(xlim=[0,len(phis)*dt],ylim=[0,np.pi],
+              xlabel='time (s)',ylabel=r'$\theta$',
+              yticks=[0,np.pi/2,np.pi],yticklabels=[r'$0$',r'$\pi/2$',r'$\pi$'])
+    [l.set_fontsize(10) for l in ax[1].get_yticklabels()]
+    [l.set_fontsize(10) for l in ax[1].get_xticklabels()]
+    ax[1].xaxis.get_label().set_fontsize(10)
 
+    ax[1].plot(dt*np.arange(len(phis)),thetas)
     ax[2].plot(phis,thetas,'.',alpha=.2)
     ax[2].set(xlim=[-np.pi,np.pi],ylim=[0,np.pi],xlabel=r'$\phi$',ylabel=r'$\theta$');
     return fig
