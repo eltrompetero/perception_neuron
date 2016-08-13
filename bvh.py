@@ -1,4 +1,8 @@
+# Edward Lee edl56@cornell.edu
+# Classes:
+# Node, Tree
 # 2016-08-11
+
 from __future__ import division
 import pandas as pd
 import numpy as np

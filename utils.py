@@ -5,6 +5,50 @@ from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
+# ---------------------- #
+# Calculation functions. #
+# ---------------------- #
+def polar_angles(v0,a,b,c):
+    """
+    Get the polar and azimuthal angles that correspond to the new position of v0 after applying rotation matrices with angles a,b,c.
+    With YXZ.v0 convention.
+    2016-08-12
+    
+    Params:
+    -------
+    v0 (floats)
+        Starting vector.
+    a,b,c (floats)
+        Euler angles about x,y,z axes.
+    """
+    x,y,z = v0
+    v1 = np.array([-z*np.cos(a)*np.sin(b) + y*(np.cos(c)*np.sin(a)*np.sin(b) + np.cos(b)*np.sin(c)) + 
+                   x*(np.cos(b)*np.cos(c) - np.sin(a)*np.sin(b)*np.sin(c)),
+                   y*np.cos(a)*np.cos(c) + z*np.sin(a) - x*np.cos(a)*np.sin(c),
+                   z*np.cos(a)*np.cos(b) + x*(np.cos(c)*np.sin(b) + np.cos(b)*np.sin(a)*np.sin(c)) + 
+                       y*(-np.cos(b)*np.cos(c)*np.sin(a) + np.sin(b)*np.sin(c))])
+    
+    phi = np.arctan2( v1[1],v1[0] )
+    theta = np.arccos( v1[2] )
+    return v1,phi,theta
+
+def convert(yxz):
+    """
+    Convert Euler angles into polar/azimuthal angles.
+    2016-08-12
+    
+    Params:
+    -------
+    yxz (ndarray)
+        With columns for rotation angles about y,x,z axes.
+    """
+    v = np.array([0,0,1])
+    phis,thetas = np.zeros((len(yxz))),np.zeros((len(yxz)))
+    for i,r in enumerate(yxz):
+        v,phis[i],thetas[i] = polar_angles(v,r[1],r[0],r[2])
+    return phis,thetas
+
+
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
