@@ -95,7 +95,7 @@ def plot_positions(bp):
            zlim=[bp['yy'].min()/100,bp['yy'].max()/100])
     return fig
 
-def plot_angles(bp):
+def plot_euler_angles(bp):
     """
     Plot the 3D angle rotations.
     2016-08-11
