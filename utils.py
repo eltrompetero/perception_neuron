@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+import pandas as pd
 
 # ---------------------- #
 # Calculation functions. #
@@ -42,11 +43,17 @@ def convert_euler_to_polar(yxz):
     yxz (ndarray)
         With columns for rotation angles about y,x,z axes.
     """
+    if type(yxz) is pd.core.frame.DataFrame:
+        yxz = yxz.values
+    elif not type(yxz) is np.ndarray:
+        raise Exception("Unexpected data type.")
+
     v = np.array([0,0,1])
     phis,thetas = np.zeros((len(yxz))),np.zeros((len(yxz)))
     for i,r in enumerate(yxz):
         v,phis[i],thetas[i] = polar_angles(v,r[1],r[0],r[2])
     return phis,thetas
+
 
 
 # ------------------- #
