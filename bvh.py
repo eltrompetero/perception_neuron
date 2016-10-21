@@ -9,7 +9,7 @@ import numpy as np
 
 def load(fname,includeDisplacement=False,removeBlank=True):
     """
-    Load data from BVD file.
+    Load data from BVD file. Data is typically given as the Euler angles.
     2016-08-11
 
     Params:

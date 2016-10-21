@@ -11,7 +11,8 @@ import pandas as pd
 # ---------------------- #
 def polar_angles(v0,a,b,c):
     """
-    Get the polar and azimuthal angles that correspond to the new position of v0 after applying rotation matrices with angles a,b,c.
+    Get the polar and azimuthal angles that correspond to the new position of v0 after applying rotation 
+    matrices with angles a,b,c.
     With YXZ.v0 convention.
     2016-08-12
     
@@ -87,7 +88,7 @@ def plot_hips_drift(hips,dt):
 
 def plot_positions(bp):
     """
-    Plot the 3D positions.
+    Plot the 3D positions of a particular body part. The default measurement in Perception Neuron ignores the displacement except for the hips.
     2016-08-11
 
     Params:
