@@ -4,17 +4,28 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
+from numpy import sin,cos
 import pandas as pd
 
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def Ryxz(a,b,c):
+    """
+    BVH rotation matrix. As from cgkit's skeleton.py process_bvhkeyframe(). For multiplication on the right side of the vector to be transformed.
+    2016-10-23
+    """
+    ry = np.array([[cos(a),0,-sin(a)],[0,1,0],[sin(a),0,cos(a)]]).T
+    rx = np.array([[1,0,0],[0,cos(b),sin(b)],[0,-sin(b),cos(b)]]).T
+    rz = np.array([[cos(c),sin(c),0],[-sin(c),cos(c),0],[0,0,1]]).T
+    return ry.dot(rx.dot(rz))
+
 def polar_angles(v0,a,b,c):
     """
     Get the polar and azimuthal angles that correspond to the new position of v0 after applying rotation 
     matrices with angles a,b,c.
     With YXZ.v0 convention.
-    2016-08-12
+    2016-10-23
     
     Params:
     -------
@@ -23,13 +34,7 @@ def polar_angles(v0,a,b,c):
     a,b,c (floats)
         Euler angles about x,y,z axes.
     """
-    x,y,z = v0
-    v1 = np.array([-z*np.cos(a)*np.sin(b) + y*(np.cos(c)*np.sin(a)*np.sin(b) + np.cos(b)*np.sin(c)) + 
-                   x*(np.cos(b)*np.cos(c) - np.sin(a)*np.sin(b)*np.sin(c)),
-                   y*np.cos(a)*np.cos(c) + z*np.sin(a) - x*np.cos(a)*np.sin(c),
-                   z*np.cos(a)*np.cos(b) + x*(np.cos(c)*np.sin(b) + np.cos(b)*np.sin(a)*np.sin(c)) + 
-                       y*(-np.cos(b)*np.cos(c)*np.sin(a) + np.sin(b)*np.sin(c))])
-    
+    v1 = v0.dot(Ryxz(a,b,c))
     phi = np.arctan2( v1[1],v1[0] )
     theta = np.arccos( v1[2] )
     return v1,phi,theta
@@ -49,10 +54,15 @@ def convert_euler_to_polar(yxz):
     elif not type(yxz) is np.ndarray:
         raise Exception("Unexpected data type.")
 
-    v = np.array([0,0,1])
+    v = np.array([0,0,1.])
     phis,thetas = np.zeros((len(yxz))),np.zeros((len(yxz)))
     for i,r in enumerate(yxz):
         v,phis[i],thetas[i] = polar_angles(v,r[1],r[0],r[2])
+
+    # Account for discontinuities.
+    phis = np.unwrap(phis,discont=2*np.pi)
+    thetas = np.unwrap(thetas)
+
     return phis,thetas
 
 

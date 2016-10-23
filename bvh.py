@@ -9,7 +9,8 @@ import numpy as np
 
 def load(fname,includeDisplacement=False,removeBlank=True):
     """
-    Load data from BVD file. Data is typically given as the Euler angles.
+    Load data from BVD file. Euler angles are given as YXZ. Axis Neuron only keeps track of displacement for the hip.
+    Details about data files from Axis Neuron?
     2016-08-11
 
     Params:
@@ -52,7 +53,7 @@ def load(fname,includeDisplacement=False,removeBlank=True):
         while 'Frame Time' not in ln:
             ln = f.readline()
             lineix += 1
-        dt = float( ln.split(' ')[-1][:-2] )
+        dt = float( ln.split(' ')[-1] )
     
     s = nestedExpr('{','}').parseString(s).asList()
     nodes = []
@@ -101,6 +102,8 @@ def load(fname,includeDisplacement=False,removeBlank=True):
     if removeBlank:
         # Only keep entries that change at all.
         df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
+    # Units of radians and not degress.
+    df *= np.pi/180.
     return df,dt,skeleton
 
 
