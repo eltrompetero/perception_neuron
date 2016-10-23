@@ -12,7 +12,7 @@ import pandas as pd
 # ---------------------- #
 def Ryxz(a,b,c):
     """
-    BVH rotation matrix. As from cgkit's skeleton.py process_bvhkeyframe(). For multiplication on the right side of the vector to be transformed.
+    BVH rotation matrix. As from cgkit's skeleton.py process_bvhkeyframe(). For multiplication on the right side of the vector to be transformed. These rotation matrices are the canonical rotation matrices transposed (for left side multiplication).
     2016-10-23
     """
     ry = np.array([[cos(a),0,-sin(a)],[0,1,0],[sin(a),0,cos(a)]]).T
@@ -42,7 +42,7 @@ def polar_angles(v0,a,b,c):
 def convert_euler_to_polar(yxz):
     """
     Convert Euler angles into polar/azimuthal angles.
-    2016-08-12
+    2016-10-23
     
     Params:
     -------
@@ -54,10 +54,10 @@ def convert_euler_to_polar(yxz):
     elif not type(yxz) is np.ndarray:
         raise Exception("Unexpected data type.")
 
-    v = np.array([0,0,1.])
+    v0 = np.array([0,0,1.])
     phis,thetas = np.zeros((len(yxz))),np.zeros((len(yxz)))
     for i,r in enumerate(yxz):
-        v,phis[i],thetas[i] = polar_angles(v,r[1],r[0],r[2])
+        v,phis[i],thetas[i] = polar_angles(v0,r[1],r[0],r[2])
 
     # Account for discontinuities.
     phis = np.unwrap(phis,discont=2*np.pi)
