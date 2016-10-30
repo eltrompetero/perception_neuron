@@ -6,19 +6,69 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from numpy import sin,cos
 import pandas as pd
+from ising.heisenberg import rotate
+from scipy.interpolate import LSQUnivariateSpline
 
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def spline_smooth(t,Y):
+    """
+    Use quintic least squares spline to smooth given data in place.
+    2016-10-30
+
+    Params:
+    -------
+    t (vector)
+        Time of measurements
+    Y (ndarray) 
+        n_time x n_dim. Measurements.
+    """
+    dt = t[1]-t[0]
+    T = int(1/dt)
+    for i,y in enumerate(Y.T):
+        spline = LSQUnivariateSpline(t,y,t[T::T],k=5)
+        Y[:,i] = spline(t)
+    return
+
 def Ryxz(a,b,c):
     """
-    BVH rotation matrix. As from cgkit's skeleton.py process_bvhkeyframe(). For multiplication on the right side of the vector to be transformed. These rotation matrices are the canonical rotation matrices transposed (for left side multiplication).
-    2016-10-23
+    BVH rotation matrix. As from bvhplayer's skeleton.py process_bvhkeyframe(). For multiplication on the right side of the vector to be transformed. These rotation matrices are the canonical rotation matrices transposed (for left side multiplication).
+    The convention as stated in http://www.dcs.shef.ac.uk/intranet/research/public/resmes/CS0111.pdf does not correspond to that used in Perception Neuron. I tested this by collecting some data with my wrist moving in a circle. Reversing the order of the multiplication gives weird results whereas this one gives the correct results.
+    2016-10-24
     """
     ry = np.array([[cos(a),0,-sin(a)],[0,1,0],[sin(a),0,cos(a)]]).T
     rx = np.array([[1,0,0],[0,cos(b),sin(b)],[0,-sin(b),cos(b)]]).T
     rz = np.array([[cos(c),sin(c),0],[-sin(c),cos(c),0],[0,0,1]]).T
     return ry.dot(rx.dot(rz))
+
+def rotate_by_angles(v0,a,b,c,*args):
+    """
+    Rotate v0 by given set of angles. Assuming given Euler angles are in order of YXZ for left hand multiplication.
+    2016-10-23
+    
+    Params:
+    -------
+    v0
+    a,b,c (vectors)
+        Rotation angles.
+    *args (vectors)
+        More rotation angles. Children after the parents. Because this means that the children are multiplied further to the left and precede the vector to be rotated immediately.
+    """
+    assert (len(args)%3)==0
+
+    v = np.zeros((len(a),3))
+    if len(args)>0:
+        for i in xrange(len(a)):
+            R = Ryxz(a[i],b[i],c[i])
+            for j in xrange(len(args)//3):
+                R = R.dot(Ryxz(args[j*3][i],args[j*3+1][i],args[j*3+2][i]))
+            v[i] = v0.dot(R)
+    else:
+        for i in xrange(len(a)):
+            v[i] = v0.dot(Ryxz(a[i],b[i],c[i]))
+
+    return v
 
 def polar_angles(v0,a,b,c):
     """
@@ -64,6 +114,33 @@ def convert_euler_to_polar(yxz):
     thetas = np.unwrap(thetas)
 
     return phis,thetas
+
+def euler_to_vectors(*angles):
+    x0=np.array([0,0,1.])
+    x = rotate_by_angles(x0,*angles)
+    
+    # Normalize vector and rotate so that we can project easily onto x-y plane as defined
+    # by average vector.
+    xavg = x.mean(0)
+    xavg /= np.linalg.norm(xavg)
+    x /= np.linalg.norm(x,axis=1)[:,None]
+    
+    n = np.cross(xavg,np.array([0,0,1.]))
+    d = np.arccos(xavg[-1])
+    xavg = rotate( xavg, n, d )
+    x = rotate(x,n,d)
+    return x
+
+def extract_phase(*angles):
+    """
+    Extract phase given the Euler angles as output by BVH. Phase is defined as the xy angle in the 
+    plane of the average vector.
+    2016-10-23
+    """
+    x = euler_to_vectors(*angles)
+    
+    return np.unwrap(np.arctan2(x[:,1],x[:,0]),discont=np.pi)
+
 
 
 
@@ -114,22 +191,19 @@ def plot_positions(bp):
            zlim=[bp['yy'].min()/100,bp['yy'].max()/100])
     return fig
 
-def plot_euler_angles(bp):
+def plot_euler_angles(t,angles,setkwargs={},linestyles=['-','--','-.']):
     """
-    Plot the 3D angle rotations.
-    2016-08-11
-
-    Params:
-    -------
-    bp (pd.DataFrame)
+    2016-10-28
     """
-    fig = plt.figure(figsize=(10,10))
-    ax = fig.add_subplot(111,projection='3d')
-    
-    ax.plot(bp['x']/100,bp['z']/100,bp['y']/100,'o',alpha=.3)
-    ax.set(xlim=[bp['x'].min()/100,bp['x'].max()/100],
-           ylim=[bp['z'].min()/100,bp['z'].max()/100],
-           zlim=[bp['y'].min()/100,bp['y'].max()/100])
+    fig,ax = plt.subplots(figsize=(12,4))
+    for i,a in enumerate(angles):
+        ax.plot(t,a[:,0],'b'+linestyles[i])
+        ax.plot(t,a[:,1],'g'+linestyles[i])
+        ax.plot(t,a[:,2],'r'+linestyles[i])
+    ax.set(xlim=[0,t[-1]],ylim=[-np.pi,np.pi],xlabel='Time',ylabel='Euler angle',
+           yticks=[-np.pi,-np.pi/2,0,np.pi/2,np.pi],yticklabels=[r'$-\pi$',r'$-\pi/2$',r'$0$',r'$\pi/2$',r'$\pi$'],
+           **setkwargs)
+    ax.legend(('y','x','z'),fontsize='small',bbox_to_anchor=[1.15,1])
     return fig
 
 def plot_polar_angles(phis,thetas,dt):
@@ -167,4 +241,21 @@ def plot_polar_angles(phis,thetas,dt):
     ax[1].plot(dt*np.arange(len(phis)),thetas)
     ax[2].plot(phis,thetas,'.',alpha=.2)
     ax[2].set(xlim=[-np.pi,np.pi],ylim=[0,np.pi],xlabel=r'$\phi$',ylabel=r'$\theta$');
+    return fig
+
+def plot_unit_trajectory(*angles):
+    """
+    Extract phase given the Euler angles as output by BVH. Phase is defined as the xy angle in the 
+    plane of the average vector.
+    2016-10-23
+    """
+    x = euler_to_vectors(*angles)
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111,projection='3d')
+    ax.plot(x[:,0],x[:,1],x[:,2],alpha=.8,lw=10)
+#     ax.scatter(x[:,0],x[:,1],x[:,2],alpha=.8,lw=0,s=1000,
+#                c=[plt.cm.copper(i/len(x)) for i in xrange(len(x))])
+    ax.plot(x[:,0],x[:,1],np.zeros((len(x))),alpha=.7,lw=10)
+    ax.quiver(0,0,0,0,0,1,pivot='tail',lw=5)
     return fig
