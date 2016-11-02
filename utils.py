@@ -14,7 +14,7 @@ from scipy.interpolate import LSQUnivariateSpline
 # ---------------------- #
 def spline_smooth(t,Y):
     """
-    Use quintic least squares spline to smooth given data in place.
+    Use quintic least squares spline to smooth given data in place down the columns. Knots appear about every second as estimated from the inverse sampling rate.
     2016-10-30
 
     Params:
@@ -23,13 +23,19 @@ def spline_smooth(t,Y):
         Time of measurements
     Y (ndarray) 
         n_time x n_dim. Measurements.
+
+    Value:
+    ------
+    spline (list)
+        List of LSQUnivariateSpline instances for each col of input Y.
     """
     dt = t[1]-t[0]
     T = int(1/dt)
+    spline = []
     for i,y in enumerate(Y.T):
-        spline = LSQUnivariateSpline(t,y,t[T::T],k=5)
-        Y[:,i] = spline(t)
-    return
+        spline.append( LSQUnivariateSpline(t,y,t[T::T],k=5) )
+        Y[:,i] = spline[-1](t)
+    return spline
 
 def Ryxz(a,b,c):
     """
@@ -98,6 +104,10 @@ def convert_euler_to_polar(yxz):
     -------
     yxz (ndarray)
         With columns for rotation angles about y,x,z axes.
+
+    Value:
+    ------
+    phis,thetas
     """
     if type(yxz) is pd.core.frame.DataFrame:
         yxz = yxz.values
@@ -200,9 +210,9 @@ def plot_euler_angles(t,angles,setkwargs={},linestyles=['-','--','-.']):
         ax.plot(t,a[:,0],'b'+linestyles[i])
         ax.plot(t,a[:,1],'g'+linestyles[i])
         ax.plot(t,a[:,2],'r'+linestyles[i])
-    ax.set(xlim=[0,t[-1]],ylim=[-np.pi,np.pi],xlabel='Time',ylabel='Euler angle',
-           yticks=[-np.pi,-np.pi/2,0,np.pi/2,np.pi],yticklabels=[r'$-\pi$',r'$-\pi/2$',r'$0$',r'$\pi/2$',r'$\pi$'],
-           **setkwargs)
+    ax.set(xlim=[t[0],t[-1]],ylim=[-np.pi,np.pi],xlabel='Time',ylabel='Euler angle',
+           yticks=[-np.pi,-np.pi/2,0,np.pi/2,np.pi],yticklabels=[r'$-\pi$',r'$-\pi/2$',r'$0$',r'$\pi/2$',r'$\pi$'])
+    ax.set(**setkwargs)
     ax.legend(('y','x','z'),fontsize='small',bbox_to_anchor=[1.15,1])
     return fig
 
