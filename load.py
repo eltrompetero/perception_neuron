@@ -7,7 +7,7 @@ from __future__ import division
 import pandas as pd
 import numpy as np
 
-def load_calc(fname,skeleton=None):
+def load_calc(fname,skeleton=None,cols='V'):
     """
     Load calculation file output by Axis Neuron.
     2016-11-07
@@ -17,10 +17,18 @@ def load_calc(fname,skeleton=None):
     fname (str)
     skeleton (list of str)
         Names fo the bones specified in fname.
+    cols (str)
+        Data columns to keep. Columns are XVQAW (position, vel, quaternion, acc, angular vel)
     """
     df = pd.read_csv(fname,skiprows=5,sep='\t')
-    columns = list(df.columns)
     
+    # Only keep desired data points.
+    keepix = np.zeros((len(df.columns)),dtype=bool)
+    for s in cols:
+        keepix += np.array([s in c for c in df.columns])
+    df = df.ix[:,keepix]
+    columns = list(df.columns)
+
     # Rename numbered columns by body parts.
     if not skeleton is None:
         for i,s in enumerate(skeleton):
