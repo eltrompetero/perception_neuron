@@ -33,7 +33,7 @@ def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     """
     Load data from BVD file. Euler angles are given as YXZ. Axis Neuron only keeps track of displacement for the hip.
     Details about data files from Axis Neuron?
-    2016-08-11
+    2016-11-07
 
     Params:
     -------
@@ -43,6 +43,72 @@ def load_bvh(fname,includeDisplacement=False,removeBlank=True):
         If displacement data is included for everything including root.
     removeBlank (bool=True)
         Remove entries where nothing changes over the entire recording session. This should mean that there was nothing being recorded in that field.
+
+    Value:
+    ------
+    df (dataFrame)
+    dt (float)
+        Frame rate.
+    """
+    from itertools import chain
+    from pyparsing import nestedExpr
+    import string
+
+    skeleton = load_skeleton(fname)
+    bodyParts = skeleton.nodes
+
+    # Find the line where data starts.
+    lineix = 0
+    with open(fname) as f:
+        f.readline()
+        f.readline()
+        ln = f.readline()
+        lineix += 3
+        while not 'MOTION' in ln:
+            ln = f.readline()
+            lineix += 1
+        
+        # Read in the frame rate.
+        while 'Frame Time' not in ln:
+            ln = f.readline()
+            lineix += 1
+        dt = float( ln.split(' ')[-1] )
+    
+    # Parse motion.
+    df = pd.read_csv(fname,skiprows=lineix+2,delimiter=' ',header=None)
+    df = df.iloc[:,:-1]  # remove bad last col
+    
+    if includeDisplacement:
+        df.columns = pd.MultiIndex.from_arrays([list(chain.from_iterable([[b]*6 for b in bodyParts])),
+                                            ['xx','yy','zz','y','x','z']*len(bodyParts)])
+    else:
+        df.columns = pd.MultiIndex.from_arrays([[bodyParts[0]]*6 + 
+                                                 list(chain.from_iterable([[b]*3 for b in bodyParts[1:]])),
+                                            ['xx','yy','zz']+['y','x','z']*len(bodyParts)])
+   
+
+    # Filtering.
+    if removeBlank:
+        # Only keep entries that change at all.
+        df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
+    # Units of radians and not degress.
+    df *= np.pi/180.
+    return df,dt,skeleton
+
+def load_skeleton(fname):
+    """
+    Load skeleton from BVH file header. 
+    2016-11-07
+
+    Params:
+    -------
+    fname (str)
+        Name of file to load
+    includeDisplacement (bool=False)
+        If displacement data is included for everything including root.
+    removeBlank (bool=True)
+        Remove entries where nothing changes over the entire recording session. This should mean that there
+        was nothing being recorded in that field.
 
     Value:
     ------
@@ -107,28 +173,13 @@ def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     nodes = [nodes[i] for i in bodyPartsIx]
     skeleton = Tree(nodes) 
    
-    # Parse motion.
-    df = pd.read_csv(fname,skiprows=lineix+2,delimiter=' ',header=None)
-    df = df.iloc[:,:-1]  # remove bad last col
-    
-    if includeDisplacement:
-        df.columns = pd.MultiIndex.from_arrays([list(chain.from_iterable([[b]*6 for b in bodyParts])),
-                                            ['xx','yy','zz','y','x','z']*len(bodyParts)])
-    else:
-        df.columns = pd.MultiIndex.from_arrays([[bodyParts[0]]*6 + 
-                                                 list(chain.from_iterable([[b]*3 for b in bodyParts[1:]])),
-                                            ['xx','yy','zz']+['y','x','z']*len(bodyParts)])
-   
-
-    # Filtering.
-    if removeBlank:
-        # Only keep entries that change at all.
-        df = df.iloc[:,np.diff(df,axis=0).sum(0)!=0] 
-    # Units of radians and not degress.
-    df *= np.pi/180.
-    return df,dt,skeleton
+    return skeleton
 
 
+
+# ------------------ #
+# Class definitions. #
+# ------------------ #
 class Node(object):
     def __init__(self,name=None,parents=[],children=[]):
         self.name = name
