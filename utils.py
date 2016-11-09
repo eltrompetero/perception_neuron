@@ -8,10 +8,125 @@ from numpy import sin,cos
 import pandas as pd
 from ising.heisenberg import rotate
 from scipy.interpolate import LSQUnivariateSpline
+import entropy.entropy as info
+from scipy.signal import fftconvolve
 
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def moving_mean_smooth(x,filtDuration=12):
+    """
+    Wrapper for moving mean.
+    2016-11-09
+    
+    Params:
+    -------
+    x (vector)
+    filtDuration (float)
+        Moving mean filter duration in number of consecutive data points.
+    """
+    return fftconvolve(x,np.ones((filtDuration)),mode='same')
+
+def discrete_vel(v,timescale):
+    """
+    Smooth velocity with moving average, sample with frequency inversely proportional to width of moving
+    average and take the sign of the diff.
+    2016-11-09
+
+    Params:
+    -------
+    v (vector)
+    timescale (int)
+    """
+    vsmooth = moving_mean_smooth(v,timescale)
+    vsmooth = vsmooth[::timescale]
+    
+    change = np.sign(np.diff(vsmooth))
+    return change
+
+def convert_t_to_bins(timescale,dt):
+    """
+    Convert timescale given in units of seconds to bins for a moving average in the given sample. Remove
+    duplicate timescale entries that appear when this discretization to bins has occurred.
+    2016-11-07
+
+    Params:
+    -------
+    timescale (int)
+    dt (float)
+    """
+    discretetimescale = (timescale/dt).astype(int)
+    ix = np.unique(discretetimescale,return_index=True)[1]
+    return discretetimescale[ix],discretetimescale[ix]*dt
+
+def asym_mi(leader,follower,timescale):
+    """
+    Asymmetric MI using moving average.
+    2016-11-07
+    
+    Params:
+    -------
+    leader (vector)
+    follower (vector)
+    timescale (vector)
+        Given in units of the number of entries to skip in sample.
+    """
+    lchange = discrete_vel(leader,timescale)
+    fchange = discrete_vel(follower,timescale)
+
+    p = info.get_state_probs(np.vstack((lchange,fchange)).T,
+                             allstates=np.array([[1,1],[1,-1],[-1,1],[-1,-1]])).reshape((2,2))
+    samemi = info.MI(p)
+
+    p = info.get_state_probs(np.vstack((lchange[:-1],fchange[1:])).T,
+                             allstates=np.array([[1,1],[1,-1],[-1,1],[-1,-1]])).reshape((2,2))
+    ltofmi = info.MI(p)
+
+    p = info.get_state_probs(np.vstack((lchange[1:],fchange[:-1])).T,
+                             allstates=np.array([[1,1],[1,-1],[-1,1],[-1,-1]])).reshape((2,2))
+    ftolmi = info.MI(p)
+
+    return samemi,ltofmi,ftolmi
+
+def transfer_info(leader,follower,timescale):
+    """
+    Wrapper for computing transfer entropy between two trajectories using a binary representation.
+    2016-11-09
+    
+    Params:
+    -------
+    leader (vector)
+    follower (vector)
+    timescale (vector)
+        Given in units of the number of entries to skip in sample.
+    """
+    from entropy.transfer import TransferEntropy
+    te = TransferEntropy()
+    
+    lchange = discrete_vel(leader,timescale)
+    fchange = discrete_vel(follower,timescale)
+    
+    ltofinfo = te.n_step_transfer_entropy(lchange,fchange,discretize=False)
+    ftolinfo = te.n_step_transfer_entropy(fchange,lchange,discretize=False) 
+    return ltofinfo,ftolinfo
+
+def truncate(t,y,t0=10,t1=10):
+    """
+    Truncate ends of data set.
+    2016-11-07
+    """
+    timeix = np.logical_and(t>t0,t<(t[-1]-t1))
+    if type(y) is pd.core.frame.DataFrame:
+        if y.ndim==2:
+            return y.ix[timeix,:]
+        else:
+            return y.ix[timeix]
+    else:
+        if y.ndim==2:
+            return y[timeix,:]
+        else:
+            return y[timeix]
+
 def spline_smooth(t,Y):
     """
     Use quintic least squares spline to smooth given data in place down the columns. Knots appear about every second as estimated from the inverse sampling rate.
