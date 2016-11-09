@@ -40,7 +40,6 @@ def discrete_vel(v,timescale):
     """
     vsmooth = moving_mean_smooth(v,timescale)
     vsmooth = vsmooth[::timescale]
-    
     change = np.sign(np.diff(vsmooth))
     return change
 
@@ -105,7 +104,7 @@ def transfer_info(leader,follower,timescale):
     
     lchange = discrete_vel(leader,timescale)
     fchange = discrete_vel(follower,timescale)
-    
+
     ltofinfo = te.n_step_transfer_entropy(lchange,fchange,discretize=False)
     ftolinfo = te.n_step_transfer_entropy(fchange,lchange,discretize=False) 
     return ltofinfo,ftolinfo
