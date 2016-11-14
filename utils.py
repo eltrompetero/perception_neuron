@@ -7,7 +7,7 @@ import numpy as np
 from numpy import sin,cos
 import pandas as pd
 from ising.heisenberg import rotate
-from scipy.interpolate import LSQUnivariateSpline
+from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline
 import entropy.entropy as info
 from scipy.signal import fftconvolve
 
@@ -126,10 +126,11 @@ def truncate(t,y,t0=10,t1=10):
         else:
             return y[timeix]
 
-def spline_smooth(t,Y):
+def spline_smooth(t,Y,T=None,S=None,fixedKnots=True,spline_kwargs={}):
     """
-    Use quintic least squares spline to smooth given data in place down the columns. Knots appear about every second as estimated from the inverse sampling rate.
-    2016-10-30
+    Use quintic least squares spline to smooth given data in place down the columns. Knots appear about every
+    second as estimated from the inverse sampling rate.
+    2016-11-09
 
     Params:
     -------
@@ -137,18 +138,33 @@ def spline_smooth(t,Y):
         Time of measurements
     Y (ndarray) 
         n_time x n_dim. Measurements.
-
+    T (int=None)
+        Indices between knots.
+    S (float=None)
+        Smoothing factor for UnivariateSpline.
+    fixedKnots (bool=True)
+        If true, use the sampling rate as the default spacing between knots or the given T. Otherwise, use
+        smoothing factor method UnivariateSpline.
+        
     Value:
     ------
     spline (list)
         List of LSQUnivariateSpline instances for each col of input Y.
     """
-    dt = t[1]-t[0]
-    T = int(1/dt)
-    spline = []
-    for i,y in enumerate(Y.T):
-        spline.append( LSQUnivariateSpline(t,y,t[T::T],k=5) )
-        Y[:,i] = spline[-1](t)
+    if fixedKnots:
+        if T is None:
+            dt = t[1]-t[0]
+            T = int(1/dt)
+        spline = []
+        for i,y in enumerate(Y.T):
+            spline.append( LSQUnivariateSpline(t,y,t[T::T],k=5) )
+            Y[:,i] = spline[-1](t)
+    else:
+        spline = []
+        for i,y in enumerate(Y.T):
+            spline.append( UnivariateSpline(t,y,k=5,s=S,**spline_kwargs) )
+            Y[:,i] = spline[-1](t)
+
     return spline
 
 def Ryxz(a,b,c):
