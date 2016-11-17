@@ -74,7 +74,7 @@ def calc_file_body_parts():
             'LeftHandPinky2',
             'LeftHandPinky3']
 
-def load_calc(fname,skeleton=None,cols='V'):
+def load_calc(fname,cols='V'):
     """
     Load calculation file output by Axis Neuron.
     2016-11-07
@@ -97,10 +97,13 @@ def load_calc(fname,skeleton=None,cols='V'):
     columns = list(df.columns)
 
     # Rename numbered columns by body parts.
-    if not skeleton is None:
-        for i,s in enumerate(skeleton):
+    skeleton = calc_file_body_parts()
+    nameIx = 0
+    for i,s in enumerate(skeleton):
+        if not 'contact' in s:
             for j,c in enumerate(columns):
-                columns[j] = c.replace(str(i+1).zfill(2),s)
+                columns[j] = c.replace(str(nameIx+1).zfill(2),s)
+            nameIx += 1
     df.columns = columns
     return df
 
