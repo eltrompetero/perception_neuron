@@ -1,3 +1,4 @@
+# Edward Lee edl56@cornell.edu
 # 2016-08-11
 from __future__ import division
 import matplotlib.pyplot as plt
@@ -10,6 +11,7 @@ from ising.heisenberg import rotate
 from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline
 import entropy.entropy as info
 from scipy.signal import fftconvolve
+from misc.utils import unique_rows
 
 # ---------------------- #
 # Calculation functions. #
@@ -25,11 +27,16 @@ def moving_mean_smooth(x,filtDuration=12):
     filtDuration (float)
         Moving mean filter duration in number of consecutive data points.
     """
+    if x.ndim>1:
+        y = np.zeros_like(x)
+        for i in xrange(x.shape[1]):
+            y[:,i] = fftconvolve( x[:,i],np.ones((filtDuration)),mode='same' )
+        return y
     return fftconvolve(x,np.ones((filtDuration)),mode='same')
 
 def discrete_vel(v,timescale):
     """
-    Smooth velocity with moving average, sample with frequency inversely proportional to width of moving
+    Smooth velocity, sample with frequency inversely proportional to width of moving
     average and take the sign of the diff.
     2016-11-09
 
@@ -38,9 +45,11 @@ def discrete_vel(v,timescale):
     v (vector)
     timescale (int)
     """
-    vsmooth = moving_mean_smooth(v,timescale)
-    vsmooth = vsmooth[::timescale]
-    change = np.sign(np.diff(vsmooth))
+    vsmooth = v[::timescale]
+    if v.ndim>1:
+        change = np.sign(np.diff(vsmooth,axis=0))
+    else:
+        change = np.sign(np.diff(vsmooth))
     return change
 
 def convert_t_to_bins(timescale,dt):
@@ -104,6 +113,9 @@ def transfer_info(leader,follower,timescale):
     
     lchange = discrete_vel(leader,timescale)
     fchange = discrete_vel(follower,timescale)
+    
+    lchange = unique_rows(lchange,return_inverse=True)
+    fchange = unique_rows(fchange,return_inverse=True)
 
     ltofinfo = te.n_step_transfer_entropy(lchange,fchange,discretize=False)
     ftolinfo = te.n_step_transfer_entropy(fchange,lchange,discretize=False) 
