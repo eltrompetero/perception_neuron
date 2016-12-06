@@ -45,17 +45,24 @@ def discrete_vel(v,timescale):
     v (vector)
     timescale (int)
     """
+    # I commented out time average smoothing because it confuses the analysis for what information transfer
+    # actually means. It might be better to use Savitzky-Golay filtering or something like that. However,
+    # those are also fit by looking over many data points.
+    #vsmooth = moving_mean_smooth(v,timescale)[::timescale]
     vsmooth = v[::timescale]
+
     if v.ndim>1:
         change = np.sign(np.diff(vsmooth,axis=0))
     else:
         change = np.sign(np.diff(vsmooth))
+    
     return change
 
 def convert_t_to_bins(timescale,dt):
     """
     Convert timescale given in units of seconds to bins for a moving average in the given sample. Remove
-    duplicate timescale entries that appear when this discretization to bins has occurred.
+    duplicate timescale entries that appear when this discretization to bins has occurred. Only return lags
+    that are greater than 0.
     2016-11-07
 
     Params:
@@ -64,6 +71,7 @@ def convert_t_to_bins(timescale,dt):
     dt (float)
     """
     discretetimescale = (timescale/dt).astype(int)
+    discretetimescale = discretetimescale[discretetimescale>0]
     ix = np.unique(discretetimescale,return_index=True)[1]
     return discretetimescale[ix],discretetimescale[ix]*dt
 
@@ -114,8 +122,14 @@ def transfer_info(leader,follower,timescale):
     lchange = discrete_vel(leader,timescale)
     fchange = discrete_vel(follower,timescale)
     
-    lchange = unique_rows(lchange,return_inverse=True)
-    fchange = unique_rows(fchange,return_inverse=True)
+    if lchange.ndim>1:
+        lchange = unique_rows(lchange,return_inverse=True)
+    else:
+        lchange = unique_rows(lchange[:,None],return_inverse=True)
+    if fchange.ndim>1:
+        fchange = unique_rows(fchange,return_inverse=True)
+    else:
+        fchange = unique_rows(fchange[:,None],return_inverse=True)
 
     ltofinfo = te.n_step_transfer_entropy(lchange,fchange,discretize=False)
     ftolinfo = te.n_step_transfer_entropy(fchange,lchange,discretize=False) 

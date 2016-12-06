@@ -76,8 +76,9 @@ def calc_file_body_parts():
 
 def load_calc(fname,cols='V'):
     """
-    Load calculation file output by Axis Neuron.
-    2016-11-07
+    Load calculation file output by Axis Neuron. Rotate given vectors such that z-axis faces along given Zd
+    direction in calc file.
+    2016-12-05
 
     Params:
     -------
@@ -87,6 +88,8 @@ def load_calc(fname,cols='V'):
     cols (str)
         Data columns to keep. Columns are XVQAW (position, vel, quaternion, acc, angular vel)
     """
+    from ising.heisenberg import rotate
+
     df = pd.read_csv(fname,skiprows=5,sep='\t')
     
     # Only keep desired data points.
@@ -105,6 +108,16 @@ def load_calc(fname,cols='V'):
                 columns[j] = c.replace(str(nameIx+1).zfill(2),s)
             nameIx += 1
     df.columns = columns
+    
+    # Rotate vectors such that z-axis is along Zd axis.
+    with open(fname,'r') as f:
+        zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
+    n = np.cross(zd,np.array([-1,0,0]))
+    theta = np.arccos(zd.dot([-1,0,0]))
+    
+    for i in xrange(len(df.columns)):
+        if any([c+'-x' in df.columns[i] for c in cols]):
+            df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
     return df
 
 def load_bvh(fname,includeDisplacement=False,removeBlank=True):
