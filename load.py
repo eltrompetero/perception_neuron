@@ -78,6 +78,7 @@ def load_calc(fname,cols='V'):
     """
     Load calculation file output by Axis Neuron. Rotate given vectors such that z-axis faces along given Zd
     direction in calc file.
+    Be  careful because z-axis points into the ground by default.
     2016-12-05
 
     Params:
@@ -92,7 +93,7 @@ def load_calc(fname,cols='V'):
 
     df = pd.read_csv(fname,skiprows=5,sep='\t')
     
-    # Only keep desired data points.
+    # Only keep desired columns.
     keepix = np.zeros((len(df.columns)),dtype=bool)
     for s in cols:
         keepix += np.array([s in c for c in df.columns])
