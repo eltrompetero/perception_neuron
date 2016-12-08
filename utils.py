@@ -16,6 +16,21 @@ from misc.utils import unique_rows
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def initial_orientation(df):
+    """
+    Using the point between the hands and the z-vector to get the vector pointing between the two subjects.
+    Rotate the data about the midpoint between the hands
+    2016-12-07
+    """
+    handsIx = [skeleton.index('LeftHand'),skeleton.index('RightHand')]
+    handsvector = ( df.iloc[:10,handsIx[1]*9:handsIx[1]*9+3].mean(0).values-
+                    df.iloc[:10,handsIx[0]*9:handsIx[0]*9+3].mean(0).values )
+    handsvector[-1] = 0.
+    
+    bodyvec = np.cross(handsvector,[0,0,1.])
+    bodyvec /= np.linalg.norm(bodyvec)
+    return bodyvec
+
 def moving_mean_smooth(x,filtDuration=12):
     """
     Wrapper for moving mean.
@@ -313,6 +328,22 @@ def extract_phase(*angles):
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def plot_va_comparison(fig,ax,v1,v2,a1,a2,aOffset=0.,title=''):
+    ax[0].plot(v1,v2,'.',alpha=.2)
+    ax[0].plot([-.5,.5],[-.5,.5],'k-')
+    ax[0].set(xlabel='Leader vel',ylabel='Follower vel',
+              xlim=[-.5,.5],ylim=[-.5,.5])
+    [l.set_rotation(75) for l in ax[0].xaxis.get_ticklabels()]
+
+    ax[1].plot(a1,a2,'.',alpha=.2)
+    ax[1].plot([-1.5,1.5],[-1.5,1.5],'k-')
+    ax[1].set(xlim=[-.4+aOffset,.4+aOffset],ylim=[-.4+aOffset,.4+aOffset])
+    ax[1].set(xlabel='Leader acc',ylabel='Follower acc')
+    [l.set_rotation(75) for l in ax[1].xaxis.get_ticklabels()]
+    
+    fig.subplots_adjust(wspace=.5)
+    fig.text(.3,.95,title)
+
 def plot_hips_drift(hips,dt):
     gs = gridspec.GridSpec(2,3,wspace=.3)
     gs.update(wspace=.4)
