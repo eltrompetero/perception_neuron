@@ -17,6 +17,41 @@ import load
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def get_reshape_samples(sample,neighborsix):
+    """
+    Return samples from list of samples but reshaped as sample_length x n_dim.
+    2016-12-09
+    """
+    samples_ = sample[neighborsix]
+    samples_ = samples_.reshape(len(samples_),windowlen,3)
+    return samples_
+
+def get_samples(X,samplesix,windowlen,minusdt,plusdt):
+    """
+    Fetch specified samples of window length starting at samplesix and padded from data.
+    2016-12-09
+
+    Params:
+    -------
+    X (ndarray)
+        n_samples x n_dim
+    samplesix (list of ints)
+        Locations of samples to extract.
+    windowlen (int)
+    minusdt (int)
+        Left side padding
+    plusdt (int)
+
+    Value:
+    ------
+    sample (ndarray(
+        n_samples x sample_length x 3
+    """
+    sample = np.zeros((len(samplesix),windowlen+minusdt+plusdt+1,3))
+    for i,ix in enumerate(samplesix):
+        sample[i] = X[ix-minusdt:ix+windowlen+plusdt+1]
+    return sample
+
 def find_neighbors(samples,distThresh,neighborsSep=30):
     """
     Find set of nearest neighbors below a threshold (Euclidean metric) for each sample. Nearest neighbors
