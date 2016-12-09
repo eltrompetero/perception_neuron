@@ -12,16 +12,66 @@ from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline
 import entropy.entropy as info
 from scipy.signal import fftconvolve
 from misc.utils import unique_rows
+import load
 
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def find_neighbors(samples,distThresh,neighborsSep=30):
+    """
+    Find set of nearest neighbors below a threshold (Euclidean metric) for each sample. Nearest neighbors
+    should be separated by at least n frame.
+    2016-12-09
+    
+    Params:
+    -------
+    distThresh (float)
+        Cutoff for determining whether or not two samples are neighbors.
+    neighborSep (int=30)
+        Min separation between two found neighbors. This prevents the algorithm from returning basically the
+        same sample multiple times as a neighbor.
+
+    Value:
+    ------
+    neighbors
+        List of neighbors for each given sample including self as a neighbor.
+    nNneighbors
+        Length of each list of neighbors.
+    """
+    neighbors = []
+    for i in xrange(len(samples)):
+        ix = np.argwhere(norm(samples[i][None,:]-samples,axis=1)<distThresh).ravel()
+        if len(ix)>0:
+            ix = concatenate([[ix[0]],ix[argwhere(diff(ix)>neighborsSep).ravel()+1]])
+        neighbors.append(ix)
+    nNeighbors = np.array([len(i) for i in neighbors])
+    return neighbors,nNeighbors
+
+def sliding_sample(X,windowlen,):
+    """
+    Take samples from the given data sliding a flat window across it and taking all data points that fall into
+    the window.
+    2016-12-09
+    
+    Values:
+    -------
+    X (ndarray)
+        n_samples x n_dim
+    windowlen (int)
+        Width of sampling window.
+    """
+    samples = np.zeros((len(X)-windowlen,X.shape[1]*windowlen))
+    for i in xrange(len(X)-windowlen):
+        samples[i] = X[i:i+windowlen].ravel()
+    return samples
+
 def initial_orientation(df):
     """
     Using the point between the hands and the z-vector to get the vector pointing between the two subjects.
     Rotate the data about the midpoint between the hands
     2016-12-07
     """
+    skeleton = load.calc_file_body_parts() 
     handsIx = [skeleton.index('LeftHand'),skeleton.index('RightHand')]
     handsvector = ( df.iloc[:10,handsIx[1]*9:handsIx[1]*9+3].mean(0).values-
                     df.iloc[:10,handsIx[0]*9:handsIx[0]*9+3].mean(0).values )

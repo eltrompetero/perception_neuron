@@ -111,14 +111,13 @@ def load_calc(fname,cols='V'):
     df.columns = columns
     
     # Rotate vectors such that z-axis is along Zd axis.
-    with open(fname,'r') as f:
-        zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
-    n = np.cross(zd,np.array([-1,0,0]))
-    theta = np.arccos(zd.dot([-1,0,0]))
-    
-    for i in xrange(len(df.columns)):
-        if any([c+'-x' in df.columns[i] for c in cols]):
-            df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
+    #with open(fname,'r') as f:
+    #    zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
+    #n = np.cross(zd,np.array([-1,0,0]))
+    #theta = np.arccos(zd.dot([-1,0,0]))
+    #for i in xrange(len(df.columns)):
+    #    if any([c+'-x' in df.columns[i] for c in cols]):
+    #        df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
     return df
 
 def load_bvh(fname,includeDisplacement=False,removeBlank=True):
