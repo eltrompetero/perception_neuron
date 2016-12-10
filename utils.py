@@ -1,7 +1,10 @@
 # Edward Lee edl56@cornell.edu
 # 2016-08-11
 from __future__ import division
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print "Could not import matplotlib."
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -17,7 +20,7 @@ import load
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
-def get_reshape_samples(sample,neighborsix):
+def get_reshape_samples(sample,neighborsix,windowlen):
     """
     Return samples from list of samples but reshaped as sample_length x n_dim.
     2016-12-09
@@ -73,11 +76,13 @@ def find_neighbors(samples,distThresh,neighborsSep=30):
     nNneighbors
         Length of each list of neighbors.
     """
+    from numpy.linalg import norm
+
     neighbors = []
     for i in xrange(len(samples)):
         ix = np.argwhere(norm(samples[i][None,:]-samples,axis=1)<distThresh).ravel()
         if len(ix)>0:
-            ix = concatenate([[ix[0]],ix[argwhere(diff(ix)>neighborsSep).ravel()+1]])
+            ix = np.concatenate([[ix[0]],ix[np.argwhere(np.diff(ix)>neighborsSep).ravel()+1]])
         neighbors.append(ix)
     nNeighbors = np.array([len(i) for i in neighbors])
     return neighbors,nNeighbors
@@ -103,14 +108,29 @@ def sliding_sample(X,windowlen,):
 def initial_orientation(df):
     """
     Using the point between the hands and the z-vector to get the vector pointing between the two subjects.
-    Rotate the data about the midpoint between the hands
-    2016-12-07
+    Center the dataframe to the midpoint between the two hands in the xy plane.
+    2016-12-10
+
+    Params:
+    -------
+    df (pandas.DataFrame)
+        With XVA columns.
     """
     skeleton = load.calc_file_body_parts() 
+    upperix = skeleton.index('left foot contact')
+    
+    # Vector from the position of the left to the right hand at the initial stationary part.
     handsIx = [skeleton.index('LeftHand'),skeleton.index('RightHand')]
     handsvector = ( df.iloc[:10,handsIx[1]*9:handsIx[1]*9+3].mean(0).values-
                     df.iloc[:10,handsIx[0]*9:handsIx[0]*9+3].mean(0).values )
     handsvector[-1] = 0.
+
+    # Position between the hands.
+    midpoint = ( df.iloc[:10,handsIx[1]*9:handsIx[1]*9+3].mean(0).values+
+                 df.iloc[:10,handsIx[0]*9:handsIx[0]*9+3].mean(0).values )/2
+    midpoint[-1] = 0
+    for i in xrange(upperix):
+        df.values[:,i*9:i*9+3] -= midpoint[None,:]
     
     bodyvec = np.cross(handsvector,[0,0,1.])
     bodyvec /= np.linalg.norm(bodyvec)
@@ -415,9 +435,9 @@ def extract_phase(*angles):
 # ------------------- #
 def plot_va_comparison(fig,ax,v1,v2,a1,a2,aOffset=0.,title=''):
     ax[0].plot(v1,v2,'.',alpha=.2)
-    ax[0].plot([-.5,.5],[-.5,.5],'k-')
+    ax[0].plot([-1,1],[-1,1],'k-')
     ax[0].set(xlabel='Leader vel',ylabel='Follower vel',
-              xlim=[-.5,.5],ylim=[-.5,.5])
+              xlim=[-1,1],ylim=[-1,1])
     [l.set_rotation(75) for l in ax[0].xaxis.get_ticklabels()]
 
     ax[1].plot(a1,a2,'.',alpha=.2)
