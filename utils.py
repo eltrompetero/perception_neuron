@@ -109,6 +109,8 @@ def initial_orientation(df):
     """
     Using the point between the hands and the z-vector to get the vector pointing between the two subjects.
     Center the dataframe to the midpoint between the two hands in the xy plane.
+
+    It is not clear whether the z-axis is in the global up or pointing towards the ground.
     2016-12-10
 
     Params:
@@ -130,8 +132,9 @@ def initial_orientation(df):
                  df.iloc[:10,handsIx[0]*9:handsIx[0]*9+3].mean(0).values )/2
     midpoint[-1] = 0
     for i in xrange(upperix):
+        # Only need to subtract midpoint from X values which are the first three cols of each set.
         df.values[:,i*9:i*9+3] -= midpoint[None,:]
-    
+
     bodyvec = np.cross(handsvector,[0,0,1.])
     bodyvec /= np.linalg.norm(bodyvec)
     return bodyvec

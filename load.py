@@ -6,6 +6,7 @@
 from __future__ import division
 import pandas as pd
 import numpy as np
+from utils import *
 
 def calc_file_body_parts():
     """
@@ -110,7 +111,8 @@ def load_calc(fname,cols='V'):
             nameIx += 1
     df.columns = columns
     
-    # Rotate vectors such that z-axis is along Zd axis.
+    # Rotate vectors such that x-axis is along Zd axis.
+    # NOTE: What is the Zd axis?
     #with open(fname,'r') as f:
     #    zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
     #n = np.cross(zd,np.array([-1,0,0]))
@@ -119,6 +121,130 @@ def load_calc(fname,cols='V'):
     #    if any([c+'-x' in df.columns[i] for c in cols]):
     #        df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
     return df
+
+def extract_calc(fname,dr,bodyparts,dt,append=True,dotruncate=True):
+    """
+    Extract specific set of body parts from calculation file. If a file with coordination of hands is given,
+    then I have to align the subjects to a global coordinate frame defined by the initial orientation of their
+    hands.
+
+    The slowest part is loading the data from file.
+    2016-12-10
+
+    Params:
+    -------
+    fname (str)
+    dr (str)
+    bodyparts (list of list of strings)
+        First list is for leader and second list is for follower.
+    dt (float)
+    append (bool=True)
+        Whether or not to keep list of data from bodyparts or to add all the velocities and acceleration
+        together.
+    dotruncate (bool=True)
+
+    Value:
+    ------
+    T,leaderX,leaderV,leaderA,followerX,followerV,followerA
+    """
+    skeleton = calc_file_body_parts()
+
+    # Read position, velocity and acceleration data from files.
+    print "Loading file %s"%fname
+    leaderix = 1 if ('F' in fname.split(' ')[1]) else 0
+    if not 'leaderdf' in globals():
+        characters = [fname.split(' ')[0],fname.split(' ')[2]]
+        leaderdf = load_calc('%s%s%s.calc'%(dr,fname,characters[leaderix]),cols='XVA')
+        followerdf = load_calc('%s%s%s.calc'%(dr,fname,characters[1-leaderix]),cols='XVA')
+        
+        T = np.arange(len(followerdf))*dt
+
+    if 'Hands' in fname:
+        # The correction for the hands is a bit involved. First, I remove the drift from the hips from all
+        # the position of all body parts. Then, take the hands, and center them by their midpoint. Then
+        # I rotate their positions so that the leader and follower are facing each other. For some reason,
+        # the calc data sometimes has them facing parallel directions. Remember that the z-axis is pointing
+        # into the ground!
+
+        # Remove drift in hips.
+        Xix = np.array(['X' in c for c in leaderdf.columns])
+        leaderdf.iloc[:,Xix] -= np.tile(leaderdf.iloc[:,:3],(1,leaderdf.shape[1]//9))
+        followerdf.iloc[:,Xix] -= np.tile(followerdf.iloc[:,:3],(1,followerdf.shape[1]//9))
+
+        # Use initial condition to set orientation of subjects, 
+        bodyvec = [initial_orientation(leaderdf),initial_orientation(followerdf)]
+
+    # Select out the body parts that we want.
+    bodypartix = [[skeleton.index(b) for b in bodyparts_] 
+                   for bodyparts_ in bodyparts]
+    
+    if append:
+        leaderX,leaderV,leaderA,followerX,followerV,followerA = [],[],[],[],[],[]
+        for i,ix in enumerate(bodypartix[leaderix]):
+            leaderX.append( leaderdf.values[:,ix*9:ix*9+3].copy() ) 
+            leaderV.append( leaderdf.values[:,ix*9+3:ix*9+6].copy() ) 
+            leaderA.append( leaderdf.values[:,ix*9+6:ix*9+9].copy() ) 
+        for i,ix in enumerate(bodypartix[1-leaderix]):
+            followerX.append( followerdf.values[:,ix*9:ix*9+3].copy() )
+            followerV.append( followerdf.values[:,ix*9+3:ix*9+6].copy() )
+            followerA.append( followerdf.values[:,ix*9+6:ix*9+9].copy() )
+    else:
+        for i,ix in enumerate(bodypartix[leaderix]):
+            if i==0:
+                leaderX = [leaderdf.values[:,ix*9:ix*9+3].copy()]
+                leaderV = [leaderdf.values[:,ix*9+3:ix*9+6].copy()]
+                leaderA = [leaderdf.values[:,ix*9+6:ix*9+9].copy()]
+            else:
+                leaderV[0] += leaderdf.values[:,ix*9+3:ix*9+6]
+                leaderA[0] += leaderdf.values[:,ix*9+6:ix*9+9]
+                
+        for i,ix in enumerate(bodypartix[1-leaderix]):
+            if i==0:
+                followerX = [followerdf.values[:,ix*9:ix*9+3].copy()]
+                followerV = [followerdf.values[:,ix*9+3:ix*9+6].copy()]
+                followerA = [followerdf.values[:,ix*9+6:ix*9+9].copy()]
+            else:
+                followerV[0] += followerdf.values[:,ix*9+3:ix*9+6]
+                followerA[0] += followerdf.values[:,ix*9+6:ix*9+9]
+
+    if 'Hands' in fname:
+        # Make sure that first dimension corresponds to the axis towards the other person.
+        # Make the leader face towards ([1,0,0]) and the follower towards [-1,0,0].
+        phi = []
+        phi.append(np.arccos(bodyvec[0][0]) if bodyvec[0][1]<0 else -np.arccos(bodyvec[0][0]))
+        phi.append(np.arccos(-bodyvec[1][0]) if (-bodyvec[1][1])<0 else -np.arccos(-bodyvec[1][0]))
+        
+        for x,v,a in zip(leaderX,leaderV,leaderA):
+            x[:,:] = rotate(x,np.array([0,0,1.]),phi[0])
+            v[:,:] = rotate(v,np.array([0,0,1.]),phi[0])
+            a[:,:] = rotate(a,np.array([0,0,1.]),phi[0])
+        for x,v,a in zip(followerX,followerV,followerA):
+            x[:,:] = rotate(x,np.array([0,0,1.]),phi[1])
+            v[:,:] = rotate(v,np.array([0,0,1.]),phi[1])
+            a[:,:] = rotate(a,np.array([0,0,1.]),phi[1])
+
+        # Shift subjects away from each other so that they're actually facing each over a gap.
+        for i,s in enumerate(bodyparts):
+            if 'Right' in s or 'Left' in s:
+                leaderX[i][:,0] -= 1
+                followerX[i][:,0] += 1
+            
+                # Reflect follower about mirror over the axis parallel to the "mirror."
+                followerV[i][:,0] *= -1
+                followerA[i][:,0] *= -1
+
+    # Truncate beginning and ends of data set.
+    if dotruncate:
+        for x,v,a in zip(leaderX,leaderV,leaderA):
+            x = truncate(T,x,t0=5,t1=5)
+            v = truncate(T,v,t0=5,t1=5)
+            a = truncate(T,a,t0=5,t1=5)
+        for x,v,a in zip(followerX,followerV,followerA):
+            x = truncate(T,x,t0=5,t1=5)
+            v = truncate(T,v,t0=5,t1=5)
+            a = truncate(T,a,t0=5,t1=5)
+        T = truncate(T,T,t0=5,t1=5)
+    return T,leaderX,leaderV,leaderA,followerX,followerV,followerA
 
 def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     """
