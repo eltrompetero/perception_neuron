@@ -436,6 +436,28 @@ def extract_phase(*angles):
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def plot_xva_comparison(fig,ax,x1,x2,v1,v2,a1,a2,aOffset=0.,title=''):
+    ax[0].plot(x1,x2,'.',alpha=.2)
+    ax[0].plot([-1,1],[-1,1],'k-')
+    ax[0].set(xlabel='Leader pos',ylabel='Follower pos',
+              xlim=[-1,1],ylim=[-1,1])
+    [l.set_rotation(75) for l in ax[0].xaxis.get_ticklabels()]
+    
+    ax[1].plot(v1,v2,'.',alpha=.2)
+    ax[1].plot([-1,1],[-1,1],'k-')
+    ax[1].set(xlabel='Leader vel',ylabel='Follower vel',
+              xlim=[-1,1],ylim=[-1,1])
+    [l.set_rotation(75) for l in ax[1].xaxis.get_ticklabels()]
+
+    ax[2].plot(a1,a2,'.',alpha=.2)
+    ax[2].plot([-1.5,1.5],[-1.5,1.5],'k-')
+    ax[2].set(xlim=[-.4+aOffset,.4+aOffset],ylim=[-.4+aOffset,.4+aOffset])
+    ax[2].set(xlabel='Leader acc',ylabel='Follower acc')
+    [l.set_rotation(75) for l in ax[2].xaxis.get_ticklabels()]
+    
+    fig.subplots_adjust(wspace=.5)
+    fig.text(.3,.95,title)
+
 def plot_va_comparison(fig,ax,v1,v2,a1,a2,aOffset=0.,title=''):
     ax[0].plot(v1,v2,'.',alpha=.2)
     ax[0].plot([-1,1],[-1,1],'k-')
