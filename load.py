@@ -128,6 +128,8 @@ def extract_calc(fname,dr,bodyparts,dt,append=True,dotruncate=True):
     then I have to align the subjects to a global coordinate frame defined by the initial orientation of their
     hands.
 
+    For import of hands, the first axis is the direction along which the subjects are aligned.
+
     The slowest part is loading the data from file.
     2016-12-10
 
