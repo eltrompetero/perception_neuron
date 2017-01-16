@@ -1,6 +1,9 @@
-# Edward Lee edl56@cornell.edu
+# Module for loading and extracting data from perception neuron files.
+#
 # Classes:
 # Node, Tree
+# 
+# Edward D. Lee edl56@cornell.edu
 # 2016-08-11
 
 from __future__ import division
@@ -77,9 +80,8 @@ def calc_file_body_parts():
 
 def load_calc(fname,cols='V'):
     """
-    Load calculation file output by Axis Neuron. Rotate given vectors such that z-axis faces along given Zd
-    direction in calc file.
-    Be  careful because z-axis points into the ground by default.
+    Load calculation file output by Axis Neuron. 
+    Be careful with z-axis that points into the ground by default.
     2016-12-05
 
     Params:
@@ -112,7 +114,7 @@ def load_calc(fname,cols='V'):
     df.columns = columns
     
     # Rotate vectors such that x-axis is along Zd axis.
-    # NOTE: What is the Zd axis?
+    # NOTE: What is the Zd axis? It's the original direction that the wearer is facing.
     #with open(fname,'r') as f:
     #    zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
     #n = np.cross(zd,np.array([-1,0,0]))

@@ -429,7 +429,7 @@ def extract_phase(*angles):
     x = euler_to_vectors(*angles)
     
     return np.unwrap(np.arctan2(x[:,1],x[:,0]),discont=np.pi)
-
+# End calculation files
 
 
 
