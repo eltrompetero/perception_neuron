@@ -1,5 +1,8 @@
+# A lot of smaller helper functions used for manipulating Axis Neuron files.
+# 
 # Edward Lee edl56@cornell.edu
 # 2016-08-11
+
 from __future__ import division
 try:
     import matplotlib.pyplot as plt
@@ -110,7 +113,7 @@ def initial_orientation(df):
     Using the point between the hands and the z-vector to get the vector pointing between the two subjects.
     Center the dataframe to the midpoint between the two hands in the xy plane.
 
-    It is not clear whether the z-axis is in the global up or pointing towards the ground.
+    z-axis points towards the ground.
     2016-12-10
 
     Params:
@@ -135,7 +138,7 @@ def initial_orientation(df):
         # Only need to subtract midpoint from X values which are the first three cols of each set.
         df.values[:,i*9:i*9+3] -= midpoint[None,:]
 
-    bodyvec = np.cross(handsvector,[0,0,1.])
+    bodyvec = np.cross(handsvector,[0,0,-1.])
     bodyvec /= np.linalg.norm(bodyvec)
     return bodyvec
 
