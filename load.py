@@ -1,4 +1,4 @@
-# Module for loading and extracting data from perception neuron files.
+# Module for loading and extracting data from Axis Neuron files.
 #
 # Classes:
 # Node, Tree
@@ -113,18 +113,21 @@ def load_calc(fname,cols='V'):
             nameIx += 1
     df.columns = columns
     
-    # Rotate vectors such that x-axis is along Zd axis.
-    # NOTE: What is the Zd axis? It's the original direction that the wearer is facing.
-    #with open(fname,'r') as f:
-    #    zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
+    # Read Zd axis, the original direction that the wearer is facing.
+    with open(fname,'r') as f:
+        zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
     #n = np.cross(zd,np.array([-1,0,0]))
     #theta = np.arccos(zd.dot([-1,0,0]))
     #for i in xrange(len(df.columns)):
     #    if any([c+'-x' in df.columns[i] for c in cols]):
     #        df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
-    return df
+    return df,zd
 
-def extract_calc(fname,dr,bodyparts,dt,append=True,dotruncate=True):
+def extract_calc(fname,dr,bodyparts,dt,
+                 append=True,
+                 dotruncate=True,
+                 usezd=False
+                ):
     """
     Extract specific set of body parts from calculation file. If a file with coordination of hands is given,
     then I have to align the subjects to a global coordinate frame defined by the initial orientation of their
@@ -133,7 +136,7 @@ def extract_calc(fname,dr,bodyparts,dt,append=True,dotruncate=True):
     For import of hands, the first axis is the direction along which the subjects are aligned.
 
     The slowest part is loading the data from file.
-    2016-12-10
+    2017-01-16
 
     Params:
     -------
@@ -146,6 +149,10 @@ def extract_calc(fname,dr,bodyparts,dt,append=True,dotruncate=True):
         Whether or not to keep list of data from bodyparts or to add all the velocities and acceleration
         together.
     dotruncate (bool=True)
+    usezd (bool=True)
+        Get initial body orientation from calc file's Zd entry. This seems to not work as well in capturing
+        the 3 dimension of hand movement. I'm not sure why, but I would assume because the orientation between
+        hands and the body is not totally accurate according to Axis Neuron.
 
     Value:
     ------
@@ -158,8 +165,8 @@ def extract_calc(fname,dr,bodyparts,dt,append=True,dotruncate=True):
     leaderix = 1 if ('F' in fname.split(' ')[1]) else 0
     if not 'leaderdf' in globals():
         characters = [fname.split(' ')[0],fname.split(' ')[2]]
-        leaderdf = load_calc('%s%s%s.calc'%(dr,fname,characters[leaderix]),cols='XVA')
-        followerdf = load_calc('%s%s%s.calc'%(dr,fname,characters[1-leaderix]),cols='XVA')
+        leaderdf,leaderzd = load_calc('%s%s%s.calc'%(dr,fname,characters[leaderix]),cols='XVA')
+        followerdf,followerzd = load_calc('%s%s%s.calc'%(dr,fname,characters[1-leaderix]),cols='XVA')
         
         T = np.arange(len(followerdf))*dt
 
@@ -176,7 +183,10 @@ def extract_calc(fname,dr,bodyparts,dt,append=True,dotruncate=True):
         followerdf.iloc[:,Xix] -= np.tile(followerdf.iloc[:,:3],(1,followerdf.shape[1]//9))
 
         # Use initial condition to set orientation of subjects, 
-        bodyvec = [initial_orientation(leaderdf),initial_orientation(followerdf)]
+        if usezd:
+            bodyvec=[leaderzd,followerzd]
+        else:
+            bodyvec = [initial_orientation(leaderdf),initial_orientation(followerdf)]
 
     # Select out the body parts that we want.
     bodypartix = [[skeleton.index(b) for b in bodyparts_] 
