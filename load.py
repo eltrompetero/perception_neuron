@@ -3,13 +3,55 @@
 # Classes:
 # Node, Tree
 # 
-# Edward D. Lee edl56@cornell.edu
+# Author: Edward D. Lee
+# Email: edl56@cornell.edu
 # 2016-08-11
 
 from __future__ import division
 import pandas as pd
 import numpy as np
 from utils import *
+
+def get_fnames():
+    return ['Eddie L Caeli F March',
+          'Eddie F Caeli L March',
+          'Eddie J Caeli J Tango',
+          'Eddie F Caeli L Tango',
+          'Eddie L Caeli F Tango',
+          'Caeli (L) Vincent (F) March',
+          'Caeli (F) Vincent (L) March',
+          'Caeli (L) Vincent (F) Tango',
+          'Caeli (F) Vincent (L) Tango',
+          'Caeli (J) Vincent (J) Tango',
+          'Caeli (L) Vincent (F) Hands',
+          'Caeli (F) Vincent (L) Hands',
+          'Caeli (J) Vincent (J) Hands',
+          'Itai (L) Anja (F) March',
+          'Itai (F) Anja (L) March',
+          'Itai (L) Anja (F) Tango',
+          'Itai (F) Anja (L) Tango',
+          'Itai (J) Anja (J) Tango',
+          'Itai (L) Anja (F) Hands',
+          'Itai (F) Anja (L) Hands',
+          'Itai (J) Anja (J) Hands',
+          'Itai (J) Anja (J) Hands_1']
+
+def get_dr(fname):
+    if 'Itai' in fname and 'Anja' in fname:
+        return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
+    elif 'Caeli' in fname and 'Vincent' in fname:
+        return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
+    else:
+        raise Exception("Invalid file name.")
+
+def print_files():
+    """
+    Print list of available file names with their indices to make it easy to load them.
+    2017-01-18
+    """
+    fnames=get_fnames()
+    for i,f in enumerate(fnames):
+        print "%d\t%s"%(i,f)
 
 def calc_file_body_parts():
     """
