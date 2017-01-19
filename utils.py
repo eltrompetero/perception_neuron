@@ -52,6 +52,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     if measure=='dot':
         v1=v1/norm1(v1)[:,None]
         v2=v2/norm1(v2)[:,None]
+        print(norm1(v1)[:10])
 
         for i in xrange(maxshift,len(v1)-maxshift-windowlength):
             window=v2[i:i+windowlength]
@@ -80,7 +81,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
 @jit
 def norm1(x):
     """Helper function for phase_lag()"""
-    return (x*x).sum(axis=1)
+    return np.sqrt((x*x).sum(axis=1))
 
 def smooth(x,window=61,order=4):
     """
