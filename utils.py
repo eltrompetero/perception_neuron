@@ -23,6 +23,28 @@ import load
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def smooth(x,window=61,order=4):
+    """
+    Smooth multidimensional curve. Currently, using Savitzy-Golay on each
+    dimension independently. Ideally, I would implememnt some sort of smoothing
+    algorithm that accounts for relationships between the different dimensions.
+    2017-01-19
+
+    Params:
+    -------
+    x (ndarray)
+        n_samples x n_dim
+    """
+    from scipy.signal import savgol_filter
+
+    if x.ndim==1:
+        return savgol_filter(x,window,order)
+    
+    xfiltered=np.zeros_like(x)
+    for i in xrange(x.shape[1]):
+        xfiltered[:,i]=savgol_filter(x[:,i],window,order)
+    return xfiltered
+    
 def get_reshape_samples(sample,neighborsix,windowlen):
     """
     Return samples from list of samples but reshaped as sample_length x n_dim.
@@ -34,7 +56,8 @@ def get_reshape_samples(sample,neighborsix,windowlen):
 
 def get_samples(X,samplesix,windowlen,minusdt,plusdt):
     """
-    Fetch specified samples of window length starting at samplesix and padded from data.
+    Fetch specified samples of window length starting at samplesix and padded
+    from data.
     2016-12-09
 
     Params:
