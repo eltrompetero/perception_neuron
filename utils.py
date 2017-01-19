@@ -79,6 +79,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
 
 @jit
 def norm1(x):
+    """Helper function for phase_lag()"""
     return (x*x).sum(axis=1)
 
 def smooth(x,window=61,order=4):
