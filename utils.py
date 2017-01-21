@@ -24,6 +24,63 @@ from numba import jit
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleFreq=60):
+    """
+    Moving frequency filter using Butterworth lowpass filter. First, construct windowed input as given
+    window type is dragged across. Frequency filter each of those samples and then add them all up 
+    back together to get the filtered signal.
+    2017-01-21
+    
+    Params:
+    -------
+    s (ndarray)
+        1d signal
+    window (int=61)
+        Window width.
+    windowType (tuple)
+        ('Gaussian',20) as input to scipy.signal.get_window()
+    cutoffFreq (float=5)
+        Cutoff frequency for butterworth filter.
+    sampleFreq (float=60)
+        Sampling frequency of input signal.
+    """
+    assert (window%2)==1, "Window width must be odd."
+    from scipy.signal import get_window
+    
+    T=len(s)
+    swindow=np.zeros((T,T))  # windowed input
+
+    # Normalize the window. Each point gets hit with every part of window once (except boundaries).
+    window=get_window(windowType,window)
+    window/=window.sum()
+
+    # Extract subsets of data while window is moving across.
+    for i in xrange(len(window)//2+1):
+        swindow[i,:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
+
+    for i in xrange(len(window)//2+1,T-len(window)//2-1):
+        swindow[i,i-len(window)//2:i+len(window)//2+1]=s[i-len(window)//2:i+len(window)//2+1]*window
+
+    counter=0
+    for i in xrange(T-len(window)//2-1,T):
+        swindow[i,i-len(window)//2:T]=window[:len(window)-counter]*s[i-len(window)//2:T]
+        counter += 1
+    
+    # Properly normalize window at boundaries.
+    for i in xrange(len(window)//2+1):
+        swindow[:len(window)//2+1+i,i] /= window[:len(window)//2+i+1].sum()
+
+    counter=0
+    for i in xrange(T-len(window)//2-1,T):
+        swindow[T-len(window)-1+counter:,i] /= window[counter:].sum()
+        counter += 1
+
+    # Apply frequency filter.
+    swindowfilt=butter_lowpass_filter(swindow,cutoffFreq,sampleFreq,axis=1)
+    sfilter=swindowfilt.sum(0)
+    
+    return sfilter
+
 @jit
 def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     """
@@ -52,7 +109,6 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     if measure=='dot':
         v1=v1/norm1(v1)[:,None]
         v2=v2/norm1(v2)[:,None]
-        print(norm1(v1)[:10])
 
         for i in xrange(maxshift,len(v1)-maxshift-windowlength):
             window=v2[i:i+windowlength]
@@ -83,28 +139,93 @@ def norm1(x):
     """Helper function for phase_lag()"""
     return np.sqrt((x*x).sum(axis=1))
 
-def smooth(x,window=61,order=4):
+def smooth(x,filtertype='sav',filterparams={'window':61,'order':4}):
     """
     Smooth multidimensional curve. Currently, using Savitzy-Golay on each
     dimension independently. Ideally, I would implememnt some sort of smoothing
     algorithm that accounts for relationships between the different dimensions.
-    2017-01-19
+    2017-01-20
 
     Params:
     -------
     x (ndarray)
         n_samples x n_dim
+    filtertype (str='sav')
+        'sav' or 'butter'
+    filterparams (dict)
+        savitzy-Golay: window, order
+        Butter: cutoff, fs
     """
-    from scipy.signal import savgol_filter
+    if filtertype=='sav':
+        from scipy.signal import savgol_filter
 
-    if x.ndim==1:
-        return savgol_filter(x,window,order)
-    
-    xfiltered=np.zeros_like(x)
-    for i in xrange(x.shape[1]):
-        xfiltered[:,i]=savgol_filter(x[:,i],window,order)
+        if x.ndim==1:
+            return savgol_filter(x,
+                                 filterparams['window'],filterparams['order'])
+        
+        xfiltered=np.zeros_like(x)
+        for i in xrange(x.shape[1]):
+            xfiltered[:,i]=savgol_filter(x[:,i],window,order)
+    elif filtertype=='butter':
+        if x.ndim==1:
+            axis=-1
+        else:
+            axis=0
+        xfiltered=butter_lowpass_filter(x,
+                                        filterparams['cutoff'],
+                                        filterparams['fs'],
+                                        axis=axis) 
+    elif filtertype=='moving_butter':
+        if x.ndim==1:
+            xfiltered=moving_freq_filt(x)
+        else:
+            xfiltered=np.vstack([moving_freq_filt(x[:,i],
+                                                  cutoffFreq=filterparams['cutoff'],
+                                                  sampleFreq=filterparams['fs'])
+                                 for i in xrange(x.shape[1])]).T
+    else: raise Exception("Invalid filter option.")
     return xfiltered
-    
+ 
+def butter_lowpass(cutoff,fs, order=5):
+    from scipy.signal import butter
+    nyq = 0.5 * fs
+    cutoff /= nyq
+    b, a = butter( order, cutoff )
+    return b, a
+
+def butter_lowpass_filter(data, cutoff, fs, order=5, axis=0, **kwargs):
+    """
+    Forward-backward call to Butterworth filter. This applies the filter in the forwards direction and then
+    backwards and the result is in phase with the data.
+    2015-10-18
+
+    Params:
+    -------
+    data (ndarray)
+    cutoff (float)
+        max frequency in Hz corresponding to frequency at which gain goes to -3dB, or 1/sqrt(2)
+    fs (float)
+        sample frequency in Hz
+    order (5,int)
+        order of Buttworth filter
+    """
+    from scipy.signal import filtfilt
+    b,a = butter_lowpass(cutoff,fs,order)
+    return filtfilt( b,a,data,axis=axis, **kwargs)
+
+def butter_plot(ax, b, a, fs):
+    """Show plot of filter gain.
+    2015-09-09
+    """
+    w, h = signal.freqz(b, a)
+    ax.semilogx(w*.5*fs/np.pi, 20 * np.log10(abs(h)))
+    ax.set(title='Butterworth filter frequency response',
+           xlabel='Frequency [Hz]',
+           ylabel='Amplitude [dB]',ylim=[-5,1])
+    #ax.margins(0, 0.1)
+    ax.grid(which='both', axis='both')
+    ax.axvline(10, color='green') # cutoff frequency
+   
 def get_reshape_samples(sample,neighborsix,windowlen):
     """
     Return samples from list of samples but reshaped as sample_length x n_dim.
