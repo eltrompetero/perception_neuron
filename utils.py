@@ -86,7 +86,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     """
     Find index shift that would maximize the overlap between two different time series. This involves taking
     windows of one series and moving across the other time series to find maximal agreement.
-    2017-01-19
+    2017-01-21
 
     Params:
     -------
@@ -102,8 +102,16 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     dt (float=1)
         Amount of time that each index increment corresponds to. This determines the units that the phase is
         returned as.
+
+    Returns:
+    --------
+    phase
+        Phase difference in units of dt.
+    overlaperror
+        Max overlap measure used to determine phase lag.
     """
     phase=np.zeros((len(v1)-2*maxshift))
+    overlaperror=np.zeros((len(v1)-2*maxshift))
     counter=0
 
     if measure=='dot':
@@ -118,21 +126,23 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
                 background=v1[i-maxshift+j:i-maxshift+windowlength+j]
                 overlapcost[j]=(window*background).sum()
             phase[counter]=(np.argmax(overlapcost)-maxshift)*-dt
+            overlaperror[counter]=overlapcost.max()
             counter+=1 
     elif measure=='corr':
         assert v1.ndim==1 and v2.ndim==1
         for i in xrange(maxshift,len(v1)-maxshift-windowlength):
             window=v2[i:i+windowlength]
-            windowstd=window.std()
+            windowmean,windowstd=window.mean(),window.std()
             
             overlapcost=np.zeros((2*maxshift))
             for j in xrange(maxshift*2):
                 background=v1[i-maxshift+j:i-maxshift+windowlength+j]
-                overlapcost[j]=(window*background).mean()/windowstd/background.std()
+                overlapcost[j]=((window*background).mean()-windowmean*background.mean())/windowstd/background.std()
             phase[counter]=(np.argmax(overlapcost)-maxshift)*-dt
+            overlaperror[counter]=overlapcost.max()
             counter+=1 
     else: raise Exception("Bad correlation measure option.")
-    return phase
+    return phase,overlaperror
 
 @jit
 def norm1(x):
