@@ -124,7 +124,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
             overlapcost=np.zeros((2*maxshift))
             for j in xrange(maxshift*2):
                 background=v1[i-maxshift+j:i-maxshift+windowlength+j]
-                overlapcost[j]=(window*background).sum()
+                overlapcost[j]=(window*background).sum(1).mean()
             phase[counter]=(np.argmax(overlapcost)-maxshift)*-dt
             overlaperror[counter]=overlapcost.max()
             counter+=1 
