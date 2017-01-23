@@ -20,29 +20,27 @@ from scipy.signal import fftconvolve
 from misc.utils import unique_rows
 import load
 from numba import jit
+import multiprocess as mp
 
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
-def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleFreq=60):
+def moving_window(s,window,windowType):
     """
-    Moving frequency filter using Butterworth lowpass filter. First, construct windowed input as given
-    window type is dragged across. Frequency filter each of those samples and then add them all up 
-    back together to get the filtered signal.
+    Return snapshots of input as window is moved across it.
     2017-01-21
-    
+
     Params:
     -------
-    s (ndarray)
-        1d signal
-    window (int=61)
-        Window width.
-    windowType (tuple)
-        ('Gaussian',20) as input to scipy.signal.get_window()
-    cutoffFreq (float=5)
-        Cutoff frequency for butterworth filter.
-    sampleFreq (float=60)
-        Sampling frequency of input signal.
+    s
+    window
+    windowType
+
+    Returns:
+    --------
+    swindow (ndarray)
+        len(s) x len(s). Each row is a snapshot of the input with the window being shifted over. The sum down
+        the columns will reconstruct the input.
     """
     assert (window%2)==1, "Window width must be odd."
     from scipy.signal import get_window
@@ -74,6 +72,30 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
     for i in xrange(T-len(window)//2-1,T):
         swindow[T-len(window)-1+counter:,i] /= window[counter:].sum()
         counter += 1
+
+    return swindow
+
+def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleFreq=60):
+    """
+    Moving frequency filter using Butterworth lowpass filter. First, construct windowed input as given
+    window type is dragged across. Frequency filter each of those samples and then add them all up 
+    back together to get the filtered signal.
+    2017-01-21
+    
+    Params:
+    -------
+    s (ndarray)
+        1d signal
+    window (int=61)
+        Window width.
+    windowType (tuple)
+        ('Gaussian',20) as input to scipy.signal.get_window()
+    cutoffFreq (float=5)
+        Cutoff frequency for butterworth filter.
+    sampleFreq (float=60)
+        Sampling frequency of input signal.
+    """
+    swindow=moving_window(s,window,windowType)
 
     # Apply frequency filter.
     swindowfilt=butter_lowpass_filter(swindow,cutoffFreq,sampleFreq,axis=1)
@@ -187,12 +209,16 @@ def smooth(x,filtertype='sav',filterparams={'window':61,'order':4}):
                                         axis=axis) 
     elif filtertype=='moving_butter':
         if x.ndim==1:
-            xfiltered=moving_freq_filt(x)
+            xfiltered=moving_freq_filt(x,cutoffFreq=filterparams['cutoff'],
+                                       sampleFreq=filterparams['fs'])
         else:
-            xfiltered=np.vstack([moving_freq_filt(x[:,i],
-                                                  cutoffFreq=filterparams['cutoff'],
-                                                  sampleFreq=filterparams['fs'])
-                                 for i in xrange(x.shape[1])]).T
+            def f(x):
+                return moving_freq_filt(x,
+                                        cutoffFreq=filterparams['cutoff'],
+                                        sampleFreq=filterparams['fs'])
+            pool=mp.Pool()
+            xfiltered=np.vstack( pool.map(f,x.T) ).T
+            pool.close()
     else: raise Exception("Invalid filter option.")
     return xfiltered
  
