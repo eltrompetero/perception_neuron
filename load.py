@@ -175,7 +175,7 @@ def load_calc(fname,cols='V'):
 
 def extract_calc(fname,dr,bodyparts,dt,
                  append=True,
-                 dotruncate=True,
+                 dotruncate=5,
                  usezd=False
                 ):
     """
@@ -198,7 +198,8 @@ def extract_calc(fname,dr,bodyparts,dt,
     append (bool=True)
         Whether or not to keep list of data from bodyparts or to add all the velocities and acceleration
         together.
-    dotruncate (bool=True)
+    dotruncate (float=5)
+        Truncate beginning and end of data by this many seconds.
     usezd (bool=True)
         Get initial body orientation from calc file's Zd entry. This seems to not work as well in capturing
         the 3 dimension of hand movement. I'm not sure why, but I would assume because the orientation between
@@ -301,14 +302,14 @@ def extract_calc(fname,dr,bodyparts,dt,
     # Truncate beginning and ends of data set.
     if dotruncate:
         for x,v,a in zip(leaderX,leaderV,leaderA):
-            x = truncate(T,x,t0=5,t1=5)
-            v = truncate(T,v,t0=5,t1=5)
-            a = truncate(T,a,t0=5,t1=5)
+            x = truncate(T,x,t0=dotruncate,t1=dotruncate)
+            v = truncate(T,v,t0=dotruncate,t1=dotruncate)
+            a = truncate(T,a,t0=dotruncate,t1=dotruncate)
         for x,v,a in zip(followerX,followerV,followerA):
-            x = truncate(T,x,t0=5,t1=5)
-            v = truncate(T,v,t0=5,t1=5)
-            a = truncate(T,a,t0=5,t1=5)
-        T = truncate(T,T,t0=5,t1=5)
+            x = truncate(T,x,t0=dotruncate,t1=dotruncate)
+            v = truncate(T,v,t0=dotruncate,t1=dotruncate)
+            a = truncate(T,a,t0=dotruncate,t1=dotruncate)
+        T = truncate(T,T,t0=dotruncate,t1=dotruncate)
     return T,leaderX,leaderV,leaderA,followerX,followerV,followerA
 
 def load_bvh(fname,includeDisplacement=False,removeBlank=True):
