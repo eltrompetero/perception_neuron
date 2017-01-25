@@ -290,10 +290,13 @@ def extract_calc(fname,dr,bodyparts,dt,
             v[:,:] = rotate(v,np.array([0,0,1.]),phi[1])
             a[:,:] = rotate(a,np.array([0,0,1.]),phi[1])
 
-        # Shift subjects away from each other so that they're actually facing each over a gap.
-        for i,s in enumerate(bodyparts):
+        for i,s in enumerate(bodyparts[leaderix]):
             if 'Right' in s or 'Left' in s:
+                # Shift subjects away from each other so that they're actually facing each over a gap.
                 leaderX[i][:,0] -= 1
+        for i,s in enumerate(bodyparts[1-leaderix]):
+            if 'Right' in s or 'Left' in s:
+                # Shift subjects away from each other so that they're actually facing each over a gap.
                 followerX[i][:,0] += 1
             
                 # Reflect follower about mirror over the axis parallel to the "mirror."
