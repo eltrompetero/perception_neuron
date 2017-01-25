@@ -171,25 +171,28 @@ def norm1(x):
     """Helper function for phase_lag()"""
     return np.sqrt((x*x).sum(axis=1))
 
-def smooth(x,filtertype='sav',filterparams={'window':61,'order':4}):
+def smooth(x,filtertype='moving_butter',filterparams='default'):
     """
     Smooth multidimensional curve. Currently, using Savitzy-Golay on each
     dimension independently. Ideally, I would implememnt some sort of smoothing
     algorithm that accounts for relationships between the different dimensions.
-    2017-01-20
+    2017-01-24
 
     Params:
     -------
     x (ndarray)
         n_samples x n_dim
     filtertype (str='sav')
-        'sav' or 'butter'
+        'sav', 'butter', 'moving_butter'
     filterparams (dict)
-        savitzy-Golay: window, order
-        Butter: cutoff, fs
+        Savitzy-Golay: (window, order) typically {'window':61,'order':4}
+        Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
+        Moving Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
     """
     if filtertype=='sav':
         from scipy.signal import savgol_filter
+        if filterparams=='default':
+            filterparams={'window':61,'order':4}
 
         if x.ndim==1:
             return savgol_filter(x,
@@ -199,6 +202,9 @@ def smooth(x,filtertype='sav',filterparams={'window':61,'order':4}):
         for i in xrange(x.shape[1]):
             xfiltered[:,i]=savgol_filter(x[:,i],window,order)
     elif filtertype=='butter':
+        if filterparams=='default':
+            filterparams={'cutoff':10,'fs':60}
+
         if x.ndim==1:
             axis=-1
         else:
@@ -208,6 +214,9 @@ def smooth(x,filtertype='sav',filterparams={'window':61,'order':4}):
                                         filterparams['fs'],
                                         axis=axis) 
     elif filtertype=='moving_butter':
+        if filterparams=='default':
+            filterparams={'cutoff':10,'fs':60}
+
         if x.ndim==1:
             xfiltered=moving_freq_filt(x,cutoffFreq=filterparams['cutoff'],
                                        sampleFreq=filterparams['fs'])
