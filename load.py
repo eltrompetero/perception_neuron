@@ -301,14 +301,18 @@ def extract_calc(fname,dr,bodyparts,dt,
 
     # Truncate beginning and ends of data set.
     if dotruncate:
+        counter=0
         for x,v,a in zip(leaderX,leaderV,leaderA):
-            x = truncate(T,x,t0=dotruncate,t1=dotruncate)
-            v = truncate(T,v,t0=dotruncate,t1=dotruncate)
-            a = truncate(T,a,t0=dotruncate,t1=dotruncate)
+            leaderX[counter] = truncate(T,x,t0=dotruncate,t1=dotruncate)
+            leaderV[counter] = truncate(T,v,t0=dotruncate,t1=dotruncate)
+            leaderA[counter] = truncate(T,a,t0=dotruncate,t1=dotruncate)
+            counter += 1
+        counter=0
         for x,v,a in zip(followerX,followerV,followerA):
-            x = truncate(T,x,t0=dotruncate,t1=dotruncate)
-            v = truncate(T,v,t0=dotruncate,t1=dotruncate)
-            a = truncate(T,a,t0=dotruncate,t1=dotruncate)
+            followerX[counter] = truncate(T,x,t0=dotruncate,t1=dotruncate)
+            followerV[counter] = truncate(T,v,t0=dotruncate,t1=dotruncate)
+            followerA[counter] = truncate(T,a,t0=dotruncate,t1=dotruncate)
+            counter += 1
         T = truncate(T,T,t0=dotruncate,t1=dotruncate)
     return T,leaderX,leaderV,leaderA,followerX,followerV,followerA
 
