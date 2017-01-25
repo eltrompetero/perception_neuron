@@ -196,8 +196,9 @@ def extract_calc(fname,dr,bodyparts,dt,
         First list is for leader and second list is for follower.
     dt (float)
     append (bool=True)
-        Whether or not to keep list of data from bodyparts or to add all the velocities and acceleration
-        together.
+        If true, keep list of data from bodyparts else add all the velocities and acceleration together. This
+        is useful if we're looking at the motion of the feet and want to look at the sum of the motion of the
+        feet (because we don't care about stationary feet).
     dotruncate (float=5)
         Truncate beginning and end of data by this many seconds.
     usezd (bool=True)
@@ -222,11 +223,11 @@ def extract_calc(fname,dr,bodyparts,dt,
         T = np.arange(len(followerdf))*dt
 
     if 'Hands' in fname:
-        # The correction for the hands is a bit involved. First, I remove the drift from the hips from all
-        # the position of all body parts. Then, take the hands, and center them by their midpoint. Then
-        # I rotate their positions so that the leader and follower are facing each other. For some reason,
-        # the calc data sometimes has them facing parallel directions. Remember that the z-axis is pointing
-        # into the ground!
+        # The correction for the hands is a bit involved. First, I remove the drift from the hips from all the
+        # position of all body parts. Then, take the hands, and center them by their midpoint. Then I rotate
+        # their positions so that the leader and follower are facing each other. For some reason, the calc
+        # data sometimes has them facing parallel directions. Remember that the z-axis is pointing into the
+        # ground!
 
         # Remove drift in hips.
         Xix = np.array(['X' in c for c in leaderdf.columns])
@@ -329,7 +330,8 @@ def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     includeDisplacement (bool=False)
         If displacement data is included for everything including root.
     removeBlank (bool=True)
-        Remove entries where nothing changes over the entire recording session. This should mean that there was nothing being recorded in that field.
+        Remove entries where nothing changes over the entire recording session. This should mean that there
+        was nothing being recorded in that field.
 
     Value:
     ------
