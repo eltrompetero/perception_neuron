@@ -320,6 +320,63 @@ def extract_calc(fname,dr,bodyparts,dt,
         T = truncate(T,T,t0=dotruncate,t1=dotruncate)
     return T,leaderX,leaderV,leaderA,followerX,followerV,followerA
 
+def extract_W(fname,dr,bodyparts,dt,
+                 dotruncate=5,
+                ):
+    """
+    Extract angular velocities of specified set of body parts from calculation file without any adjustment.
+
+    The slowest part is loading the data from file.
+    2017-01-28
+
+    Params:
+    -------
+    fname (str)
+    dr (str)
+    bodyparts (list of list of strings)
+        First list is for leader and second list is for follower.
+    dt (float)
+    dotruncate (float=5)
+        Truncate beginning and end of data by this many seconds.
+
+    Value:
+    ------
+    T,leaderW,followerW
+    """
+    skeleton = calc_file_body_parts()
+
+    # Read position, velocity and acceleration data from files.
+    leaderix = 1 if ('F' in fname.split(' ')[1]) else 0
+    if not 'leaderdf' in globals():
+        characters = [fname.split(' ')[0],fname.split(' ')[2]]
+        leaderdf,leaderzd = load_calc('%s%s%s.calc'%(dr,fname,characters[leaderix]),cols='W')
+        followerdf,followerzd = load_calc('%s%s%s.calc'%(dr,fname,characters[1-leaderix]),cols='W')
+        
+        T = np.arange(len(followerdf))*dt
+
+    # Select out the body parts that we want.
+    bodypartix = [[skeleton.index(b) for b in bodyparts_] 
+                   for bodyparts_ in bodyparts]
+    
+    leaderW,followerW = [],[]
+    for i,ix in enumerate(bodypartix[leaderix]):
+        leaderW.append( leaderdf.values[:,ix*9:ix*9+3].copy() ) 
+    for i,ix in enumerate(bodypartix[1-leaderix]):
+        followerW.append( followerdf.values[:,ix*9:ix*9+3].copy() )
+    
+    # Truncate beginning and ends of data set.
+    if dotruncate:
+        counter=0
+        for w in leaderW:
+            leaderW[counter] = truncate(T,w,t0=dotruncate,t1=dotruncate)
+            counter += 1
+        counter=0
+        for w in followerW:
+            followerW[counter] = truncate(T,w,t0=dotruncate,t1=dotruncate)
+            counter += 1
+        T = truncate(T,T,t0=dotruncate,t1=dotruncate)
+    return T,leaderW,followerW
+
 def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     """
     Load data from BVD file. Euler angles are given as YXZ. Axis Neuron only keeps track of displacement for the hip.
