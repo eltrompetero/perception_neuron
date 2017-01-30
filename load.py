@@ -47,7 +47,7 @@ def get_fnames():
           'Caeli (J) Sam (J) Hands']
 
 def get_dr(fname):
-    from os import expanduser
+    from os.path import expanduser
     if 'Itai' in fname and 'Anja' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
     elif 'Caeli' in fname and 'Vincent' in fname:
