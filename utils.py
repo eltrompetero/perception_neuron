@@ -81,7 +81,8 @@ def _move_window(i,T,s,window,swindow):
 
 def moving_window(s,window,windowType):
     """
-    Return snapshots of input as window is moved across it.
+    Return snapshots of input as window is moved across it. This can be memory intensive if the array s is
+    long.
     2017-01-30
 
     Params:
@@ -132,13 +133,28 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
     sampleFreq (float=60)
         Sampling frequency of input signal.
     """
-    swindow=moving_window(s,window,windowType)
-
-    # Apply frequency filter.
-    swindowfilt=butter_lowpass_filter(swindow,cutoffFreq,sampleFreq,axis=1)
-    sfilter=swindowfilt.sum(0)
+    assert (window%2)==1, "Window width must be odd."
+    from scipy.signal import get_window
     
-    return sfilter
+    T=len(s)
+    swindow=np.zeros((T))  # windowed input
+
+    # Normalize the window. Each point gets hit with every part of window once (except boundaries).
+    window = get_window(windowType,window)
+    window /= window.sum()
+
+    # Extract subsets of data while window is moving across.
+    pool = mp.Pool(mp.cpu_count())
+    def f(i):
+        return _moving_window(i,s,window)
+    swindow = np.vstack( pool.map(f,range(T)) )
+    pool.close()
+
+    swindow = butter_lowpass_filter( swindow,
+                                     cutoffFreq,
+                                     sampleFreq,
+                                     axis=1 ).sum(0)
+    return swindow
 
 @jit
 def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
@@ -262,9 +278,10 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
                 return moving_freq_filt(x,
                                         cutoffFreq=filterparams['cutoff'],
                                         sampleFreq=filterparams['fs'])
-            pool=mp.Pool()
-            xfiltered=np.vstack( pool.map(f,x.T) ).T
-            pool.close()
+            xfiltered = []
+            for i in xrange(x.shape[1]):
+                xfiltered.append( f(x[:,i]) )
+            xfiltered = np.vstack(xfiltered).T
     else: raise Exception("Invalid filter option.")
     return xfiltered
  
