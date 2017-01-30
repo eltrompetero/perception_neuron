@@ -39,7 +39,12 @@ def get_fnames():
           'Caeli (L) Eddie (F) Hands',
           'Caeli (F) Eddie (L) Hands',
           'Caeli (J) Eddie (J) Hands',
-          'Caeli (J) Eddie (J) Hands Cal After']
+          'Caeli (J) Eddie (J) Hands Cal After',
+          'Caeli (J) Sam (J) Hands Cal1',
+          'Caeli (L) Sam (F) Hands',
+          'Caeli (F) Sam (L) Hands',
+          'Caeli (J) Sam (J) Hands Cal2',
+          'Caeli (J) Sam (J) Hands']
 
 def get_dr(fname):
     if 'Itai' in fname and 'Anja' in fname:
@@ -48,6 +53,8 @@ def get_dr(fname):
         return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
     elif 'Caeli' in fname and 'Eddie' in fname:
         return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170124_Caeli_Eddie/'
+    elif 'Caeli' in fname and 'Sam' in fname:
+        return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Sam/'
 
     else:
         raise Exception("Invalid file name.")

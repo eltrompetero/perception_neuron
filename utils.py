@@ -53,12 +53,15 @@ def moving_window(s,window,windowType):
     window/=window.sum()
 
     # Extract subsets of data while window is moving across.
+    # Left side.
     for i in xrange(len(window)//2+1):
         swindow[i,:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
-
+    
+    # MIddle.
     for i in xrange(len(window)//2+1,T-len(window)//2-1):
         swindow[i,i-len(window)//2:i+len(window)//2+1]=s[i-len(window)//2:i+len(window)//2+1]*window
-
+    
+    # Right side.
     counter=0
     for i in xrange(T-len(window)//2-1,T):
         swindow[i,i-len(window)//2:T]=window[:len(window)-counter]*s[i-len(window)//2:T]
