@@ -25,10 +25,64 @@ import multiprocess as mp
 # ---------------------- #
 # Calculation functions. #
 # ---------------------- #
+def _moving_window(i,s,window):
+    """
+    Return snapshots of input as given window array is moved across it. This is very fast using jit.
+    2017-01-30
+
+    Params:
+    -------
+    s
+    window
+    windowType
+
+    Returns:
+    --------
+    swindow (ndarray)
+        len(s) x len(s). Each row is a snapshot of the input with the window being shifted over. The sum down
+        the columns will reconstruct the input.
+    """
+    T=len(s)
+    swindow=np.zeros((T))  # windowed input
+
+    # Extract subsets of data while window is moving across.
+    _move_window(i,T,s,window,swindow)
+    return swindow
+
+@jit(nopython=True)
+def _move_window(i,T,s,window,swindow):
+    if i<(len(window)//2+1):
+        swindow[:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
+        for j in xrange(len(window)//2+1):
+            swindow[j] /= window[:len(window)//2+j+1].sum()
+    # Middle.
+    elif (len(window)//2+1)<=i<(T-len(window)//2-1):
+        swindow[i-len(window)//2:i+len(window)//2+1]=s[i-len(window)//2:i+len(window)//2+1]*window
+        for j in xrange(i-len(window)//2-1,len(window)//2+1):
+            swindow[j] /= window[:len(window)//2+j+1].sum()
+        
+        counter=0
+        i=counter+T-len(window)//2-1
+        while (T-len(window)-1+counter)<=i and i<T:
+            swindow[i] /= window[counter:].sum()
+            counter+=1
+            i=counter+T-len(window)//2-1
+    # Right side.
+    elif (T-len(window)//2-1)<=i<T:
+        counter=i-T+len(window)//2+1
+        swindow[i-len(window)//2:T]=window[:len(window)-counter]*s[i-len(window)//2:T]
+        
+        counter=0
+        i=counter+T-len(window)//2-1
+        while i<T:
+            swindow[i] /= window[counter:].sum()
+            counter+=1
+            i=counter+T-len(window)//2-1
+
 def moving_window(s,window,windowType):
     """
     Return snapshots of input as window is moved across it.
-    2017-01-21
+    2017-01-30
 
     Params:
     -------
@@ -49,32 +103,12 @@ def moving_window(s,window,windowType):
     swindow=np.zeros((T,T))  # windowed input
 
     # Normalize the window. Each point gets hit with every part of window once (except boundaries).
-    window=get_window(windowType,window)
-    window/=window.sum()
+    window = get_window(windowType,window)
+    window /= window.sum()
 
     # Extract subsets of data while window is moving across.
-    # Left side.
-    for i in xrange(len(window)//2+1):
-        swindow[i,:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
-    
-    # MIddle.
-    for i in xrange(len(window)//2+1,T-len(window)//2-1):
-        swindow[i,i-len(window)//2:i+len(window)//2+1]=s[i-len(window)//2:i+len(window)//2+1]*window
-    
-    # Right side.
-    counter=0
-    for i in xrange(T-len(window)//2-1,T):
-        swindow[i,i-len(window)//2:T]=window[:len(window)-counter]*s[i-len(window)//2:T]
-        counter += 1
-    
-    # Properly normalize window at boundaries.
-    for i in xrange(len(window)//2+1):
-        swindow[:len(window)//2+1+i,i] /= window[:len(window)//2+i+1].sum()
-
-    counter=0
-    for i in xrange(T-len(window)//2-1,T):
-        swindow[T-len(window)-1+counter:,i] /= window[counter:].sum()
-        counter += 1
+    for i in xrange(T):
+        swindow[i] = _moving_window(i,s,window)
 
     return swindow
 
