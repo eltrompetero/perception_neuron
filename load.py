@@ -47,15 +47,15 @@ def get_fnames():
           'Caeli (J) Sam (J) Hands']
 
 def get_dr(fname):
+    from os import expanduser
     if 'Itai' in fname and 'Anja' in fname:
-        return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
+        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
     elif 'Caeli' in fname and 'Vincent' in fname:
-        return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
+        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
     elif 'Caeli' in fname and 'Eddie' in fname:
-        return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170124_Caeli_Eddie/'
+        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170124_Caeli_Eddie/'
     elif 'Caeli' in fname and 'Sam' in fname:
-        return '/Users/eddie/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Sam/'
-
+        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Sam/'
     else:
         raise Exception("Invalid file name.")
 
