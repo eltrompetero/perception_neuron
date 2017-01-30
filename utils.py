@@ -146,14 +146,15 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
     # Extract subsets of data while window is moving across.
     pool = mp.Pool(mp.cpu_count())
     def f(i):
-        return _moving_window(i,s,window)
-    swindow = np.vstack( pool.map(f,range(T)) )
+        return butter_lowpass_filter( _moving_window(i,s,window),
+                                      cutoffFreq,sampleFreq )
+    swindow = np.vstack( pool.map(f,range(T)) ).sum(0)
     pool.close()
 
-    swindow = butter_lowpass_filter( swindow,
-                                     cutoffFreq,
-                                     sampleFreq,
-                                     axis=1 ).sum(0)
+    #swindow = butter_lowpass_filter( swindow,
+    #                                 cutoffFreq,
+    #                                 sampleFreq,
+    #                                 axis=1 ).sum(0)
     return swindow
 
 @jit
