@@ -245,7 +245,7 @@ def extract_calc(fname,dr,bodyparts,dt,
         if usezd:
             bodyvec=[leaderzd,followerzd]
         else:
-            from load import initial_orientation
+            from utils import initial_orientation
             bodyvec = [initial_orientation(leaderdf),initial_orientation(followerdf)]
 
     # Select out the body parts that we want.
