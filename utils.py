@@ -753,12 +753,12 @@ def train_cal_noise(leaderW,followerW,dv,nTrainSamples=None):
         Number of training samples to use.
     """
     from sklearn.gaussian_process import GaussianProcessRegressor
-    nTrainSamples = nTrainSamples or len(X)//2
-    assert 0<nTrainSamples<=len(X)
 
     X = np.hstack((leaderW,followerW))
     Y = dv
-    
+    nTrainSamples = nTrainSamples or len(X)//2
+    assert 0<nTrainSamples<=len(X)
+   
     randix = np.zeros((len(X)))==1
     randix[np.random.choice(range(len(X)),size=nTrainSamples)] = True
     trainX = X[randix]
