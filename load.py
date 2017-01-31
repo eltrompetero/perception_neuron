@@ -40,6 +40,11 @@ def get_fnames():
           'Caeli (F) Eddie (L) Hands',
           'Caeli (J) Eddie (J) Hands',
           'Caeli (J) Eddie (J) Hands Cal After',
+          'Caeli (J) Eddie (J) Hands Cal1 Blind',
+          'Caeli (L) Eddie (F) Hands Blind',
+          'Caeli (F) Eddie (L) Hands Blind',
+          'Caeli (J) Eddie (J) Hands Blind',
+          'Caeli (J) Eddie (J) Hands Cal2 Blind ',
           'Caeli (J) Sam (J) Hands Cal1',
           'Caeli (L) Sam (F) Hands',
           'Caeli (F) Sam (L) Hands',
@@ -52,6 +57,8 @@ def get_dr(fname):
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
     elif 'Caeli' in fname and 'Vincent' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
+    elif 'Caeli' in fname and 'Eddie' in fname and 'Blind' in fname:
+        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Eddie/'
     elif 'Caeli' in fname and 'Eddie' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170124_Caeli_Eddie/'
     elif 'Caeli' in fname and 'Sam' in fname:
