@@ -736,6 +736,36 @@ def extract_phase(*angles):
     x = euler_to_vectors(*angles)
     
     return np.unwrap(np.arctan2(x[:,1],x[:,0]),discont=np.pi)
+
+def train_cal_noise(leaderW,followerW,dv):
+    """
+    Train Gaussian process noise prediction on hand calibration trials (with hands touching) using the angular
+    velocities.
+    2017-01-30
+
+    Params:
+    -------
+    leaderW, followerW (ndarray)
+        (n_samples, n_dim)
+    dv (ndarray)
+        (n_samples, 3) Error in velocities.
+    """
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    
+    X = np.hstack((leaderW,followerW))
+    Y = dv
+    
+    randix = np.zeros((len(X)))==1
+    randix[np.random.choice(range(len(X)),size=len(X)//2)] = True
+    trainX = X[randix]
+    testX = X[randix==0]
+    trainY = Y[randix]
+    testY = Y[randix==0]
+    
+    gpr = GaussianProcessRegressor(alpha=1e-1,n_restarts_optimizer=10)
+    gpr.fit(trainX,trainY)
+    
+    return gpr,np.corrcoef(gpr.predict(testX).ravel(),testY.ravel())[0,1]
 # End calculation files
 
 
