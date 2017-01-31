@@ -319,19 +319,22 @@ def extract_calc(fname,dr,bodyparts,dt,
 
     # Truncate beginning and ends of data set.
     if dotruncate:
+        if not type(dotruncate) is list:
+            dotruncate = [dotruncate]*2
+        
         counter=0
         for x,v,a in zip(leaderX,leaderV,leaderA):
-            leaderX[counter] = truncate(T,x,t0=dotruncate,t1=dotruncate)
-            leaderV[counter] = truncate(T,v,t0=dotruncate,t1=dotruncate)
-            leaderA[counter] = truncate(T,a,t0=dotruncate,t1=dotruncate)
+            leaderX[counter] = truncate(T,x,t0=dotruncate[0],t1=dotruncate[1])
+            leaderV[counter] = truncate(T,v,t0=dotruncate[0],t1=dotruncate[1])
+            leaderA[counter] = truncate(T,a,t0=dotruncate[0],t1=dotruncate[1])
             counter += 1
         counter=0
         for x,v,a in zip(followerX,followerV,followerA):
-            followerX[counter] = truncate(T,x,t0=dotruncate,t1=dotruncate)
-            followerV[counter] = truncate(T,v,t0=dotruncate,t1=dotruncate)
-            followerA[counter] = truncate(T,a,t0=dotruncate,t1=dotruncate)
+            followerX[counter] = truncate(T,x,t0=dotruncate[0],t1=dotruncate[1])
+            followerV[counter] = truncate(T,v,t0=dotruncate[0],t1=dotruncate[1])
+            followerA[counter] = truncate(T,a,t0=dotruncate[0],t1=dotruncate[1])
             counter += 1
-        T = truncate(T,T,t0=dotruncate,t1=dotruncate)
+        T = truncate(T,T,t0=dotruncate[0],t1=dotruncate[1])
     return T,leaderX,leaderV,leaderA,followerX,followerV,followerA
 
 def extract_W(fname,dr,bodyparts,dt,
