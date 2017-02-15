@@ -157,7 +157,6 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
     #                                 axis=1 ).sum(0)
     return swindow
 
-@jit
 def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     """
     Find index shift that would maximize the overlap between two different time series. This involves taking
@@ -184,26 +183,29 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     phase
         Phase difference in units of dt.
     overlaperror
-        Max overlap measure used to determine phase lag.
+        Max overlap measure used to determine phase lag. With dot product, this maxes out at 1.
     """
-    phase=np.zeros((len(v1)-2*maxshift))
-    overlaperror=np.zeros((len(v1)-2*maxshift))
-    counter=0
-
     if measure=='dot':
         v1=v1/norm1(v1)[:,None]
         v2=v2/norm1(v2)[:,None]
-
-        for i in xrange(maxshift,len(v1)-maxshift-windowlength):
+        
+        def f(i):
             window=v2[i:i+windowlength]
+            overlapcost=np.zeros((2*maxshift))  # average overlap between the two velocity time series
 
-            overlapcost=np.zeros((2*maxshift))
+            # Shift background.
             for j in xrange(maxshift*2):
                 background=v1[i-maxshift+j:i-maxshift+windowlength+j]
                 overlapcost[j]=(window*background).sum(1).mean()
-            phase[counter]=(np.argmax(overlapcost)-maxshift)*-dt
-            overlaperror[counter]=overlapcost.max()
-            counter+=1 
+            phase = (np.argmax(overlapcost)-maxshift)*-dt
+            overlaperror = overlapcost.max()
+            return phase,overlaperror
+
+        p = mp.Pool(mp.cpu_count())
+        phase,overlaperror = zip(*p.map(f,range(maxshift,len(v1)-maxshift-windowlength)))
+        phase,overlaperror = np.array(phase),np.array(overlaperror)
+        p.close()
+
     elif measure=='corr':
         assert v1.ndim==1 and v2.ndim==1
         for i in xrange(maxshift,len(v1)-maxshift-windowlength):

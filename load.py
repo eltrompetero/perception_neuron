@@ -48,7 +48,22 @@ def get_fnames():
           'Caeli (L) Sam (F) Hands',
           'Caeli (F) Sam (L) Hands',
           'Caeli (J) Sam (J) Hands Cal2',
-          'Caeli (J) Sam (J) Hands']
+          'Caeli (J) Sam (J) Hands',
+          'Caeli (J) Eddie (J) Fine Cal 1',
+          'Caeli (J) Eddie (J) Fine Cal 2',
+          'Caeli (J) Eddie (J) Fine',
+          'Caeli (J) Eddie (J) Fine Cal 3',
+          'Caeli (J) Eddie (J) Fine Cal 4',
+          'Caeli (J) Yunus (J) Cal 1',
+          'Caeli (J) Yunus (J) Cal 2',
+          'Caeli (L) Yunus (F)',
+          'Caeli (J) Yunus (J) Cal 3',
+          'Caeli (J) Yunus (J) Cal 4',
+          'Caeli (F) Yunus (L)',
+          'Caeli (J) Yunus (J) Cal 5',
+          'Caeli (J) Yunus (J) Cal 6',
+          'Caeli (J) Yunus (J)',
+          'Caeli (J) Yunus (J) Cal 7']
 
 def get_dr(fname):
     from os.path import expanduser
@@ -58,10 +73,14 @@ def get_dr(fname):
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
     elif 'Caeli' in fname and 'Eddie' in fname and 'Blind' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Eddie/'
-    elif 'Caeli' in fname and 'Eddie' in fname:
+    elif 'Caeli' in fname and 'Eddie' in fname and not 'Fine' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170124_Caeli_Eddie/'
     elif 'Caeli' in fname and 'Sam' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Sam/'
+    elif 'Caeli' in fname and 'Eddie' in fname and 'Fine' in fname:
+        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170202_Caeli_Eddie/'
+    elif 'Caeli' in fname and 'Yunus' in fname:
+        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170203_Caeli_Yunus/'
     else:
         raise Exception("Invalid file name.")
 
