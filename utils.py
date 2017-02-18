@@ -157,7 +157,7 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
     #                                 axis=1 ).sum(0)
     return swindow
 
-def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
+def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None):
     """
     Find index shift that would maximize the overlap between two different time series. This involves taking
     windows of one series and moving across the other time series to find maximal agreement.
@@ -185,12 +185,17 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot'):
     overlaperror
         Max overlap measure used to determine phase lag. With dot product, this maxes out at 1.
     """
+    if window is None:
+        filtwindow = np.ones((windowlength,1))/windowlength
+    else:
+        filtwindow = window[:,None] 
+
     if measure=='dot':
         v1=v1/norm1(v1)[:,None]
         v2=v2/norm1(v2)[:,None]
         
         def f(i):
-            window=v2[i:i+windowlength]
+            window=v2[i:i+windowlength]*filtwindow
             overlapcost=np.zeros((2*maxshift))  # average overlap between the two velocity time series
 
             # Shift background.
