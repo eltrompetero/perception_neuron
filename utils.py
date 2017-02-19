@@ -157,11 +157,11 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
     #                                 axis=1 ).sum(0)
     return swindow
 
-def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None):
+def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_threshold=0):
     """
     Find index shift that would maximize the overlap between two different time series. This involves taking
     windows of one series and moving across the other time series to find maximal agreement.
-    2017-01-21
+    2017-02-18
 
     Params:
     -------
@@ -177,6 +177,8 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None):
     dt (float=1)
         Amount of time that each index increment corresponds to. This determines the units that the phase is
         returned as.
+    v_threshold (float=0)
+        Minimum norm below which to set vector value to 0.
 
     Returns:
     --------
@@ -186,24 +188,43 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None):
         Max overlap measure used to determine phase lag. With dot product, this maxes out at 1.
     """
     if window is None:
-        filtwindow = np.ones((windowlength,1))/windowlength
+        filtwindow = np.ones((windowlength,1))
     else:
         filtwindow = window[:,None] 
+    v1,v2 = v1.copy(),v2.copy()
 
     if measure=='dot':
-        v1=v1/norm1(v1)[:,None]
-        v2=v2/norm1(v2)[:,None]
+        normv1,normv2 = norm1(v1),norm1(v2)
+        nanix1,nanix2 = normv1<v_threshold,normv2<v_threshold
+        v1[nanix1] = np.nan
+        v2[nanix2] = np.nan
+
+        v1=v1/normv1[:,None]
+        v2=v2/normv2[:,None]
         
+        # Label the zero vectors to always give max error in the dot product.
+        v1[np.isnan(v1)] = -1
+        v2[np.isnan(v2)] = -1
+
         def f(i):
-            window=v2[i:i+windowlength]*filtwindow
+            """
+            Window is the selection in the first vector that we hold fixed. Then we take a moving window
+            across the second vector and see how good the overlap is between the two vectors.
+            """
+            window=v2[i:i+windowlength]
             overlapcost=np.zeros((2*maxshift))  # average overlap between the two velocity time series
 
             # Shift background.
             for j in xrange(maxshift*2):
-                background=v1[i-maxshift+j:i-maxshift+windowlength+j]
-                overlapcost[j]=(window*background).sum(1).mean()
-            phase = (np.argmax(overlapcost)-maxshift)*-dt
-            overlaperror = overlapcost.max()
+                background = v1[i-maxshift+j:i-maxshift+windowlength+j]
+                dotprod = (window*background).sum(1)
+                dotprod[dotprod>1] = 1  # thresholded 0 vectors should be perfectly aligned as defined by 1
+                overlapcost[j] = (dotprod*filtwindow).mean()
+
+            #phase = (np.argmax(overlapcost)-maxshift)*-dt
+            maxix = local_argmax(overlapcost,windowlength//2)
+            phase = (maxix-maxshift)*-dt
+            overlaperror = overlapcost[maxix]
             return phase,overlaperror
 
         p = mp.Pool(mp.cpu_count())
@@ -231,6 +252,41 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None):
 def norm1(x):
     """Helper function for phase_lag()"""
     return np.sqrt((x*x).sum(axis=1))
+
+@jit(nopython=True)
+def local_argmax(x,ix0):
+    """
+    Find biggest local max starting from ix0 and looking in both directions.
+    2017-02-18
+    """
+    # Left side first.
+    atMax= False
+    ix = ix0
+    while not atMax:
+        if x[ix-1]>x[ix]:
+            ix -= 1
+        else:
+            atMax = True
+        if ix==0:
+            atMax = True
+    leftMaxIx = ix
+    
+    # Search right side.
+    atMax = False
+    ix = ix0
+    while not atMax:
+        if x[ix+1]>x[ix]:
+            ix += 1
+        else:
+            atMax = True
+        if  ix==(len(x)-1):
+            atMax = True
+    rightMaxIx = ix
+    
+    if x[leftMaxIx]>=x[rightMaxIx]:
+        return leftMaxIx
+    else:
+        return rightMaxIx
 
 def smooth(x,filtertype='moving_butter',filterparams='default'):
     """
