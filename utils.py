@@ -234,8 +234,8 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
 
     elif measure=='corr':
         assert v1.ndim==1 and v2.ndim==1
-        phase = np.zeros((len(v1)-maxshift-windowlength))
-        overlaperror = np.zeros((len(v1)-maxshift-windowlength))
+        phase = np.zeros((len(v1)-2*maxshift-windowlength))
+        overlaperror = np.zeros((len(v1)-2*maxshift-windowlength))
 
         counter = 0
         for i in xrange(maxshift,len(v1)-maxshift-windowlength):
