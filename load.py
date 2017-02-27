@@ -160,6 +160,50 @@ def calc_file_body_parts():
             'LeftHandPinky2',
             'LeftHandPinky3']
 
+def filter_hand_trials(filesToFilter):
+    """
+    Shortcut for filtering hand trials data by just giving file number.
+    2017-02-23
+    
+    Params:
+    -------
+    filesToFilter (list)
+    """
+    from utils import smooth
+    import cPickle as pickle
+    dt = 1/60
+    bodyparts = [['RightHand','LeftHand'],
+                 ['LeftHand','RightHand']]
+
+    for fileix in filesToFilter:
+        # Read position, velocity and acceleration data from files.
+        fname=get_fnames()[fileix]
+        T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
+                                                                               get_dr(fname),
+                                                                               bodyparts,
+                                                                               dt)
+
+        for x in leaderX:
+            x-=x.mean(0)
+        for x in followerX:
+            x-=x.mean(0)
+
+        # Butterworth filter data and pickle it.
+        for x,v,a in zip(leaderX,leaderV,leaderA):
+            x[:] = smooth(x)[:]
+            v[:] = smooth(v)[:]
+            a[:] = smooth(a)[:]
+        for x,v,a in zip(followerX,followerV,followerA):
+            x[:] = smooth(x)[:]
+            v[:] = smooth(v)[:]
+            a[:] = smooth(a)[:]
+
+        pickle.dump({'T':T,
+                     'leaderX':leaderX,'followerX':followerX,
+                     'leaderV':leaderV,'followerV':followerV,
+                     'leaderA':leaderA,'followerA':followerA},
+                    open('%s%s.p'%(get_dr(fname),fname),'wb'),-1)
+
 def load_calc(fname,cols='V'):
     """
     Load calculation file output by Axis Neuron. 

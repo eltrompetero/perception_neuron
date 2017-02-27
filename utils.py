@@ -234,17 +234,22 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
 
     elif measure=='corr':
         assert v1.ndim==1 and v2.ndim==1
+        phase = np.zeros((len(v1)-maxshift-windowlength))
+        overlaperror = np.zeros((len(v1)-maxshift-windowlength))
+
+        counter = 0
         for i in xrange(maxshift,len(v1)-maxshift-windowlength):
             window=v2[i:i+windowlength]
-            windowmean,windowstd=window.mean(),window.std()
+            windowmean,windowstd = window.mean(),window.std()
             
             overlapcost=np.zeros((2*maxshift))
             for j in xrange(maxshift*2):
-                background=v1[i-maxshift+j:i-maxshift+windowlength+j]
-                overlapcost[j]=((window*background).mean()-windowmean*background.mean())/windowstd/background.std()
-            phase[counter]=(np.argmax(overlapcost)-maxshift)*-dt
-            overlaperror[counter]=overlapcost.max()
-            counter+=1 
+                background = v1[i-maxshift+j:i-maxshift+windowlength+j]
+                overlapcost[j] = ((window*background).mean()-windowmean*background.mean())/windowstd/background.std()
+            maxix = local_argmax(overlapcost,windowlength//2)
+            phase[counter] = (maxix-maxshift)*-dt
+            overlaperror[counter] = overlapcost.max()
+            counter += 1 
     else: raise Exception("Bad correlation measure option.")
     return phase,overlaperror
 
