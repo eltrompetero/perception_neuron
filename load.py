@@ -249,6 +249,14 @@ def load_calc(fname,cols='V'):
     #        df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
     return df,zd
 
+def group_cols(columns):
+    """
+    Group columns of 3 into multiindex.
+    2017-03-03
+    """
+    bodyparts = [c.split('-')[0] for c in columns[::3]]
+    return pd.MultiIndex.from_product((bodyparts,['x','y','z'])) 
+
 def extract_calc(fname,dr,bodyparts,dt,
                  append=True,
                  dotruncate=5,
