@@ -66,7 +66,9 @@ def get_fnames():
           'Caeli (J) Yunus (J) Cal 7',
           'Caeli (J) Eddie (J) Half Occlusion',
           'Caeli (J) Eddie (J) Full Occlusion',
-          'Caeli (J) Eddie (J) Low Light']
+          'Caeli (J) Eddie (J) Low Light',
+          'Caeli (L) Eddie (F) Hands Startup Timer',
+          'Caeli (F) Eddie (L) Hands Startup Timer']
 
 def get_dr(fname):
     from os.path import expanduser
@@ -74,6 +76,9 @@ def get_dr(fname):
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
     elif 'Caeli' in fname and 'Vincent' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
+    elif 'Caeli' in fname and 'Eddie' in fname and 'Startup' in fname:
+        return (expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion '+
+                'Files/20170310_Caeli_Eddie_Startup/')
     elif 'Caeli' in fname and 'Eddie' in fname and ('Occlusion' in fname or 'Low' in fname):
         return ( expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion '+
                  'Files/20170307_Caeli_Eddie_Occlusion/' )
@@ -217,7 +222,7 @@ def filter_hand_trials(filesToFilter):
                      'leaderA':leaderA,'followerA':followerA},
                     open('%s%s.p'%(get_dr(fname),fname),'wb'),-1)
 
-def load_calc(fname,cols='V'):
+def load_calc(fname,cols='V',read_csv_kwargs={}):
     """
     Load calculation file output by Axis Neuron. 
     Be careful with z-axis that points into the ground by default.
@@ -233,7 +238,7 @@ def load_calc(fname,cols='V'):
     """
     from ising.heisenberg import rotate
 
-    df = pd.read_csv(fname,skiprows=5,sep='\t')
+    df = pd.read_csv(fname,skiprows=5,sep='\t',**read_csv_kwargs)
     
     # Only keep desired columns.
     keepix = np.zeros((len(df.columns)),dtype=bool)
@@ -273,7 +278,8 @@ def group_cols(columns):
 def extract_calc(fname,dr,bodyparts,dt,
                  append=True,
                  dotruncate=5,
-                 usezd=False
+                 usezd=False,
+                 read_csv_kwargs={},
                 ):
     """
     Extract specific set of body parts from calculation file. If a file with coordination of hands is given,
@@ -302,6 +308,8 @@ def extract_calc(fname,dr,bodyparts,dt,
         Get initial body orientation from calc file's Zd entry. This seems to not work as well in capturing
         the 3 dimension of hand movement. I'm not sure why, but I would assume because the orientation between
         hands and the body is not totally accurate according to Axis Neuron.
+    read_csv_kwargs (dict)
+        Passed onto pandas.read_csv
 
     Value:
     ------
@@ -314,8 +322,12 @@ def extract_calc(fname,dr,bodyparts,dt,
     leaderix = 1 if ('F' in fname.split(' ')[1]) else 0
     if not 'leaderdf' in globals():
         characters = [fname.split(' ')[0],fname.split(' ')[2]]
-        leaderdf,leaderzd = load_calc('%s%s%s.calc'%(dr,fname,characters[leaderix]),cols='XVA')
-        followerdf,followerzd = load_calc('%s%s%s.calc'%(dr,fname,characters[1-leaderix]),cols='XVA')
+        leaderdf,leaderzd = load_calc('%s%s%s.calc'%(dr,fname,characters[leaderix]),
+                                      cols='XVA',
+                                      read_csv_kwargs=read_csv_kwargs)
+        followerdf,followerzd = load_calc('%s%s%s.calc'%(dr,fname,characters[1-leaderix]),
+                                          cols='XVA',
+                                          read_csv_kwargs=read_csv_kwargs)
         
         T = np.arange(len(followerdf))*dt
 
