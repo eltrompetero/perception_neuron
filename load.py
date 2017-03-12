@@ -63,7 +63,10 @@ def get_fnames():
           'Caeli (J) Yunus (J) Cal 5',
           'Caeli (J) Yunus (J) Cal 6',
           'Caeli (J) Yunus (J)',
-          'Caeli (J) Yunus (J) Cal 7']
+          'Caeli (J) Yunus (J) Cal 7',
+          'Caeli (J) Eddie (J) Half Occlusion',
+          'Caeli (J) Eddie (J) Full Occlusion',
+          'Caeli (J) Eddie (J) Low Light']
 
 def get_dr(fname):
     from os.path import expanduser
@@ -71,6 +74,9 @@ def get_dr(fname):
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
     elif 'Caeli' in fname and 'Vincent' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
+    elif 'Caeli' in fname and 'Eddie' in fname and ('Occlusion' in fname or 'Low' in fname):
+        return ( expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion '+
+                 'Files/20170307_Caeli_Eddie_Occlusion/' )
     elif 'Caeli' in fname and 'Eddie' in fname and 'Blind' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Eddie/'
     elif 'Caeli' in fname and 'Eddie' in fname and not 'Fine' in fname:
@@ -84,14 +90,21 @@ def get_dr(fname):
     else:
         raise Exception("Invalid file name.")
 
-def print_files():
+def print_files(ix0=0,ix1=None):
     """
     Print list of available file names with their indices to make it easy to load them.
     2017-01-18
+
+    Params:
+    -------
+    ix0 (int=0)
+    ix1 (int=None)
     """
     fnames=get_fnames()
+    ix1 = ix1 or len(fnames)
+    fnames = fnames[ix0:ix1]
     for i,f in enumerate(fnames):
-        print "%d\t%s"%(i,f)
+        print "%d\t%s"%(i+ix0,f)
 
 def calc_file_body_parts():
     """
