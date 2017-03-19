@@ -64,14 +64,29 @@ def get_fnames():
           'Caeli (J) Yunus (J) Cal 6',
           'Caeli (J) Yunus (J)',
           'Caeli (J) Yunus (J) Cal 7',
-          'Caeli (J) Eddie (J) Half Occlusion',
-          'Caeli (J) Eddie (J) Full Occlusion',
-          'Caeli (J) Eddie (J) Low Light',
-          'Caeli (L) Eddie (F) Hands Startup Timer',
-          'Caeli (F) Eddie (L) Hands Startup Timer']
+          ('Caeli (J) Eddie (J) Half Occlusion','20170307'),
+          ('Caeli (J) Eddie (J) Full Occlusion','20170307'),
+          ('Caeli (J) Eddie (J) Low Light','20170307'),
+          ('Caeli (L) Eddie (F) Hands Startup Timer','20170310'),
+          ('Caeli (F) Eddie (L) Hands Startup Timer','20170310'),
+          ('Caeli (L) Eddie (F) Hands','20170317'),
+          ('Caeli (F) Eddie (L) Hands','20170317'),
+          ('Caeli (J) Eddie (J) Hands','20170317'),
+          ('Caeli (J) Eddie (J) Hands Half Occlusion','20170317'),
+          ('Caeli (J) Eddie (J) Hands Full Occlusion','20170317'),
+          ('Caeli (J) Eddie (J) Hands Low Light','20171317')]
 
-def get_dr(fname):
+def get_dr(fname,date=None):
+    """Return directory where files are saved."""
     from os.path import expanduser
+    homedr = expanduser('~')
+    datadr = 'Dropbox/Documents/Noitom/Axis Neuron/Motion Files'
+
+    if not date is None:
+        return {'20170307':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Occlusion'),
+                '20170310':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Startup'),
+                '20170317':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie')}[date]
+
     if 'Itai' in fname and 'Anja' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
     elif 'Caeli' in fname and 'Vincent' in fname:
@@ -269,7 +284,7 @@ def load_calc(fname,cols='V',read_csv_kwargs={}):
 
 def group_cols(columns):
     """
-    Group columns of 3 into multiindex.
+    Group columns of 3 into multiindex with xyz subcolumns.
     2017-03-03
     """
     bodyparts = [c.split('-')[0] for c in columns[::3]]
@@ -278,6 +293,7 @@ def group_cols(columns):
 def extract_calc(fname,dr,bodyparts,dt,
                  append=True,
                  dotruncate=5,
+                 rotate_to_face=True,
                  usezd=False,
                  read_csv_kwargs={},
                 ):
@@ -286,7 +302,7 @@ def extract_calc(fname,dr,bodyparts,dt,
     then I have to align the subjects to a global coordinate frame defined by the initial orientation of their
     hands.
 
-    For import of hands, the first axis is the direction along which the subjects are aligned.
+    For import of hands trials, the first axis is the direction along which the subjects are aligned.
 
     The slowest part is loading the data from file.
     2017-01-16
@@ -304,6 +320,8 @@ def extract_calc(fname,dr,bodyparts,dt,
         feet (because we don't care about stationary feet).
     dotruncate (float=5)
         Truncate beginning and end of data by this many seconds.
+    rotate_to_face (bool=True)
+        Rotate the individuals to face each other.
     usezd (bool=True)
         Get initial body orientation from calc file's Zd entry. This seems to not work as well in capturing
         the 3 dimension of hand movement. I'm not sure why, but I would assume because the orientation between
@@ -331,12 +349,11 @@ def extract_calc(fname,dr,bodyparts,dt,
         
         T = np.arange(len(followerdf))*dt
 
-    if 'Hands' in fname:
+    if rotate_to_face:
         # The correction for the hands is a bit involved. First, I remove the drift from the hips from all the
         # position of all body parts. Then, take the hands, and center them by their midpoint. Then I rotate
-        # their positions so that the leader and follower are facing each other. For some reason, the calc
-        # data sometimes has them facing parallel directions. Remember that the z-axis is pointing into the
-        # ground!
+        # their positions so that the leader and follower are facing each other. Remember that the z-axis is
+        # pointing into the ground!
 
         # Remove drift in hips.
         Xix = np.array(['X' in c for c in leaderdf.columns])
@@ -383,7 +400,7 @@ def extract_calc(fname,dr,bodyparts,dt,
                 followerV[0] += followerdf.values[:,ix*9+3:ix*9+6]
                 followerA[0] += followerdf.values[:,ix*9+6:ix*9+9]
 
-    if 'Hands' in fname:
+    if rotate_to_face:
         # Make sure that first dimension corresponds to the axis towards the other person.
         # Make the leader face towards ([1,0,0]) and the follower towards [-1,0,0].
         phi = []
