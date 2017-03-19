@@ -282,6 +282,18 @@ def load_calc(fname,cols='V',read_csv_kwargs={}):
     #        df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
     return df,zd
 
+def extract_parts(df,bodyparts):
+    """
+    Extract columns for specific body parts from loaded calc file by comparing with column headers.
+    2017-03-19
+    """
+    returnix = []
+    columnBodyParts = [c.split('-')[0].lower() for c in df.columns]
+    for i,c in enumerate(columnBodyParts):
+        if c in bodyparts:
+            returnix.append(i)
+    return df.ix[:,returnix]
+
 def group_cols(columns):
     """
     Group columns of 3 into multiindex with xyz subcolumns.

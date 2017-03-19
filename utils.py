@@ -25,6 +25,18 @@ from scipy.optimize import minimize
 
 
 
+def quaternion_to_rot(q,normalize=False):
+    """
+    Convert quaternion to a four-vector where first entry is the rotation about the unit vector given by
+    the last three elements of the quaternion.
+    """
+    phi = np.arccos(q[:,0])*2
+    u = q[:,1:]/sin(phi[:,None]/2)
+    if normalize:
+        u /= np.linalg.norm(u,axis=1)[:,None]  # Normalize this to one. It should normalized already, so just
+                                               # getting rid of numerical precision errors.
+    return np.hstack((phi[:,None],u))
+
 def optimize_time(t1,x1,t2,x2,
                   scale=1.0,
                   scale_bounds=[.98,1.02],
@@ -32,7 +44,8 @@ def optimize_time(t1,x1,t2,x2,
                   max_offset=10,
                   method='powell'):
     """
-    Find best way to overlap curves.
+    Find best way to overlap curves by rescaling and translating in time. This is used primarily for Vicon and
+    Perception Neuron comoparisons.
     Cost function for finding optimal time scale factor and offset between two data sets.
     Offset and scaling are for second set of trajectories.
     2017-03-07
