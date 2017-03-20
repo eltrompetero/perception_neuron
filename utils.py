@@ -29,6 +29,13 @@ def quaternion_to_rot(q,normalize=False):
     """
     Convert quaternion to a four-vector where first entry is the rotation about the unit vector given by
     the last three elements of the quaternion.
+
+    Params:
+    -------
+    q (ndarray)
+        n_samples x 4 list of quaternions
+    normalize (bool=False)
+        Normalize the rotation vector for the quaternion to erase numerical precision errors.
     """
     phi = np.arccos(q[:,0])*2
     u = q[:,1:]/sin(phi[:,None]/2)

@@ -240,7 +240,7 @@ def filter_hand_trials(filesToFilter):
 def load_calc(fname,cols='V',read_csv_kwargs={}):
     """
     Load calculation file output by Axis Neuron. 
-    Be careful with z-axis that points into the ground by default.
+    Note that z-axis points into the ground by default.
     2016-12-05
 
     Params:
@@ -305,9 +305,11 @@ def group_cols(columns):
 def extract_calc(fname,dr,bodyparts,dt,
                  append=True,
                  dotruncate=5,
+                 remove_hip_drift=True,
                  rotate_to_face=True,
                  usezd=False,
                  read_csv_kwargs={},
+                 center_x=False,
                 ):
     """
     Extract specific set of body parts from calculation file. If a file with coordination of hands is given,
@@ -332,6 +334,7 @@ def extract_calc(fname,dr,bodyparts,dt,
         feet (because we don't care about stationary feet).
     dotruncate (float=5)
         Truncate beginning and end of data by this many seconds.
+    remove_hip_drift (bool=True)
     rotate_to_face (bool=True)
         Rotate the individuals to face each other.
     usezd (bool=True)
@@ -340,6 +343,8 @@ def extract_calc(fname,dr,bodyparts,dt,
         hands and the body is not totally accurate according to Axis Neuron.
     read_csv_kwargs (dict)
         Passed onto pandas.read_csv
+    center_x (bool=False)
+        Subtract mean from the mean of each body parts' displacement.
 
     Value:
     ------
@@ -361,17 +366,19 @@ def extract_calc(fname,dr,bodyparts,dt,
         
         T = np.arange(len(followerdf))*dt
 
-    if rotate_to_face:
-        # The correction for the hands is a bit involved. First, I remove the drift from the hips from all the
-        # position of all body parts. Then, take the hands, and center them by their midpoint. Then I rotate
-        # their positions so that the leader and follower are facing each other. Remember that the z-axis is
-        # pointing into the ground!
-
+    if remove_hip_drift:
         # Remove drift in hips.
         Xix = np.array(['X' in c for c in leaderdf.columns])
         leaderdf.iloc[:,Xix] -= np.tile(leaderdf.iloc[:,:3],(1,leaderdf.shape[1]//9))
         followerdf.iloc[:,Xix] -= np.tile(followerdf.iloc[:,:3],(1,followerdf.shape[1]//9))
 
+    if rotate_to_face:
+        # The correction for the hands is a bit involved. First, I remove the drift from the hips from all the
+        # position of all body parts. Then, take the hands, and center them by their midpoint. Then I rotate
+        # their positions so that the leader and follower are facing each other. Remember that the z-axis is
+        # pointing into the ground!
+        assert remove_hip_drift, "Must remove hip drift if we have a hands trial."
+        
         # Use initial condition to set orientation of subjects, 
         if usezd:
             bodyvec=[leaderzd,followerzd]
@@ -459,6 +466,13 @@ def extract_calc(fname,dr,bodyparts,dt,
             followerA[counter] = truncate(T,a,t0=dotruncate[0],t1=dotruncate[1])
             counter += 1
         T = truncate(T,T,t0=dotruncate[0],t1=dotruncate[1])
+
+    if center_x:
+        for x in leaderX:
+            x -= x.mean(0)
+        for x in followerX:
+            x -= x.mean(0)
+
     return T,leaderX,leaderV,leaderA,followerX,followerV,followerA
 
 def extract_W(fname,dr,bodyparts,dt,
