@@ -181,12 +181,13 @@ def moving_window(s,window,windowType):
 
     return swindow
 
-def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleFreq=60):
+def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleFreq=60,
+                     mx_filter_rows=1000):
     """
     Moving frequency filter using Butterworth lowpass filter. First, construct windowed input as given
     window type is dragged across. Frequency filter each of those samples and then add them all up 
     back together to get the filtered signal.
-    2017-01-21
+    2017-03-19
     
     Params:
     -------
@@ -212,11 +213,20 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
     window /= window.sum()
 
     # Extract subsets of data while window is moving across.
-    pool = mp.Pool(mp.cpu_count())
     def f(i):
         return butter_lowpass_filter( _moving_window(i,s,window),
                                       cutoffFreq,sampleFreq )
-    swindow = np.vstack( pool.map(f,range(T)) ).sum(0)
+
+    # Given memory constraints, don't filter everything at once.
+    pool = mp.Pool(mp.cpu_count())
+    swindow = np.zeros((T))
+    for i in xrange(0,T-mx_filter_rows,mx_filter_rows):
+        swindow += np.vstack( pool.map(f,range(i,i+mx_filter_rows)) ).sum(0)
+    if (i+mx_filter_rows)<T:
+        if (i+mx_filter_rows)==(T-1):
+            swindow += pool.map(f,range(i+mx_filter_rows,T))
+        else:
+            swindow += np.vstack( pool.map(f,range(i+mx_filter_rows,T)) ).sum(0)
     pool.close()
 
     #swindow = butter_lowpass_filter( swindow,
@@ -383,6 +393,9 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
         from scipy.signal import savgol_filter
         if filterparams=='default':
             filterparams={'window':61,'order':4}
+        else:
+            raise NotImplementedError
+
 
         if x.ndim==1:
             return savgol_filter(x,
@@ -394,6 +407,10 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
     elif filtertype=='butter':
         if filterparams=='default':
             filterparams={'cutoff':10,'fs':60}
+        elif filterparams=='120':
+            filterparams={'cutoff':10,'fs':120}
+        else:
+            raise NotImplementedError
 
         if x.ndim==1:
             axis=-1
@@ -406,6 +423,10 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
     elif filtertype=='moving_butter':
         if filterparams=='default':
             filterparams={'cutoff':10,'fs':60}
+        elif filterparams=='120':
+            filterparams={'cutoff':10,'fs':120}
+        else:
+            raise NotImplementedError
 
         if x.ndim==1:
             xfiltered=moving_freq_filt(x,cutoffFreq=filterparams['cutoff'],

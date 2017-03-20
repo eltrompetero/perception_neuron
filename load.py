@@ -196,7 +196,8 @@ def calc_file_body_parts():
 def filter_hand_trials(filesToFilter,dt=1/60,
         extract_calc_kwargs={'rotate_to_face':True,
                              'remove_hip_drift':True,
-                             'dotruncate':5}):
+                             'dotruncate':5},
+        filterparams='default'):
     """
     Shortcut for filtering hand trials data by just giving file number.
     2017-03-19
@@ -206,6 +207,8 @@ def filter_hand_trials(filesToFilter,dt=1/60,
     filesToFilter (list)
     dt (float=1/60)
     extract_calc_kwargs (dict)
+    filterparams (str='default')
+        Choose between 'default' and '120'. Filter parameters for butterworth filter as in utils.smooth()
     """
     from utils import smooth
     import cPickle as pickle
@@ -235,13 +238,13 @@ def filter_hand_trials(filesToFilter,dt=1/60,
 
         # Butterworth filter data and pickle it.
         for x,v,a in zip(leaderX,leaderV,leaderA):
-            x[:] = smooth(x)[:]
-            v[:] = smooth(v)[:]
-            a[:] = smooth(a)[:]
+            x[:] = smooth(x,filterparams=filterparams)[:]
+            v[:] = smooth(v,filterparams=filterparams)[:]
+            a[:] = smooth(a,filterparams=filterparams)[:]
         for x,v,a in zip(followerX,followerV,followerA):
-            x[:] = smooth(x)[:]
-            v[:] = smooth(v)[:]
-            a[:] = smooth(a)[:]
+            x[:] = smooth(x,filterparams=filterparams)[:]
+            v[:] = smooth(v,filterparams=filterparams)[:]
+            a[:] = smooth(a,filterparams=filterparams)[:]
 
         pickle.dump({'T':T,
                      'leaderX':leaderX,'followerX':followerX,
