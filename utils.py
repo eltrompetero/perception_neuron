@@ -24,6 +24,41 @@ import multiprocess as mp
 from scipy.optimize import minimize
 from scipy.signal import spectrogram
 
+
+def detrend(x,window=None):
+    """
+    Detrend by fitting a polynomial to the data and subtracting it.
+    """
+    T = np.arange(len(x))
+    return x - np.polyval(np.polyfit(T,x,3),T)
+
+def phase_d_error(x,y,filt_params=(121,3)):
+    """
+    Relative phase fluctuations per frequency across given signals.
+    
+    Calculate the phase for two signals for various frequency with a moving window. Take the derivative of 
+    the difference of the unwrapped phase to see how much the relative phase fluctuates across the sample.
+    2017-03-20
+    
+    Params:
+    -------
+    x
+    y
+    apply_filt (bool=True)
+    """
+    if filt_params:
+        f,t,spec1,phase1 = spec_and_phase(savgol_filter(x,filt_params[0],filt_params[1]))
+        f,t,spec2,phase2 = spec_and_phase(savgol_filter(y,filt_params[0],filt_params[1]))
+    else:
+        f,t,spec1,phase1 = spec_and_phase(x)
+        f,t,spec2,phase2 = spec_and_phase(y)
+
+    # Cumulative error in the derivative.
+    cumerror = np.zeros((nFreq))
+    for i in xrange(nFreq):
+        cumerror[i] = np.abs(np.diff(np.unwrap(phase1[i])-np.unwrap(phase2[i]))).sum()
+    return cumerror/phase1.shape[1]
+
 def spec_and_phase(X,dt=1/120):
     """
     Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
