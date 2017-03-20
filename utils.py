@@ -25,6 +25,41 @@ from scipy.optimize import minimize
 
 
 
+def pipeline_phase_lag(v1,v2,dt,
+                       maxshift=60,
+                       windowlength=100,
+                       v_threshold=.03,
+                       save='temp.p'):
+    """
+    Find phase lag for each dimension separately and all dimensions together.
+    
+    Params:
+    -------
+    v1,v2,dt
+    maxshift (int=60)
+    windowlength (int=100)
+    v_threshold (float=.03)
+    save (str='temp.p')
+    """
+    import cPickle as pickle
+
+    phasexyz,overlapcostxyz = [],[]
+    for i in xrange(3):
+        p,o = phase_lag(v1[:,i],v2[:,i],maxshift,windowlength,
+                        measure='corr',dt=dt)
+        phasexyz.append(p)
+        overlapcostxyz.append(o)
+    phase,overlapcost = phase_lag(v1[:,:],v2[:,:],maxshift,windowlength,
+                                  measure='dot',dt=dt)
+    
+    if save:
+        print "Pickling results as %s"%save
+        pickle.dump({'phase':phase,'overlapcost':overlapcost,
+                     'phasexyz':phasexyz,'overlapcostxyz':overlapcostxyz,
+                     'maxshift':maxshift,'windowlength':windowlength},
+                    open(save,'wb'),-1)
+    return phasexyz,phase,overlapcostxyz,overlapcost
+
 def quaternion_to_rot(q,normalize=False):
     """
     Convert quaternion to a four-vector where first entry is the rotation about the unit vector given by
@@ -272,6 +307,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
     v1,v2 = v1.copy(),v2.copy()
 
     if measure=='dot':
+        assert v1.ndim>1 and v1.shape[1]>1, "Dot option was written for vectors only."
         normv1,normv2 = norm1(v1),norm1(v2)
         nanix1,nanix2 = normv1<v_threshold,normv2<v_threshold
         v1[nanix1] = np.nan

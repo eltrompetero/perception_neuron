@@ -25,6 +25,74 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def phase(T,v1,v2,phase,phasexyz,title='',maxshift=60,windowlength=100):
+    """
+    Plot normalized velocity phase lag graphs.
+
+    Params:
+    -------
+    T,v1,v2
+    phase
+    phasexyz
+    title
+    maxshift (int=60)
+    windowlength (int=100)
+    """
+    fig = plt.figure(figsize=(15,16))
+    gs = gridspec.GridSpec(7,1)
+    ax = [fig.add_subplot(gs[i]) for i in xrange(7)]
+
+    # Velocity plots.
+    h = []
+    h.append( ax[0].plot(T,v1[:,0],'b-')[0] )
+    h.append( ax[0].plot(T,v2[:,0],'r-')[0] )
+    ax[0].set(ylabel=r'$v$',xticklabels=[],
+              title=title)
+    ax[0].legend(h,('Leader','Follower'),fontsize='xx-small',loc=0)
+    ax[0].grid()
+
+    ax[1].plot(T,v1[:,1],'b-')
+    ax[1].plot(T,v2[:,1],'r-')
+    ax[1].set(ylabel=r'$v$',xticklabels=[])
+    ax[1].grid()
+
+    ax[2].plot(T,v1[:,2],'b-')
+    ax[2].plot(T,v2[:,2],'r-')
+    ax[2].set(ylabel=r'$v$',xticklabels=[])
+    ax[2].grid()
+
+    # Phase lag plots.
+    for i in xrange(3):
+        ax[i+3].plot(T[maxshift:-maxshift-windowlength],phasexyz[i])
+        ax[i+3].fill_between([T[0],T[-1]],-.25,.25,color='k',alpha=.1)
+        ax[i+3].hlines(0,0,T[-1])
+        ax[i+3].set(ylim=[-1,1],ylabel=['x','y','z'][i],xticklabels=[])
+    ax[-1].plot(T[maxshift:-maxshift-windowlength],phase)
+    ax[-1].set(ylim=[-1,1])
+    ax[-1].fill_between([T[0],T[-1]],-.25,.25,color='k',alpha=.1)
+    ax[-1].hlines(0,0,T[-1])
+
+    # phasethreshold = .8
+    # phase_ = phase.copy()
+    # phase_[overlapcost<=phasethreshold] = nan
+    # ax[4].plot(T[maxshift:-maxshift-windowlength],phase_,'b-',lw=2)
+    # phase_ = phase.copy()
+    # phase_[overlapcost>phasethreshold] = nan
+    # ax[4].plot(T[maxshift:-maxshift-windowlength],phase_,'b-',alpha=.3)
+    # # ax[4].fill_between(T[maxshift*2:-2*maxshift], phase-(1-overlapcost), phase+(1-overlapcost),
+    # #                    color='b',alpha=.2)
+    # smoothedPhase = fftconvolve(phase,ones((smoothingwindow))/smoothingwindow,mode='same')
+    # ax[4].plot(T[maxshift:-maxshift-windowlength],
+    #            smoothedPhase,'k-',lw=2,alpha=.5)
+    # ax[4].fill_between([T[0],T[-1]],-.25,.25,color='k',alpha=.1)
+    # ax[4].hlines(0,0,T[-1])
+    # ax[4].set(xlabel='Time',ylabel='Phase lag',ylim=[-dt*maxshift,dt*maxshift])
+    # ax[4].legend(('Raw phase lag','Moving avg','Below human rxn time'),loc=0,fontsize='xx-small')
+    # ax[4].grid()
+
+    for ax_ in ax:
+        ax_.set(xlim=[T[0],T[-1]])
+
 def a_of_t(t,v1,v2,fig=None,ax=None):
     """
     Plot acceleration as a function of time for each axis independently to compare leader and follower.
