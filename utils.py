@@ -32,36 +32,52 @@ def detrend(x,window=None):
     T = np.arange(len(x))
     return x - np.polyval(np.polyfit(T,x,3),T)
 
-def phase_d_error(x,y,filt_params=(121,3)):
+def phase_d_error(x,y,filt_x_params=(121,3),filt_phase_params=(11,2)):
     """
     Relative phase fluctuations per frequency across given signals.
     
     Calculate the phase for two signals for various frequency with a moving window. Take the derivative of 
     the difference of the unwrapped phase to see how much the relative phase fluctuates across the sample.
+
+    Filtering phase after transformation seems to work better in simple sin example rather than the raw data.
     2017-03-20
     
     Params:
     -------
     x
     y
-    apply_filt (bool=True)
+    filt_x_params (tuple)
+    filt_phase_params (tuple)
     """
-    if filt_params:
-        f,t,spec1,phase1 = spec_and_phase(savgol_filter(x,filt_params[0],filt_params[1]))
-        f,t,spec2,phase2 = spec_and_phase(savgol_filter(y,filt_params[0],filt_params[1]))
+    if filt_x_params:
+        f,t,spec1,phase1 = spec_and_phase(savgol_filter(x,filt_x_params[0],filt_x_params[1]))
+        f,t,spec2,phase2 = spec_and_phase(savgol_filter(y,filt_x_params[0],filt_x_params[1]))
     else:
         f,t,spec1,phase1 = spec_and_phase(x)
         f,t,spec2,phase2 = spec_and_phase(y)
-
+    
+    #print np.abs(spec1[1:]).sum(1),np.abs(spec2[1:]).sum(1)
+    # Ignore frequency of 0.
+    f = f[1:]
+    #phase1 = np.unwrap(phase1[1:],axis=1)
+    #phase2 = np.unwrap(phase2[1:],axis=1)
+    phase1 = savgol_filter(np.unwrap(phase1[1:],axis=1),
+                           filt_phase_params[0],
+                           filt_phase_params[1],axis=1)
+    phase2 = savgol_filter(np.unwrap(phase2[1:],axis=1),
+                           filt_phase_params[0],
+                           filt_phase_params[1],axis=1)
+    
     # Cumulative error in the derivative.
-    cumerror = np.abs(np.diff(np.unwrap(phase1,axis=1)-np.unwrap(phase2,axis=1),axis=1)).sum(1)
-    return cumerror/phase1.shape[1]
+    cumerror = np.abs(np.diff(phase1-phase2)).sum(1)
+    return f,cumerror/len(t)
 
 def spec_and_phase(X,dt=1/120):
     """
     Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
     """
     f,t,spec = spectrogram(X,window=('gaussian',90),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
+    #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
     phase = np.arctan2(spec.imag,spec.real)
     return f,t,spec,phase
 
