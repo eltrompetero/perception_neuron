@@ -32,7 +32,7 @@ def detrend(x,window=None):
     T = np.arange(len(x))
     return x - np.polyval(np.polyfit(T,x,3),T)
 
-def phase_d_error(x,y,filt_x_params=(121,3),filt_phase_params=(11,2)):
+def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2)):
     """
     Relative phase fluctuations per frequency across given signals.
     
@@ -40,13 +40,16 @@ def phase_d_error(x,y,filt_x_params=(121,3),filt_phase_params=(11,2)):
     the difference of the unwrapped phase to see how much the relative phase fluctuates across the sample.
 
     Filtering phase after transformation seems to work better in simple sin example rather than the raw data.
+
+    NOTE: Default filtering parameters are arbitrary.
     2017-03-20
     
     Params:
     -------
     x
     y
-    filt_x_params (tuple)
+    filt_x_params (tuple=None)
+        (121,3) is a reasonable choice.
     filt_phase_params (tuple)
     """
     if filt_x_params:
