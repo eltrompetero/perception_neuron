@@ -74,7 +74,7 @@ def get_fnames():
           ('Caeli (J) Eddie (J) Hands','20170317'),
           ('Caeli (J) Eddie (J) Hands Half Occlusion','20170317'),
           ('Caeli (J) Eddie (J) Hands Full Occlusion','20170317'),
-          ('Caeli (J) Eddie (J) Hands Low Light','20171317')]
+          ('Caeli (J) Eddie (J) Hands Low Light','20170317')]
 
 def get_dr(fname,date=None):
     """Return directory where files are saved."""

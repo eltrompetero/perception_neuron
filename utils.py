@@ -22,8 +22,15 @@ import load
 from numba import jit
 import multiprocess as mp
 from scipy.optimize import minimize
+from scipy.signal import spectrogram
 
-
+def spec_and_phase(X,dt=1/120):
+    """
+    Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
+    """
+    f,t,spec = spectrogram(X,window=('gaussian',90),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
+    phase = np.arctan2(spec.imag,spec.real)
+    return f,t,spec,phase
 
 def pipeline_phase_lag(v1,v2,dt,
                        maxshift=60,
