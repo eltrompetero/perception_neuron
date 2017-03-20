@@ -193,28 +193,40 @@ def calc_file_body_parts():
             'LeftHandPinky2',
             'LeftHandPinky3']
 
-def filter_hand_trials(filesToFilter):
+def filter_hand_trials(filesToFilter,dt=1/60,
+        extract_calc_kwargs={'rotate_to_face':True,
+                             'remove_hip_drift':True,
+                             'dotruncate':5}):
     """
     Shortcut for filtering hand trials data by just giving file number.
-    2017-02-23
+    2017-03-19
     
     Params:
     -------
     filesToFilter (list)
+    dt (float=1/60)
+    extract_calc_kwargs (dict)
     """
     from utils import smooth
     import cPickle as pickle
-    dt = 1/60
+    
     bodyparts = [['RightHand','LeftHand'],
                  ['LeftHand','RightHand']]
 
     for fileix in filesToFilter:
         # Read position, velocity and acceleration data from files.
-        fname=get_fnames()[fileix]
-        T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
-                                                                               get_dr(fname),
-                                                                               bodyparts,
-                                                                               dt)
+        if type(get_fnames()[fileix]) is tuple:
+            fname,date = get_fnames()[fileix]
+            T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
+                                                                                   get_dr(fname,date),
+                                                                                   bodyparts,
+                                                                                   dt,**extract_calc_kwargs)
+        else:
+            fname = get_fnames()[fileix]
+            T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
+                                                                                   get_dr(fname),
+                                                                                   bodyparts,
+                                                                                   dt,**extract_calc_kwargs)
 
         for x in leaderX:
             x-=x.mean(0)
@@ -357,10 +369,10 @@ def extract_calc(fname,dr,bodyparts,dt,
     leaderix = 1 if ('F' in fname.split(' ')[1]) else 0
     if not 'leaderdf' in globals():
         characters = [fname.split(' ')[0],fname.split(' ')[2]]
-        leaderdf,leaderzd = load_calc('%s%s%s.calc'%(dr,fname,characters[leaderix]),
+        leaderdf,leaderzd = load_calc('%s/%s%s.calc'%(dr,fname,characters[leaderix]),
                                       cols='XVA',
                                       read_csv_kwargs=read_csv_kwargs)
-        followerdf,followerzd = load_calc('%s%s%s.calc'%(dr,fname,characters[1-leaderix]),
+        followerdf,followerzd = load_calc('%s/%s%s.calc'%(dr,fname,characters[1-leaderix]),
                                           cols='XVA',
                                           read_csv_kwargs=read_csv_kwargs)
         

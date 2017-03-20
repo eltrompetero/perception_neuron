@@ -25,6 +25,36 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def a_of_t(t,v1,v2,fig=None,ax=None):
+    """
+    Plot acceleration as a function of time for each axis independently to compare leader and follower.
+
+    Params:
+    -------
+    t
+    v1
+    v2
+    fig (None)
+    ax (None)
+    """
+    if ax is None:
+        fig,ax = plt.subplots(figsize=(15,8),sharex=True,sharey=True,nrows=3)
+    
+    for i in xrange(3):
+        if i==2:
+            ax[i].plot(t,v1[:,i]-1,'b-')
+            ax[i].plot(t,v2[:,i]-1,'r-')
+            ax[i].set(ylabel='Acc')
+        else:
+            ax[i].plot(t,v1[:,i],'b-')
+            ax[i].plot(t,v2[:,i],'r-')
+            ax[i].set(ylabel='Acc')
+    ax[0].set(xlim=[t[0],t[-1]])
+    ymx = max(np.abs(ax[0].get_ylim()))
+    ax[-1].set(xlabel='Time (s)',ylim=[-ymx,ymx])
+    fig.subplots_adjust(hspace=0)
+    return fig,ax
+
 def v_of_t(t,v1,v2,fig=None,ax=None):
     """
     Plot velocity as a function of time for each axis independently to compare leader and follower.
