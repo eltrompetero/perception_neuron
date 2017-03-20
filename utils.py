@@ -22,7 +22,7 @@ import load
 from numba import jit
 import multiprocess as mp
 from scipy.optimize import minimize
-from scipy.signal import spectrogram
+from scipy.signal import spectrogram,savgol_filter
 
 
 def detrend(x,window=None):
@@ -54,9 +54,7 @@ def phase_d_error(x,y,filt_params=(121,3)):
         f,t,spec2,phase2 = spec_and_phase(y)
 
     # Cumulative error in the derivative.
-    cumerror = np.zeros((nFreq))
-    for i in xrange(nFreq):
-        cumerror[i] = np.abs(np.diff(np.unwrap(phase1[i])-np.unwrap(phase2[i]))).sum()
+    cumerror = np.abs(np.diff(np.unwrap(phase1,axis=1)-np.unwrap(phase2,axis=1),axis=1)).sum(1)
     return cumerror/phase1.shape[1]
 
 def spec_and_phase(X,dt=1/120):
