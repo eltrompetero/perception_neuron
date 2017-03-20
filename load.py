@@ -251,13 +251,13 @@ def filter_hand_trials(filesToFilter,dt=1/60,
                          'leaderX':leaderX,'followerX':followerX,
                          'leaderV':leaderV,'followerV':followerV,
                          'leaderA':leaderA,'followerA':followerA},
-                        open('%s%s.p'%(get_dr(fname,date),fname),'wb'),-1)
+                        open('%s/%s.p'%(get_dr(fname,date),fname),'wb'),-1)
         except NameError:
             pickle.dump({'T':T,
                          'leaderX':leaderX,'followerX':followerX,
                          'leaderV':leaderV,'followerV':followerV,
                          'leaderA':leaderA,'followerA':followerA},
-                        open('%s%s.p'%(get_dr(fname),fname),'wb'),-1)
+                        open('%s/%s.p'%(get_dr(fname),fname),'wb'),-1)
 
 
 def load_calc(fname,cols='V',read_csv_kwargs={}):
