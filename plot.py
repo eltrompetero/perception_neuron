@@ -25,9 +25,34 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def v_of_t(t,v1,v2,fig=None,ax=None):
+    """
+    Plot velocity as a function of time for each axis independently to compare leader and follower.
+
+    Params:
+    -------
+    t
+    v1
+    v2
+    fig (None)
+    ax (None)
+    """
+    if ax is None:
+        fig,ax = plt.subplots(figsize=(15,8),sharex=True,sharey=True,nrows=3)
+    
+    for i in xrange(3):
+        ax[i].plot(t,v1[:,i],'b-')
+        ax[i].plot(t,v2[:,i],'r-')
+        ax[i].set(ylabel='Vel')
+    ax[0].set(xlim=[t[0],t[-1]])
+    ymx = max(np.abs(ax[0].get_ylim()))
+    ax[-1].set(xlabel='Time (s)',ylim=[-ymx,ymx])
+    fig.subplots_adjust(hspace=0)
+    return fig,ax
+
 def plot_xva_comparison(fig,ax,x1,x2,v1,v2,a1,a2,aOffset=0.,title=''):
     """
-    Plot XVA comparison plots.
+    Plot XVA comparison plots. Three rows of comparison.
     2016-12-14
     """
     ax[0].plot(x1,x2,'.',alpha=.2)
@@ -55,6 +80,9 @@ def plot_xva_comparison(fig,ax,x1,x2,v1,v2,a1,a2,aOffset=0.,title=''):
     fig.text(.3,.95,title)
 
 def plot_va_comparison(fig,ax,v1,v2,a1,a2,aOffset=0.,title=''):
+    """
+    Plot velocity and acceleration points against each other in two plots.
+    """
     ax[0].plot(v1,v2,'.',alpha=.2)
     ax[0].plot([-1,1],[-1,1],'k-')
     ax[0].set(xlabel='Leader vel',ylabel='Follower vel',
