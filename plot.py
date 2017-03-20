@@ -46,19 +46,19 @@ def phase(T,v1,v2,phase,phasexyz,title='',maxshift=60,windowlength=100):
     h = []
     h.append( ax[0].plot(T,v1[:,0],'b-')[0] )
     h.append( ax[0].plot(T,v2[:,0],'r-')[0] )
-    ax[0].set(ylabel=r'$v$',xticklabels=[],
+    ax[0].set(ylabel=r'$v_x$',xticklabels=[],
               title=title)
     ax[0].legend(h,('Leader','Follower'),fontsize='xx-small',loc=0)
     ax[0].grid()
 
     ax[1].plot(T,v1[:,1],'b-')
     ax[1].plot(T,v2[:,1],'r-')
-    ax[1].set(ylabel=r'$v$',xticklabels=[])
+    ax[1].set(ylabel=r'$v_y$',xticklabels=[])
     ax[1].grid()
 
     ax[2].plot(T,v1[:,2],'b-')
     ax[2].plot(T,v2[:,2],'r-')
-    ax[2].set(ylabel=r'$v$',xticklabels=[])
+    ax[2].set(ylabel=r'$v_z$',xticklabels=[])
     ax[2].grid()
 
     # Phase lag plots.
@@ -66,7 +66,7 @@ def phase(T,v1,v2,phase,phasexyz,title='',maxshift=60,windowlength=100):
         ax[i+3].plot(T[maxshift:-maxshift-windowlength],phasexyz[i])
         ax[i+3].fill_between([T[0],T[-1]],-.25,.25,color='k',alpha=.1)
         ax[i+3].hlines(0,0,T[-1])
-        ax[i+3].set(ylim=[-1,1],ylabel=['x','y','z'][i],xticklabels=[])
+        ax[i+3].set(ylim=[-1,1],ylabel=['x phase','y phase','z phase'][i],xticklabels=[])
     ax[-1].plot(T[maxshift:-maxshift-windowlength],phase)
     ax[-1].set(ylim=[-1,1])
     ax[-1].fill_between([T[0],T[-1]],-.25,.25,color='k',alpha=.1)
