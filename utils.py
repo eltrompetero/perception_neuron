@@ -32,7 +32,7 @@ def detrend(x,window=None):
     T = np.arange(len(x))
     return x - np.polyval(np.polyfit(T,x,3),T)
 
-def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2)):
+def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=210):
     """
     Relative phase fluctuations per frequency across given signals.
     
@@ -53,11 +53,11 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2)):
     filt_phase_params (tuple)
     """
     if filt_x_params:
-        f,t,spec1,phase1 = spec_and_phase(savgol_filter(x,filt_x_params[0],filt_x_params[1]))
-        f,t,spec2,phase2 = spec_and_phase(savgol_filter(y,filt_x_params[0],filt_x_params[1]))
+        f,t,spec1,phase1 = spec_and_phase(savgol_filter(x,filt_x_params[0],filt_x_params[1]),noverlap)
+        f,t,spec2,phase2 = spec_and_phase(savgol_filter(y,filt_x_params[0],filt_x_params[1]),noverlap)
     else:
-        f,t,spec1,phase1 = spec_and_phase(x)
-        f,t,spec2,phase2 = spec_and_phase(y)
+        f,t,spec1,phase1 = spec_and_phase(x,noverlap)
+        f,t,spec2,phase2 = spec_and_phase(y,noverlap)
     
     #print np.abs(spec1[1:]).sum(1),np.abs(spec2[1:]).sum(1)
     # Ignore frequency of 0.
@@ -73,14 +73,15 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2)):
     
     # Cumulative error in the derivative.
     cumerror = np.abs(np.diff(phase1-phase2)).sum(1)
-    return f,cumerror/len(t)
+    return f,t,cumerror/len(t),phase1,phase2
 
-def spec_and_phase(X,dt=1/120):
+def spec_and_phase(X,noverlap,dt=1/120):
     """
     Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
     """
-    f,t,spec = spectrogram(X,window=('gaussian',90),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
+    #f,t,spec = spectrogram(X,window=('gaussian',90),nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
+    f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
     phase = np.arctan2(spec.imag,spec.real)
     return f,t,spec,phase
 
@@ -194,10 +195,13 @@ def _moving_window(i,s,window):
 
     Params:
     -------
-    s
-    window
-    windowType
-
+    i (int)
+        Window offset.
+    s (ndarray)
+        1d signal to window.
+    window (ndarray)
+        Window to move across signal.
+    
     Returns:
     --------
     swindow (ndarray)
@@ -213,6 +217,10 @@ def _moving_window(i,s,window):
 
 @jit(nopython=True)
 def _move_window(i,T,s,window,swindow):
+    """
+    Move window across a single row of the data while accounting for the proper normalization constant such
+    that the resummed signal will reconstitute the original signal.
+    """
     if i<(len(window)//2+1):
         swindow[:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
         for j in xrange(len(window)//2+1):
@@ -295,6 +303,8 @@ def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleF
         Cutoff frequency for butterworth filter.
     sampleFreq (float=60)
         Sampling frequency of input signal.
+    mx_filter_rows (int=1000)
+        Maximum number of rows to filter at once. This is limited by memory.
     """
     assert (window%2)==1, "Window width must be odd."
     from scipy.signal import get_window
