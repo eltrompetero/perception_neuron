@@ -59,8 +59,9 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=210):
         f,t,spec1,phase1 = spec_and_phase(x,noverlap)
         f,t,spec2,phase2 = spec_and_phase(y,noverlap)
     
-    #print np.abs(spec1[1:]).sum(1),np.abs(spec2[1:]).sum(1)
-    # Ignore frequency of 0.
+    # Filtering phase seems to be important to get a good estimate. Have only tested this with a simple sine
+    # signal.
+    # Ignore 0 frequency.
     f = f[1:]
     #phase1 = np.unwrap(phase1[1:],axis=1)
     #phase2 = np.unwrap(phase2[1:],axis=1)
@@ -79,10 +80,10 @@ def spec_and_phase(X,noverlap,dt=1/120):
     """
     Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
     """
-    #f,t,spec = spectrogram(X,window=('gaussian',90),nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
+    f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=1000,noverlap=noverlap,mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
-    f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
-    phase = np.arctan2(spec.imag,spec.real)
+    #f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
+    phase = np.angle(spec)
     return f,t,spec,phase
 
 def pipeline_phase_lag(v1,v2,dt,
@@ -219,7 +220,10 @@ def _moving_window(i,s,window):
 def _move_window(i,T,s,window,swindow):
     """
     Move window across a single row of the data while accounting for the proper normalization constant such
-    that the resummed signal will reconstitute the original signal.
+    that the resummed signal will reconstitute the original signal. This assumes that the i are space out by
+    ones.
+
+    NOTE: There is much simpler way of doing this using np.lib.stride_tricks.as_strided().
     """
     if i<(len(window)//2+1):
         swindow[:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
