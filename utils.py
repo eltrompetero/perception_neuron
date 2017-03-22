@@ -39,7 +39,7 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=210):
     Calculate the phase for two signals for various frequency with a moving window. Take the derivative of 
     the difference of the unwrapped phase to see how much the relative phase fluctuates across the sample.
 
-    Filtering phase after transformation seems to work better in simple sin example rather than the raw data.
+    Filtering phase after transformation seems to work better rather than the raw phase in simple sin example.
 
     NOTE: Default filtering parameters are arbitrary.
     2017-03-20
@@ -79,8 +79,19 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=210):
 def spec_and_phase(X,noverlap,dt=1/120):
     """
     Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
+
+    Params:
+    -------
+    X
+    noverlap (int)
+    dt (float=1/120)
     """
-    f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=1000,noverlap=noverlap,mode='complex',fs=1/dt)
+    assert noverlap<1
+    nperseg = 301
+    noverlap = int(noverlap*nperseg)
+
+    f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=nperseg,noverlap=noverlap,
+                           mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
     phase = np.angle(spec)
