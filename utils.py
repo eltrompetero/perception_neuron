@@ -212,7 +212,7 @@ def _moving_window(i,s,window):
     s (ndarray)
         1d signal to window.
     window (ndarray)
-        Window to move across signal.
+        Window to move across signal. The sum must be normalized to 1!
     
     Returns:
     --------
@@ -232,7 +232,7 @@ def _move_window(i,T,s,window,swindow):
     """
     Move window across a single row of the data while accounting for the proper normalization constant such
     that the resummed signal will reconstitute the original signal. This assumes that the i are space out by
-    ones.
+    ones and that the window sums to 1.
 
     NOTE: There is much simpler way of doing this using np.lib.stride_tricks.as_strided().
     """
