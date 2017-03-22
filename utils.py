@@ -249,13 +249,12 @@ def _move_window(i,shift,T,s,window,swindow):
             swindow[j] /= window[len(window)//2-j::shift].sum()
          
         # Right boundary.
-        counter = 0
-        i = counter+T-len(window)//2-1
-        while (T-len(window)-1+counter)<=i and i<T:
-            swindow[i] /= window[counter::shift].sum()
-            swindow[i] *= 2
-            counter += 1
-            i = counter+T-len(window)//2-1
+        #counter = 0
+        #i = counter+T-len(window)//2-1
+        #while (T-len(window)-1+counter)<=i and i<T:
+        #    swindow[i] /= window[counter::shift].sum()
+        #    counter += 1
+        #    i = counter+T-len(window)//2-1
     # Right side.
     elif (T-len(window)//2-1)<=i<T:
         counter = i-T+len(window)//2+1
@@ -264,7 +263,7 @@ def _move_window(i,shift,T,s,window,swindow):
         counter = 0
         i = counter+T-len(window)//2-1
         while i<T:
-            swindow[i] /= window[:counter+1].sum()
+            swindow[i] /= window[:counter].sum()
             counter += 1
             i += 1
 
