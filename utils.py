@@ -200,7 +200,7 @@ def optimize_time(t1,x1,t2,x2,
     scale,offset = soln['x']
     return scale,offset
 
-def _moving_window(i,s,window):
+def _moving_window(i,shift,s,window):
     """
     Return snapshots of input as given window array is moved across it. This is very fast using jit.
     2017-01-30
@@ -222,13 +222,14 @@ def _moving_window(i,s,window):
     """
     T=len(s)
     swindow=np.zeros((T))  # windowed input
+    window = window*shift  # shift means that normalization occurs over shift spaced elements of window
 
     # Extract subsets of data while window is moving across.
-    _move_window(i,T,s,window,swindow)
+    _move_window(i,shift,T,s,window,swindow)
     return swindow
 
 @jit(nopython=True)
-def _move_window(i,T,s,window,swindow):
+def _move_window(i,shift,T,s,window,swindow):
     """
     Move window across a single row of the data while accounting for the proper normalization constant such
     that the resummed signal will reconstitute the original signal. This assumes that the i are space out by
@@ -237,32 +238,35 @@ def _move_window(i,T,s,window,swindow):
     NOTE: There is much simpler way of doing this using np.lib.stride_tricks.as_strided().
     """
     if i<(len(window)//2+1):
-        swindow[:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
+        swindow[:len(window)//2+i+1] = window[len(window)//2-i:]*s[:len(window)//2+i+1]
         for j in xrange(len(window)//2+1):
-            swindow[j] /= window[:len(window)//2+j+1].sum()
+            swindow[j] /= window[len(window)//2-j::shift].sum()
     # Middle.
     elif (len(window)//2+1)<=i<(T-len(window)//2-1):
-        swindow[i-len(window)//2:i+len(window)//2+1]=s[i-len(window)//2:i+len(window)//2+1]*window
+        # Left side of window near boundary?
+        swindow[i-len(window)//2:i+len(window)//2+1] = s[i-len(window)//2:i+len(window)//2+1]*window
         for j in xrange(i-len(window)//2-1,len(window)//2+1):
-            swindow[j] /= window[:len(window)//2+j+1].sum()
-        
-        counter=0
-        i=counter+T-len(window)//2-1
+            swindow[j] /= window[len(window)//2-j::shift].sum()
+         
+        # Right boundary.
+        counter = 0
+        i = counter+T-len(window)//2-1
         while (T-len(window)-1+counter)<=i and i<T:
-            swindow[i] /= window[counter:].sum()
-            counter+=1
-            i=counter+T-len(window)//2-1
+            swindow[i] /= window[counter::shift].sum()
+            swindow[i] *= 2
+            counter += 1
+            i = counter+T-len(window)//2-1
     # Right side.
     elif (T-len(window)//2-1)<=i<T:
-        counter=i-T+len(window)//2+1
-        swindow[i-len(window)//2:T]=window[:len(window)-counter]*s[i-len(window)//2:T]
+        counter = i-T+len(window)//2+1
+        swindow[i-len(window)//2:T] = window[:len(window)-counter]*s[i-len(window)//2:T]
         
-        counter=0
-        i=counter+T-len(window)//2-1
+        counter = 0
+        i = counter+T-len(window)//2-1
         while i<T:
-            swindow[i] /= window[counter:].sum()
-            counter+=1
-            i=counter+T-len(window)//2-1
+            swindow[i] /= window[:counter+1].sum()
+            counter += 1
+            i += 1
 
 def moving_window(s,window,windowType):
     """
