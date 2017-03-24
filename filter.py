@@ -226,3 +226,75 @@ def butter_plot(ax, b, a, fs):
     ax.grid(which='both', axis='both')
     ax.axvline(10, color='green') # cutoff frequency
 
+def smooth(x,filtertype='moving_butter',filterparams='default'):
+    """
+    Smooth multidimensional curve. Currently, using Savitzy-Golay on each
+    dimension independently. Ideally, I would implememnt some sort of smoothing
+    algorithm that accounts for relationships between the different dimensions.
+    2017-01-24
+
+    Params:
+    -------
+    x (ndarray)
+        n_samples x n_dim
+    filtertype (str='sav')
+        'sav', 'butter', 'moving_butter'
+    filterparams (dict)
+        Savitzy-Golay: (window, order) typically {'window':61,'order':4}
+        Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
+        Moving Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
+    """
+    if filtertype=='sav':
+        from scipy.signal import savgol_filter
+        if filterparams=='default':
+            filterparams={'window':61,'order':4}
+        else:
+            raise NotImplementedError
+
+
+        if x.ndim==1:
+            return savgol_filter(x,
+                                 filterparams['window'],filterparams['order'])
+        
+        xfiltered=np.zeros_like(x)
+        for i in xrange(x.shape[1]):
+            xfiltered[:,i]=savgol_filter(x[:,i],window,order)
+    elif filtertype=='butter':
+        if filterparams=='default':
+            filterparams={'cutoff':10,'fs':60}
+        elif filterparams=='120':
+            filterparams={'cutoff':10,'fs':120}
+        else:
+            raise NotImplementedError
+
+        if x.ndim==1:
+            axis=-1
+        else:
+            axis=0
+        xfiltered=butter_lowpass_filter(x,
+                                        filterparams['cutoff'],
+                                        filterparams['fs'],
+                                        axis=axis) 
+    elif filtertype=='moving_butter':
+        if filterparams=='default':
+            filterparams={'cutoff':10,'fs':60}
+        elif filterparams=='120':
+            filterparams={'cutoff':10,'fs':120}
+        else:
+            raise NotImplementedError
+
+        if x.ndim==1:
+            xfiltered=moving_freq_filt(x,cutoffFreq=filterparams['cutoff'],
+                                       sampleFreq=filterparams['fs'])
+        else:
+            def f(x):
+                return moving_freq_filt(x,
+                                        cutoffFreq=filterparams['cutoff'],
+                                        sampleFreq=filterparams['fs'])
+            xfiltered = []
+            for i in xrange(x.shape[1]):
+                xfiltered.append( f(x[:,i]) )
+            xfiltered = np.vstack(xfiltered).T
+    else: raise Exception("Invalid filter option.")
+    return xfiltered
+
