@@ -408,46 +408,6 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
             xfiltered = np.vstack(xfiltered).T
     else: raise Exception("Invalid filter option.")
     return xfiltered
- 
-def butter_lowpass(cutoff,fs, order=5):
-    from scipy.signal import butter
-    nyq = 0.5 * fs
-    cutoff /= nyq
-    b, a = butter( order, cutoff )
-    return b, a
-
-def butter_lowpass_filter(data, cutoff, fs, order=5, axis=0, **kwargs):
-    """
-    Forward-backward call to Butterworth filter. This applies the filter in the forwards direction and then
-    backwards and the result is in phase with the data.
-    2015-10-18
-
-    Params:
-    -------
-    data (ndarray)
-    cutoff (float)
-        max frequency in Hz corresponding to frequency at which gain goes to -3dB, or 1/sqrt(2)
-    fs (float)
-        sample frequency in Hz
-    order (5,int)
-        order of Buttworth filter
-    """
-    from scipy.signal import filtfilt
-    b,a = butter_lowpass(cutoff,fs,order)
-    return filtfilt( b,a,data,axis=axis, **kwargs)
-
-def butter_plot(ax, b, a, fs):
-    """Show plot of filter gain.
-    2015-09-09
-    """
-    w, h = signal.freqz(b, a)
-    ax.semilogx(w*.5*fs/np.pi, 20 * np.log10(abs(h)))
-    ax.set(title='Butterworth filter frequency response',
-           xlabel='Frequency [Hz]',
-           ylabel='Amplitude [dB]',ylim=[-5,1])
-    #ax.margins(0, 0.1)
-    ax.grid(which='both', axis='both')
-    ax.axvline(10, color='green') # cutoff frequency
    
 def get_reshape_samples(sample,neighborsix,windowlen):
     """
