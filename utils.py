@@ -22,7 +22,7 @@ import load
 from numba import jit
 import multiprocess as mp
 from scipy.optimize import minimize
-from scipy.signal import spectrogram,savgol_filter
+from scipy.signal import spectrogram,savgol_filter,fftconvolve
 
 
 def detrend(x,window=None):
@@ -109,6 +109,7 @@ def pipeline_phase_lag(v1,v2,dt,
                        maxshift=60,
                        windowlength=100,
                        v_threshold=.03,
+                       measure='dot',
                        save='temp.p'):
     """
     Find phase lag for each dimension separately and for the vector including all dimensions together.
@@ -213,7 +214,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
     """
     Find index shift that would maximize the overlap between two different time series. This involves taking
     windows of one series and moving across the other time series to find maximal agreement.
-    2017-02-18
+    2017-03-27
 
     Params:
     -------
@@ -237,7 +238,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
     phase
         Phase difference in units of dt.
     overlaperror
-        Max overlap measure used to determine phase lag. With dot product, this maxes out at 1.
+        Max overlap measure used to determine phase lag. This is in the interval [-1,1].
     """
     if window is None:
         filtwindow = np.ones((windowlength,1))
@@ -286,24 +287,47 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
         p.close()
 
     elif measure=='corr':
-        assert v1.ndim==1 and v2.ndim==1
-        phase = np.zeros((len(v1)-2*maxshift-windowlength))
-        overlaperror = np.zeros((len(v1)-2*maxshift-windowlength))
+        # Normalized correlation E[x*y]/sqrt(E[x^2]E[y^2]). This accounts for importance of the sign by not
+        # subtracting off the mean.
+        if v1.ndim>1:
+            v1 = [i for i in v1.T]
+            v2 = [i for i in v2.T]
+        else:
+            v1,v2 = [v1],[v2]
+        
+        # Define function for calculating phase lag for each dimension separately.
+        def _calc_single_col(v1,v2):
+            phase = np.zeros((len(v1)-2*maxshift-windowlength))
+            overlaperror = np.zeros((len(v1)-2*maxshift-windowlength))
+            L = windowlength+maxshift*2
 
-        counter = 0
-        for i in xrange(maxshift,len(v1)-maxshift-windowlength):
-            window=v2[i:i+windowlength]
-            windowmean,windowstd = window.mean(),window.std()
-            
-            overlapcost=np.zeros((2*maxshift))
-            for j in xrange(maxshift*2):
-                background = v1[i-maxshift+j:i-maxshift+windowlength+j]
-                overlapcost[j] = ((window*background).mean()-windowmean*background.mean())/windowstd/background.std()
-            maxix = local_argmax(overlapcost,windowlength//2)
-            phase[counter] = (maxix-maxshift)*-dt
-            overlaperror[counter] = overlapcost.max()
-            counter += 1 
+            counter = 0
+            for i in xrange(maxshift,len(v1)-maxshift-windowlength):
+                window = v2[i:i+windowlength]
+                windowabsmean = np.sqrt( (window*window).mean() )
+                background = v1[i-maxshift:i+maxshift+windowlength]
+                backgroundabsmean = np.sqrt( fftconvolve(background**2,
+                                                         np.ones((windowlength))/windowlength,
+                                                         mode='same') ) 
+                overlapcost = fftconvolve(background,window,mode='same')/L / (windowabsmean * backgroundabsmean)
+                
+                # Look for local max starting from the center of the window.
+                maxix = local_argmax(overlapcost,len(background)//2)
+                phase[counter] = (maxix-maxshift)*-dt
+                overlaperror[counter] = overlapcost.max()
+                counter += 1 
+            return phase,overlaperror
+        
+        # Calculate phase lag by looping through all dimensions.
+        phase,overlaperror = [],[]
+        for x,y in zip(v1,v2):
+            p,e = _calc_single_col(x,y)
+            phase.append(p)
+            overlaperror.append(e)
+        phase,overlaperror = np.vstack(phase).T,np.vstack(overlaperror).T
+
     else: raise Exception("Bad correlation measure option.")
+
     return phase,overlaperror
 
 @jit
