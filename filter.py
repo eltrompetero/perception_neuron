@@ -1,6 +1,51 @@
 # Filtering functions.
+from __future__ import division
 import numpy as np
 import multiprocess as mp
+from numpy import fft
+
+def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
+    """
+    This does not account for the proper normalization of the windowing function such that the original signal
+    can be reconstituted. This would have to be done with shifted_window_weights().
+    2017-03-24
+
+    Params:
+    -------
+    s (ndarray)
+    window (ndarray)
+    shift (int)
+    fs (float=1)
+        Sampling rate.
+    npadding (int=0)
+    padval (float=0.)
+
+    Value:
+    -------
+    f (ndarray)
+        Return only positive frequencies.
+    t (ndarray)
+    spec
+        (n_freq,n_time)
+    """
+    lw = len(window)
+    f = fft.fftfreq(len(window),d=1/fs)
+    
+    # Define time, accounting for padding.
+    assert npadding<=(lw//2)
+    s = np.concatenate(( np.zeros((npadding))+padval,s,np.zeros((npadding))+padval ))
+    t = (1/fs)*np.arange( lw//2-npadding,len(s)-(lw//2-npadding),shift )
+    
+    spec = np.zeros((len(f)//2+1,len(t)),dtype=np.complex64)
+    #windowWeights = shifted_window_weights(window,shift,len(s),offset=lw//2)
+    
+    # Remember that the offset should be kept at lw//2 when padded because the only thing that the padding
+    # does is to shift the beginning of the windowing over but you still want a full window to fit at the left
+    # and right boundaries.
+    for counter,i in enumerate(xrange(lw//2,len(s)-lw//2,shift)):
+        spec[:,counter] = fft.fft( window_signal(i,window,s) )[f>=0] 
+
+    return f[f>=0],t,spec
 
 def window_signal(i,window,signal,extract=True,return_index=False):
     """
@@ -123,8 +168,14 @@ def shifted_window_weights(window,shift,T,offset=None):
 
     return wnorm
 
-def moving_freq_filt(s,window=201,windowType=('gaussian',20),windowShift=1,cutoffFreq=5,sampleFreq=60,
-                     mx_filter_rows=1000):
+def moving_freq_filt(s,window=201,windowType=('gaussian',20),
+                     windowShift=1,
+                     filter_type=None,
+                     cutoffFreq=5,
+                     pass_freq=None,
+                     bandwidth=None,
+                     sample_freq=60,
+                     mx_filter_rows=100):
     """
     Moving frequency filter using Butterworth lowpass filter. First, construct windowed input as given
     window type is dragged across. Frequency filter each of those samples and then add them all up 
@@ -141,20 +192,26 @@ def moving_freq_filt(s,window=201,windowType=('gaussian',20),windowShift=1,cutof
         ('Gaussian',20) as input to scipy.signal.get_window()
     windowShift (int=1)
         Not yet implemented.
+    filter_type (str=None)
+        Default is 'butter' which is a Butterworth lowpass filter.
     cutoffFreq (float=5)
         Cutoff frequency for butterworth filter.
-    sampleFreq (float=60)
+    sample_freq (float=60)
         Sampling frequency of input signal.
-    mx_filter_rows (int=1000)
+    mx_filter_rows (int=100)
         Maximum number of rows to filter at once. This is limited by memory.
     """
     windowShift = 1  # Have not yet implemented different window shifts
     assert (window%2)==1, "Window width must be odd."
     from scipy.signal import get_window
+    filter_type = filter_type or 'butter'
     
     T = len(s)
     swindow = np.zeros((T))  # windowed input
-
+    filtfun = {'butter':(lambda x: butter_lowpass_filter(x,cutoffFreq,sample_freq)),
+               'single':(lambda x: single_freq_pass_filter(x,pass_freq,bandwidth,sample_freq))
+              }[filter_type]
+    
     # Normalize the window. Each point gets hit with every part of window once (except boundaries).
     window = get_window(windowType,window)
     lw = len(window)
@@ -163,7 +220,7 @@ def moving_freq_filt(s,window=201,windowType=('gaussian',20),windowShift=1,cutof
     # Extract subsets of data while window is moving across.
     def f(i):
         view,ix = window_signal(i,window,s,extract=True,return_index=True)
-        filteredView= butter_lowpass_filter( view, cutoffFreq,sampleFreq )
+        filteredView = filtfun(view)
         filtereds = np.zeros((T))
         filtereds[ix[0]:ix[1]] = filteredView
         return filtereds
@@ -182,9 +239,25 @@ def moving_freq_filt(s,window=201,windowType=('gaussian',20),windowShift=1,cutof
 
     #swindow = butter_lowpass_filter( swindow,
     #                                 cutoffFreq,
-    #                                 sampleFreq,
+    #                                 sample_freq,
     #                                 axis=1 ).sum(0)
     return swindow/windowWeights
+
+def single_freq_pass_filter(x,pass_freq,bandwidth,sample_freq):
+    """
+    Single frequency filter using a Gaussian frequency filter.
+    
+    Params:
+    -------
+    x (ndarray)
+    pass_freq (float)
+    sample_freq (float)
+    """
+    from scipy.stats import norm
+
+    freq = fft.fftfreq(len(x),d=1/sample_freq)
+    spec = fft.fft(x)*norm.pdf(freq,pass_freq,bandwidth)*np.sqrt(2*np.pi)*bandwidth
+    return fft.ifft(spec).real
 
 def butter_lowpass(cutoff,fs, order=5):
     from scipy.signal import butter

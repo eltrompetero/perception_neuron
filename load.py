@@ -210,7 +210,7 @@ def filter_hand_trials(filesToFilter,dt=1/60,
     filterparams (str='default')
         Choose between 'default' and '120'. Filter parameters for butterworth filter as in utils.smooth()
     """
-    from utils import smooth
+    from filter import smooth
     import cPickle as pickle
     
     bodyparts = [['RightHand','LeftHand'],

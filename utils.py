@@ -32,7 +32,7 @@ def detrend(x,window=None):
     T = np.arange(len(x))
     return x - np.polyval(np.polyfit(T,x,3),T)
 
-def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=210):
+def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
     """
     Relative phase fluctuations per frequency across given signals.
     
@@ -86,14 +86,20 @@ def spec_and_phase(X,noverlap,dt=1/120):
     noverlap (int)
     dt (float=1/120)
     """
+    from filter import spectrogram
+    from scipy.signal import get_window
+
     assert noverlap<1
-    nperseg = 301
+    nperseg = 601
     noverlap = int(noverlap*nperseg)
 
-    f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=nperseg,noverlap=noverlap,
-                           mode='complex',fs=1/dt)
+    #f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=nperseg,noverlap=noverlap,
+    #                       mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
+    window = get_window(('gaussian',40),nperseg)
+    f,t,spec = spectrogram(X,window,nperseg-noverlap,fs=1/dt,npadding=nperseg//2)
+
     phase = np.angle(spec)
     return f,t,spec,phase
 
