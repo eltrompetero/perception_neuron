@@ -168,7 +168,8 @@ def shifted_window_weights(window,shift,T,offset=None):
 
     return wnorm
 
-def moving_freq_filt(s,window=201,windowType=('gaussian',20),
+def moving_freq_filt(s,window=201,
+                     windowType=('gaussian',20),
                      windowShift=1,
                      filter_type=None,
                      cutoffFreq=5,
