@@ -127,17 +127,18 @@ def pipeline_phase_lag(v1,v2,dt,
     phasexyz,overlapcostxyz = [],[]
     for i in xrange(3):
         p,o = phase_lag(v1[:,i],v2[:,i],maxshift,windowlength,
-                        measure='corr',dt=dt)
+                        measure=measure,dt=dt)
         phasexyz.append(p)
         overlapcostxyz.append(o)
-    phase,overlapcost = phase_lag(v1[:,:],v2[:,:],maxshift,windowlength,
-                                  measure='dot',dt=dt)
+    phase,overlapcost = phase_lag(v1,v2,maxshift,windowlength,
+                                  measure=measure,dt=dt)
     
     if save:
         print "Pickling results as %s"%save
         pickle.dump({'phase':phase,'overlapcost':overlapcost,
                      'phasexyz':phasexyz,'overlapcostxyz':overlapcostxyz,
                      'maxshift':maxshift,'windowlength':windowlength,
+                     'measure':measure,
                      'v1':v1,'v2':v2},
                     open(save,'wb'),-1)
     return phasexyz,phase,overlapcostxyz,overlapcost
@@ -312,7 +313,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
                 overlapcost = fftconvolve(background,window,mode='same')/L / (windowabsmean * backgroundabsmean)
                 
                 # Look for local max starting from the center of the window.
-                maxix = local_argmax(overlapcost,len(background)//2)
+                maxix = local_argmax(overlapcost,windowlength//2)
                 phase[counter] = (maxix-maxshift)*-dt
                 overlaperror[counter] = overlapcost.max()
                 counter += 1 
@@ -327,6 +328,12 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
     else: raise Exception("Bad correlation measure option.")
 
     return phase,overlaperror
+
+def fftconvolve_md(x,args=[],axis=0):
+    """
+    fftconvolve on multidimensional array along particular axis
+    """
+    return np.apply_along_axis(fftconvolve,axis,x,*args)
 
 @jit
 def norm1(x):
