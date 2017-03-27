@@ -32,7 +32,7 @@ def detrend(x,window=None):
     T = np.arange(len(x))
     return x - np.polyval(np.polyfit(T,x,3),T)
 
-def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=210):
+def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
     """
     Relative phase fluctuations per frequency across given signals.
     
@@ -86,14 +86,20 @@ def spec_and_phase(X,noverlap,dt=1/120):
     noverlap (int)
     dt (float=1/120)
     """
+    from filter import spectrogram
+    from scipy.signal import get_window
+
     assert noverlap<1
-    nperseg = 301
+    nperseg = 601
     noverlap = int(noverlap*nperseg)
 
-    f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=nperseg,noverlap=noverlap,
-                           mode='complex',fs=1/dt)
+    #f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=nperseg,noverlap=noverlap,
+    #                       mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
+    window = get_window(('gaussian',40),nperseg)
+    f,t,spec = spectrogram(X,window,nperseg-noverlap,fs=1/dt,npadding=nperseg//2)
+
     phase = np.angle(spec)
     return f,t,spec,phase
 
@@ -199,160 +205,6 @@ def optimize_time(t1,x1,t2,x2,
     soln = minimize(lambda params: f(*params),[scale,offset],method=method )
     scale,offset = soln['x']
     return scale,offset
-
-def _moving_window(i,s,window):
-    """
-    Return snapshots of input as given window array is moved across it. This is very fast using jit.
-    2017-01-30
-
-    Params:
-    -------
-    i (int)
-        Window offset.
-    s (ndarray)
-        1d signal to window.
-    window (ndarray)
-        Window to move across signal. The sum must be normalized to 1!
-    
-    Returns:
-    --------
-    swindow (ndarray)
-        len(s) x len(s). Each row is a snapshot of the input with the window being shifted over. The sum down
-        the columns will reconstruct the input.
-    """
-    T=len(s)
-    swindow=np.zeros((T))  # windowed input
-
-    # Extract subsets of data while window is moving across.
-    _move_window(i,T,s,window,swindow)
-    return swindow
-
-@jit(nopython=True)
-def _move_window(i,T,s,window,swindow):
-    """
-    Move window across a single row of the data while accounting for the proper normalization constant such
-    that the resummed signal will reconstitute the original signal. This assumes that the i are space out by
-    ones and that the window sums to 1.
-
-    NOTE: There is much simpler way of doing this using np.lib.stride_tricks.as_strided().
-    """
-    if i<(len(window)//2+1):
-        swindow[:len(window)//2+i+1]=window[len(window)//2-i:]*s[:len(window)//2+i+1]
-        for j in xrange(len(window)//2+1):
-            swindow[j] /= window[:len(window)//2+j+1].sum()
-    # Middle.
-    elif (len(window)//2+1)<=i<(T-len(window)//2-1):
-        swindow[i-len(window)//2:i+len(window)//2+1]=s[i-len(window)//2:i+len(window)//2+1]*window
-        for j in xrange(i-len(window)//2-1,len(window)//2+1):
-            swindow[j] /= window[:len(window)//2+j+1].sum()
-        
-        counter=0
-        i=counter+T-len(window)//2-1
-        while (T-len(window)-1+counter)<=i and i<T:
-            swindow[i] /= window[counter:].sum()
-            counter+=1
-            i=counter+T-len(window)//2-1
-    # Right side.
-    elif (T-len(window)//2-1)<=i<T:
-        counter=i-T+len(window)//2+1
-        swindow[i-len(window)//2:T]=window[:len(window)-counter]*s[i-len(window)//2:T]
-        
-        counter=0
-        i=counter+T-len(window)//2-1
-        while i<T:
-            swindow[i] /= window[counter:].sum()
-            counter+=1
-            i=counter+T-len(window)//2-1
-
-def moving_window(s,window,windowType):
-    """
-    Return snapshots of input as window is moved across it. This can be memory intensive if the array s is
-    long.
-    2017-01-30
-
-    Params:
-    -------
-    s
-    window
-    windowType
-
-    Returns:
-    --------
-    swindow (ndarray)
-        len(s) x len(s). Each row is a snapshot of the input with the window being shifted over. The sum down
-        the columns will reconstruct the input.
-    """
-    assert (window%2)==1, "Window width must be odd."
-    from scipy.signal import get_window
-    
-    T=len(s)
-    swindow=np.zeros((T,T))  # windowed input
-
-    # Normalize the window. Each point gets hit with every part of window once (except boundaries).
-    window = get_window(windowType,window)
-    window /= window.sum()
-
-    # Extract subsets of data while window is moving across.
-    for i in xrange(T):
-        swindow[i] = _moving_window(i,s,window)
-
-    return swindow
-
-def moving_freq_filt(s,window=61,windowType=('gaussian',20),cutoffFreq=5,sampleFreq=60,
-                     mx_filter_rows=1000):
-    """
-    Moving frequency filter using Butterworth lowpass filter. First, construct windowed input as given
-    window type is dragged across. Frequency filter each of those samples and then add them all up 
-    back together to get the filtered signal.
-    2017-03-19
-    
-    Params:
-    -------
-    s (ndarray)
-        1d signal
-    window (int=61)
-        Window width.
-    windowType (tuple)
-        ('Gaussian',20) as input to scipy.signal.get_window()
-    cutoffFreq (float=5)
-        Cutoff frequency for butterworth filter.
-    sampleFreq (float=60)
-        Sampling frequency of input signal.
-    mx_filter_rows (int=1000)
-        Maximum number of rows to filter at once. This is limited by memory.
-    """
-    assert (window%2)==1, "Window width must be odd."
-    from scipy.signal import get_window
-    
-    T=len(s)
-    swindow=np.zeros((T))  # windowed input
-
-    # Normalize the window. Each point gets hit with every part of window once (except boundaries).
-    window = get_window(windowType,window)
-    window /= window.sum()
-
-    # Extract subsets of data while window is moving across.
-    def f(i):
-        return butter_lowpass_filter( _moving_window(i,s,window),
-                                      cutoffFreq,sampleFreq )
-
-    # Given memory constraints, don't filter everything at once.
-    pool = mp.Pool(mp.cpu_count())
-    swindow = np.zeros((T))
-    for i in xrange(0,T-mx_filter_rows,mx_filter_rows):
-        swindow += np.vstack( pool.map(f,range(i,i+mx_filter_rows)) ).sum(0)
-    if (i+mx_filter_rows)<T:
-        if (i+mx_filter_rows)==(T-1):
-            swindow += pool.map(f,range(i+mx_filter_rows,T))
-        else:
-            swindow += np.vstack( pool.map(f,range(i+mx_filter_rows,T)) ).sum(0)
-    pool.close()
-
-    #swindow = butter_lowpass_filter( swindow,
-    #                                 cutoffFreq,
-    #                                 sampleFreq,
-    #                                 axis=1 ).sum(0)
-    return swindow
 
 def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_threshold=0):
     """
@@ -491,118 +343,6 @@ def local_argmax(x,ix0):
     else:
         return rightMaxIx
 
-def smooth(x,filtertype='moving_butter',filterparams='default'):
-    """
-    Smooth multidimensional curve. Currently, using Savitzy-Golay on each
-    dimension independently. Ideally, I would implememnt some sort of smoothing
-    algorithm that accounts for relationships between the different dimensions.
-    2017-01-24
-
-    Params:
-    -------
-    x (ndarray)
-        n_samples x n_dim
-    filtertype (str='sav')
-        'sav', 'butter', 'moving_butter'
-    filterparams (dict)
-        Savitzy-Golay: (window, order) typically {'window':61,'order':4}
-        Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
-        Moving Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
-    """
-    if filtertype=='sav':
-        from scipy.signal import savgol_filter
-        if filterparams=='default':
-            filterparams={'window':61,'order':4}
-        else:
-            raise NotImplementedError
-
-
-        if x.ndim==1:
-            return savgol_filter(x,
-                                 filterparams['window'],filterparams['order'])
-        
-        xfiltered=np.zeros_like(x)
-        for i in xrange(x.shape[1]):
-            xfiltered[:,i]=savgol_filter(x[:,i],window,order)
-    elif filtertype=='butter':
-        if filterparams=='default':
-            filterparams={'cutoff':10,'fs':60}
-        elif filterparams=='120':
-            filterparams={'cutoff':10,'fs':120}
-        else:
-            raise NotImplementedError
-
-        if x.ndim==1:
-            axis=-1
-        else:
-            axis=0
-        xfiltered=butter_lowpass_filter(x,
-                                        filterparams['cutoff'],
-                                        filterparams['fs'],
-                                        axis=axis) 
-    elif filtertype=='moving_butter':
-        if filterparams=='default':
-            filterparams={'cutoff':10,'fs':60}
-        elif filterparams=='120':
-            filterparams={'cutoff':10,'fs':120}
-        else:
-            raise NotImplementedError
-
-        if x.ndim==1:
-            xfiltered=moving_freq_filt(x,cutoffFreq=filterparams['cutoff'],
-                                       sampleFreq=filterparams['fs'])
-        else:
-            def f(x):
-                return moving_freq_filt(x,
-                                        cutoffFreq=filterparams['cutoff'],
-                                        sampleFreq=filterparams['fs'])
-            xfiltered = []
-            for i in xrange(x.shape[1]):
-                xfiltered.append( f(x[:,i]) )
-            xfiltered = np.vstack(xfiltered).T
-    else: raise Exception("Invalid filter option.")
-    return xfiltered
- 
-def butter_lowpass(cutoff,fs, order=5):
-    from scipy.signal import butter
-    nyq = 0.5 * fs
-    cutoff /= nyq
-    b, a = butter( order, cutoff )
-    return b, a
-
-def butter_lowpass_filter(data, cutoff, fs, order=5, axis=0, **kwargs):
-    """
-    Forward-backward call to Butterworth filter. This applies the filter in the forwards direction and then
-    backwards and the result is in phase with the data.
-    2015-10-18
-
-    Params:
-    -------
-    data (ndarray)
-    cutoff (float)
-        max frequency in Hz corresponding to frequency at which gain goes to -3dB, or 1/sqrt(2)
-    fs (float)
-        sample frequency in Hz
-    order (5,int)
-        order of Buttworth filter
-    """
-    from scipy.signal import filtfilt
-    b,a = butter_lowpass(cutoff,fs,order)
-    return filtfilt( b,a,data,axis=axis, **kwargs)
-
-def butter_plot(ax, b, a, fs):
-    """Show plot of filter gain.
-    2015-09-09
-    """
-    w, h = signal.freqz(b, a)
-    ax.semilogx(w*.5*fs/np.pi, 20 * np.log10(abs(h)))
-    ax.set(title='Butterworth filter frequency response',
-           xlabel='Frequency [Hz]',
-           ylabel='Amplitude [dB]',ylim=[-5,1])
-    #ax.margins(0, 0.1)
-    ax.grid(which='both', axis='both')
-    ax.axvline(10, color='green') # cutoff frequency
-   
 def get_reshape_samples(sample,neighborsix,windowlen):
     """
     Return samples from list of samples but reshaped as sample_length x n_dim.
