@@ -134,7 +134,8 @@ def pipeline_phase_lag(v1,v2,dt,
         print "Pickling results as %s"%save
         pickle.dump({'phase':phase,'overlapcost':overlapcost,
                      'phasexyz':phasexyz,'overlapcostxyz':overlapcostxyz,
-                     'maxshift':maxshift,'windowlength':windowlength},
+                     'maxshift':maxshift,'windowlength':windowlength,
+                     'v1':v1,'v2':v2},
                     open(save,'wb'),-1)
     return phasexyz,phase,overlapcostxyz,overlapcost
 
