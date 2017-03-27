@@ -76,7 +76,7 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
     cumerror = np.abs(np.diff(phase1-phase2)).sum(1)
     return f,t,cumerror/len(t),phase1,phase2
 
-def spec_and_phase(X,noverlap,dt=1/120):
+def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
     """
     Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
 
@@ -85,19 +85,21 @@ def spec_and_phase(X,noverlap,dt=1/120):
     X
     noverlap (int)
     dt (float=1/120)
+    window (tuple,('gaussian',50))
+        For scipy.signal.get_window()
+    nperseg (int=501)
     """
     from filter import spectrogram
     from scipy.signal import get_window
 
     assert noverlap<1
-    nperseg = 601
     noverlap = int(noverlap*nperseg)
 
     #f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=nperseg,noverlap=noverlap,
     #                       mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
     #f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
-    window = get_window(('gaussian',40),nperseg)
+    window = get_window(window,nperseg)
     f,t,spec = spectrogram(X,window,nperseg-noverlap,fs=1/dt,npadding=nperseg//2)
 
     phase = np.angle(spec)
@@ -109,7 +111,7 @@ def pipeline_phase_lag(v1,v2,dt,
                        v_threshold=.03,
                        save='temp.p'):
     """
-    Find phase lag for each dimension separately and all dimensions together.
+    Find phase lag for each dimension separately and for the vector including all dimensions together.
     
     Params:
     -------
