@@ -319,11 +319,9 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
             return phase,overlaperror
         
         # Calculate phase lag by looping through all dimensions.
-        phase,overlaperror = [],[]
-        for x,y in zip(v1,v2):
-            p,e = _calc_single_col(x,y)
-            phase.append(p)
-            overlaperror.append(e)
+        pool = mp.Pool(len(v1))
+        phase,overlaperror = zip(*pool.map(lambda x: _calc_single_col(x[0],x[1]),zip(v1,v2)))
+        pool.close()
         phase,overlaperror = np.vstack(phase).T,np.vstack(overlaperror).T
 
     else: raise Exception("Bad correlation measure option.")
