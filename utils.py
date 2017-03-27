@@ -290,27 +290,20 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
     elif measure=='corr':
         # Normalized correlation E[x*y]/sqrt(E[x^2]E[y^2]). This accounts for importance of the sign by not
         # subtracting off the mean.
-        if v1.ndim>1:
-            v1 = [i for i in v1.T]
-            v2 = [i for i in v2.T]
-        else:
-            v1,v2 = [v1],[v2]
         
         # Define function for calculating phase lag for each dimension separately.
         def _calc_single_col(v1,v2):
             phase = np.zeros((len(v1)-2*maxshift-windowlength))
             overlaperror = np.zeros((len(v1)-2*maxshift-windowlength))
             L = windowlength+maxshift*2
-
+            
             counter = 0
             for i in xrange(maxshift,len(v1)-maxshift-windowlength):
                 window = v2[i:i+windowlength]
-                windowabsmean = np.sqrt( (window*window).mean() )
                 background = v1[i-maxshift:i+maxshift+windowlength]
-                backgroundabsmean = np.sqrt( fftconvolve(background**2,
-                                                         np.ones((windowlength))/windowlength,
-                                                         mode='same') ) 
-                overlapcost = fftconvolve(background,window,mode='same')/L / (windowabsmean * backgroundabsmean)
+                overlapcost = crosscorr(background,window)
+                if overlapcost.ndim>1:
+                    overlapcost = overlapcost.sum(1)
                 
                 # Look for local max starting from the center of the window.
                 maxix = local_argmax(overlapcost,windowlength//2)
@@ -320,20 +313,42 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
             return phase,overlaperror
         
         # Calculate phase lag by looping through all dimensions.
-        pool = mp.Pool(len(v1))
-        phase,overlaperror = zip(*pool.map(lambda x: _calc_single_col(x[0],x[1]),zip(v1,v2)))
-        pool.close()
-        phase,overlaperror = np.vstack(phase).T,np.vstack(overlaperror).T
+        phase,overlaperror = _calc_single_col(v1,v2)
 
     else: raise Exception("Bad correlation measure option.")
 
     return phase,overlaperror
 
+def crosscorr(background,window):
+    """Normalized cross corelation from moving window across background."""
+    ones = np.ones_like(window)/len(window)
+    L = len(background)
+
+    windowabsmean = np.sqrt( (window*window).mean(0) )
+    backgroundabsmean = np.sqrt( fftconvolve_md(background**2,
+                                                args=[ones]) )
+                
+    overlapcost = fftconvolve_md(background,args=[window])/L / (windowabsmean * backgroundabsmean)
+    return overlapcost
+
 def fftconvolve_md(x,args=[],axis=0):
     """
     fftconvolve on multidimensional array along particular axis
     """
-    return np.apply_along_axis(fftconvolve,axis,x,*args)
+    if x.ndim>1:
+        if axis==0:
+            conv = np.zeros_like(x)
+            if args[0].ndim>1:
+                for i in xrange(x.shape[1]):
+                    conv[:,i] = fftconvolve(x[:,i],args[0][:,i],mode='same')
+                return conv
+            else:
+                for i in xrange(x.shape[1]):
+                    conv[:,i] = fftconvolve(x[:,i],args[0],mode='same')
+                return conv
+        else:
+            raise NotImplementedError
+    return fftconvolve(x,args[0],mode='same')
 
 @jit
 def norm1(x):
