@@ -22,7 +22,7 @@ import load
 from numba import jit
 import multiprocess as mp
 from scipy.optimize import minimize
-from scipy.signal import spectrogram,savgol_filter
+from scipy.signal import spectrogram,savgol_filter,fftconvolve
 
 
 def detrend(x,window=None):
@@ -109,6 +109,7 @@ def pipeline_phase_lag(v1,v2,dt,
                        maxshift=60,
                        windowlength=100,
                        v_threshold=.03,
+                       measure='dot',
                        save='temp.p'):
     """
     Find phase lag for each dimension separately and for the vector including all dimensions together.
@@ -126,17 +127,18 @@ def pipeline_phase_lag(v1,v2,dt,
     phasexyz,overlapcostxyz = [],[]
     for i in xrange(3):
         p,o = phase_lag(v1[:,i],v2[:,i],maxshift,windowlength,
-                        measure='corr',dt=dt)
+                        measure=measure,dt=dt)
         phasexyz.append(p)
         overlapcostxyz.append(o)
-    phase,overlapcost = phase_lag(v1[:,:],v2[:,:],maxshift,windowlength,
-                                  measure='dot',dt=dt)
+    phase,overlapcost = phase_lag(v1,v2,maxshift,windowlength,
+                                  measure=measure,dt=dt)
     
     if save:
         print "Pickling results as %s"%save
         pickle.dump({'phase':phase,'overlapcost':overlapcost,
                      'phasexyz':phasexyz,'overlapcostxyz':overlapcostxyz,
                      'maxshift':maxshift,'windowlength':windowlength,
+                     'measure':measure,
                      'v1':v1,'v2':v2},
                     open(save,'wb'),-1)
     return phasexyz,phase,overlapcostxyz,overlapcost
@@ -213,7 +215,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
     """
     Find index shift that would maximize the overlap between two different time series. This involves taking
     windows of one series and moving across the other time series to find maximal agreement.
-    2017-02-18
+    2017-03-27
 
     Params:
     -------
@@ -237,7 +239,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
     phase
         Phase difference in units of dt.
     overlaperror
-        Max overlap measure used to determine phase lag. With dot product, this maxes out at 1.
+        Max overlap measure used to determine phase lag. This is in the interval [-1,1].
     """
     if window is None:
         filtwindow = np.ones((windowlength,1))
@@ -286,25 +288,77 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
         p.close()
 
     elif measure=='corr':
-        assert v1.ndim==1 and v2.ndim==1
-        phase = np.zeros((len(v1)-2*maxshift-windowlength))
-        overlaperror = np.zeros((len(v1)-2*maxshift-windowlength))
-
-        counter = 0
-        for i in xrange(maxshift,len(v1)-maxshift-windowlength):
-            window=v2[i:i+windowlength]
-            windowmean,windowstd = window.mean(),window.std()
+        # Normalized correlation E[x*y]/sqrt(E[x^2]E[y^2]). This accounts for importance of the sign by not
+        # subtracting off the mean.
+        
+        # Define function for calculating phase lag for each dimension separately.
+        def _calc_single_col(v1,v2):
+            phase = np.zeros((len(v1)-2*maxshift-windowlength))
+            overlaperror = np.zeros((len(v1)-2*maxshift-windowlength))
+            L = windowlength+maxshift*2
             
-            overlapcost=np.zeros((2*maxshift))
-            for j in xrange(maxshift*2):
-                background = v1[i-maxshift+j:i-maxshift+windowlength+j]
-                overlapcost[j] = ((window*background).mean()-windowmean*background.mean())/windowstd/background.std()
-            maxix = local_argmax(overlapcost,windowlength//2)
-            phase[counter] = (maxix-maxshift)*-dt
-            overlaperror[counter] = overlapcost.max()
-            counter += 1 
+            counter = 0
+            for i in xrange(maxshift,len(v1)-maxshift-windowlength):
+                window = v2[i:i+windowlength]
+                background = v1[i-maxshift:i+maxshift+windowlength]
+                overlapcost = crosscorr(background,window)
+                if overlapcost.ndim>1:
+                    overlapcost = overlapcost.sum(1)
+                
+                # Look for local max starting from the center of the window.
+                maxix = local_argmax(overlapcost,L//2)
+                phase[counter] = (maxix-L//2)*-dt
+                overlaperror[counter] = overlapcost.max()
+                counter += 1 
+            return phase,overlaperror
+        
+        # Calculate phase lag by looping through all dimensions.
+        phase,overlaperror = _calc_single_col(v1,v2)
+
     else: raise Exception("Bad correlation measure option.")
+
     return phase,overlaperror
+
+def crosscorr(background,window,subtract_mean=False):
+    """Normalized cross corelation from moving window across background. Remember that when this window is
+    oved across, we must reverse the order in which the array is read."""
+    ones = np.ones_like(window)/len(window)
+    window = window[::-1]
+    
+    if subtract_mean:
+        windowMean = window.mean(0)
+        backgroundMean = fftconvolve_md( background,args=[ones] )
+        backgroundSquare = fftconvolve_md( background**2,args=[ones] )
+        
+        num = fftconvolve_md(background,args=[window])/len(window) - backgroundMean*windowMean
+        denom = np.sqrt(backgroundSquare-backgroundMean**2)*window.std(0)
+
+        overlapcost = num/denom
+    else:
+        windowabsmean = np.sqrt( (window*window).mean(0) )
+        backgroundabsmean = np.sqrt( fftconvolve_md(background**2,
+                                                    args=[ones]) )
+        overlapcost = fftconvolve_md(background,args=[window])/len(window) / (windowabsmean * backgroundabsmean)
+    return overlapcost
+
+def fftconvolve_md(x,args=[],axis=0):
+    """
+    fftconvolve on multidimensional array along particular axis
+    """
+    if x.ndim>1:
+        if axis==0:
+            conv = np.zeros_like(x)
+            if args[0].ndim>1:
+                for i in xrange(x.shape[1]):
+                    conv[:,i] = fftconvolve(x[:,i],args[0][:,i],mode='same')
+                return conv
+            else:
+                for i in xrange(x.shape[1]):
+                    conv[:,i] = fftconvolve(x[:,i],args[0],mode='same')
+                return conv
+        else:
+            raise NotImplementedError
+    return fftconvolve(x,args[0],mode='same')
 
 @jit
 def norm1(x):
