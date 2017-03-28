@@ -306,8 +306,8 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
                     overlapcost = overlapcost.sum(1)
                 
                 # Look for local max starting from the center of the window.
-                maxix = local_argmax(overlapcost,windowlength//2)
-                phase[counter] = (maxix-maxshift)*-dt
+                maxix = local_argmax(overlapcost,L//2)
+                phase[counter] = (maxix-L//2)*-dt
                 overlaperror[counter] = overlapcost.max()
                 counter += 1 
             return phase,overlaperror
@@ -319,16 +319,26 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
 
     return phase,overlaperror
 
-def crosscorr(background,window):
-    """Normalized cross corelation from moving window across background."""
+def crosscorr(background,window,subtract_mean=False):
+    """Normalized cross corelation from moving window across background. Remember that when this window is
+    oved across, we must reverse the order in which the array is read."""
     ones = np.ones_like(window)/len(window)
-    L = len(background)
+    window = window[::-1]
+    
+    if subtract_mean:
+        windowMean = window.mean(0)
+        backgroundMean = fftconvolve_md( background,args=[ones] )
+        backgroundSquare = fftconvolve_md( background**2,args=[ones] )
+        
+        num = fftconvolve_md(background,args=[window])/len(window) - backgroundMean*windowMean
+        denom = np.sqrt(backgroundSquare-backgroundMean**2)*window.std(0)
 
-    windowabsmean = np.sqrt( (window*window).mean(0) )
-    backgroundabsmean = np.sqrt( fftconvolve_md(background**2,
-                                                args=[ones]) )
-                
-    overlapcost = fftconvolve_md(background,args=[window])/L / (windowabsmean * backgroundabsmean)
+        overlapcost = num/denom
+    else:
+        windowabsmean = np.sqrt( (window*window).mean(0) )
+        backgroundabsmean = np.sqrt( fftconvolve_md(background**2,
+                                                    args=[ones]) )
+        overlapcost = fftconvolve_md(background,args=[window])/len(window) / (windowabsmean * backgroundabsmean)
     return overlapcost
 
 def fftconvolve_md(x,args=[],axis=0):
