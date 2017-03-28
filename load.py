@@ -286,10 +286,11 @@ def extract_calc(fname,dr,bodyparts,dt,
                  append=True,
                  dotruncate=5,
                  remove_hip_drift=True,
-                 rotate_to_face=True,
+                 rotate_to_face=False,
                  usezd=False,
                  read_csv_kwargs={},
                  center_x=False,
+                 rotation_angle=False
                 ):
     """
     Extract specific set of body parts from calculation file. If a file with coordination of hands is given,
@@ -325,6 +326,9 @@ def extract_calc(fname,dr,bodyparts,dt,
         Passed onto pandas.read_csv
     center_x (bool=False)
         Subtract mean from the mean of each body parts' displacement.
+    rotation_angle (int=False)
+        If an integer, both individuals will rotated by that many radians about the origin. Useful for trials
+        where individuals were set up facing a different direction in trials than in initial calibration.
 
     Value:
     ------
@@ -427,6 +431,16 @@ def extract_calc(fname,dr,bodyparts,dt,
                 # Reflect follower about mirror over the axis parallel to the "mirror."
                 followerV[i][:,0] *= -1
                 followerA[i][:,0] *= -1
+    elif rotation_angle:
+        for x,v,a in zip(leaderX,leaderV,leaderA):
+            x[:,:] = rotate(x,np.array([0,0,1.]),rotation_angle)
+            v[:,:] = rotate(v,np.array([0,0,1.]),rotation_angle)
+            a[:,:] = rotate(a,np.array([0,0,1.]),rotation_angle)
+        for x,v,a in zip(followerX,followerV,followerA):
+            x[:,:] = rotate(x,np.array([0,0,1.]),rotation_angle)
+            v[:,:] = rotate(v,np.array([0,0,1.]),rotation_angle)
+            a[:,:] = rotate(a,np.array([0,0,1.]),rotation_angle)
+
 
     # Truncate beginning and ends of data set.
     if dotruncate:
