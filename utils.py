@@ -88,6 +88,17 @@ def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
     window (tuple,('gaussian',50))
         For scipy.signal.get_window()
     nperseg (int=501)
+
+    Value:
+    ------
+    f (ndarray)
+        Frequencies.
+    t (ndarray)
+        Times at which spectra occur.
+    spec (ndarray)
+        Spectrogram.
+    phase (ndarray)
+        Array of phases for each frequency.
     """
     from filter import spectrogram
     from scipy.signal import get_window
@@ -95,10 +106,6 @@ def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
     assert noverlap<1
     noverlap = int(noverlap*nperseg)
 
-    #f,t,spec = spectrogram(X,window=('gaussian',30),nperseg=nperseg,noverlap=noverlap,
-    #                       mode='complex',fs=1/dt)
-    #f,t,spec = spectrogram(X,window=('tukey',.5),nperseg=240,noverlap=200,mode='complex',fs=1/dt)
-    #f,t,spec = spectrogram(X,window='blackman',nperseg=240,noverlap=noverlap,mode='complex',fs=1/dt)
     window = get_window(window,nperseg)
     f,t,spec = spectrogram(X,window,nperseg-noverlap,fs=1/dt,npadding=nperseg//2)
 
