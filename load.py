@@ -5,7 +5,7 @@
 # 
 # Author: Edward D. Lee
 # Email: edl56@cornell.edu
-# 2016-08-11
+# 2017-03-28
 
 from __future__ import division
 import pandas as pd
@@ -75,6 +75,30 @@ def get_fnames():
           ('Caeli (J) Eddie (J) Hands Half Occlusion','20170317'),
           ('Caeli (J) Eddie (J) Hands Full Occlusion','20170317'),
           ('Caeli (J) Eddie (J) Hands Low Light','20170317')]
+
+def hand_ix(fileix):
+    """
+    Return the hand that was used for the trial given the trial number. This is returned as the index to
+    bodyparts defined as 
+    bodyparts  = [['RightHand','LeftHand'],
+                 ['LeftHand','RightHand']]
+
+    Params:
+    -------
+    fileix (int)
+    """
+    if type(fileix) is int:
+        fileix = str(fileix)
+    
+    return {'43':0,
+            '46':1,
+            '49':1,
+            '56':0,
+            '57':1,
+            '58':1,
+            '59':1,
+            '60':0,
+            '61':1}.get(fileix,None)
 
 def get_dr(fname,date=None):
     """Return directory where files are saved."""
