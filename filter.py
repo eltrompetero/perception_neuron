@@ -6,7 +6,7 @@ import multiprocess as mp
 from numpy import fft
 
 def filter_hand_trials(filesToFilter,dt=1/60,
-        extract_calc_kwargs={'rotate_to_face':True,
+        extract_calc_kwargs={'rotate_to_face':False,
                              'remove_hip_drift':True,
                              'dotruncate':5},
         filterparams='default'):
@@ -36,9 +36,11 @@ def filter_hand_trials(filesToFilter,dt=1/60,
         else:
             date = None
         T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
-                                                                               get_dr(fname,date),
-                                                                               bodyparts,
-                                                                               dt,**extract_calc_kwargs)
+                                                                   get_dr(fname,date),
+                                                                   bodyparts,
+                                                                   dt,
+                                                                   rotation_angle=global_rotation(fileix),
+                                                                   **extract_calc_kwargs)
 
         for x in leaderX:
             x-=x.mean(0)

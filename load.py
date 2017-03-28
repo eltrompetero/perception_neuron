@@ -100,6 +100,23 @@ def hand_ix(fileix):
             '60':0,
             '61':1}.get(fileix,None)
 
+def global_rotation(fileix):
+    """
+    Return the angle that the individuals should be rotated by such that they are facing each other across the
+    x-axis.
+
+    Params:
+    -------
+    fileix (int)
+    """
+    if type(fileix) is int:
+        fileix = str(fileix)
+    
+    return {'43':np.pi/2,
+            '46':np.pi/2,
+            '49':np.pi/2}.get(fileix,0)
+
+
 def get_dr(fname,date=None):
     """Return directory where files are saved."""
     from os.path import expanduser
