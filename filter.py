@@ -30,18 +30,15 @@ def filter_hand_trials(filesToFilter,dt=1/60,
 
     for fileix in filesToFilter:
         # Read position, velocity and acceleration data from files.
-        if type(get_fnames()[fileix]) is tuple:
-            fname,date = get_fnames()[fileix]
-            T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
-                                                                                   get_dr(fname,date),
-                                                                                   bodyparts,
-                                                                                   dt,**extract_calc_kwargs)
+        fname = get_fnames()[fileix]
+        if type(fname) is tuple:
+            fname,date = fname
         else:
-            fname = get_fnames()[fileix]
-            T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
-                                                                                   get_dr(fname),
-                                                                                   bodyparts,
-                                                                                   dt,**extract_calc_kwargs)
+            date = None
+        T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
+                                                                               get_dr(fname,date),
+                                                                               bodyparts,
+                                                                               dt,**extract_calc_kwargs)
 
         for x in leaderX:
             x-=x.mean(0)
@@ -58,18 +55,14 @@ def filter_hand_trials(filesToFilter,dt=1/60,
             v[:] = smooth(v,filterparams=filterparams)[:]
             a[:] = smooth(a,filterparams=filterparams)[:]
         
-        try:
-            pickle.dump({'T':T,
-                         'leaderX':leaderX,'followerX':followerX,
-                         'leaderV':leaderV,'followerV':followerV,
-                         'leaderA':leaderA,'followerA':followerA},
-                        open('%s/%s.p'%(get_dr(fname,date),fname),'wb'),-1)
-        except NameError:
-            pickle.dump({'T':T,
-                         'leaderX':leaderX,'followerX':followerX,
-                         'leaderV':leaderV,'followerV':followerV,
-                         'leaderA':leaderA,'followerA':followerA},
-                        open('%s/%s.p'%(get_dr(fname),fname),'wb'),-1)
+        # Save into same directory as calc file.
+        savedr = '%s/%s.p'%(get_dr(fname,date),fname)
+        print "Saving as %s"%savedr
+        pickle.dump({'T':T,
+                     'leaderX':leaderX,'followerX':followerX,
+                     'leaderV':leaderV,'followerV':followerV,
+                     'leaderA':leaderA,'followerA':followerA},
+                    open(savedr,'wb'),-1)
 
 def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
     """
