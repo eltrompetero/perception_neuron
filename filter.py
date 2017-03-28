@@ -1,5 +1,6 @@
 # Filtering functions.
 from __future__ import division
+from load import *
 import numpy as np
 import multiprocess as mp
 from numpy import fft
@@ -246,8 +247,10 @@ def moving_freq_filt(s,axis=-1,**kwargs):
     Params:
     -------
     s (ndarray)
-        1d signal
+        1d or 2d signal
     axis (int=-1)
+        Axis along which data extends in time. For example, if each time sample is a new row, then axis should
+        be 0.
     window (int=61)
         Window width.
     window_type (tuple)
@@ -263,10 +266,15 @@ def moving_freq_filt(s,axis=-1,**kwargs):
     mx_filter_rows (int=100)
         Maximum number of rows to filter at once. This is limited by memory.
     """
-    if axis==-1 or axis==1:
-        s = s.T
-        return np.vstack([ _moving_freq_filt(x,**kwargs) for x in s]).T
-    return np.vstack([ _moving_freq_filt(x,**kwargs) for x in s])
+    if s.ndim>1:
+        if axis==0:
+            s = s.T
+            return np.vstack([ _moving_freq_filt(x,**kwargs) for x in s]).T
+        elif axis==-1 or axis==1:
+            return np.vstack([ _moving_freq_filt(x,**kwargs) for x in s])
+
+    return _moving_freq_filt(x,**kwargs)
+        
 
 def _moving_freq_filt(s,
                       window=201,
@@ -460,17 +468,14 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
             raise NotImplementedError
 
         if x.ndim==1:
-            xfiltered=moving_freq_filt(x,cutoffFreq=filterparams['cutoff'],
-                                       sampleFreq=filterparams['fs'])
+            xfiltered=moving_freq_filt(x,
+                                       cutoff_freq=filterparams['cutoff'],
+                                       sample_freq=filterparams['fs'])
         else:
-            def f(x):
-                return moving_freq_filt(x,
-                                        cutoffFreq=filterparams['cutoff'],
-                                        sampleFreq=filterparams['fs'])
-            xfiltered = []
-            for i in xrange(x.shape[1]):
-                xfiltered.append( f(x[:,i]) )
-            xfiltered = np.vstack(xfiltered).T
+            xfiltered = moving_freq_filt(x,
+                                        cutoff_freq=filterparams['cutoff'],
+                                        sample_freq=filterparams['fs'],
+                                        axis=0)
     else: raise Exception("Invalid filter option.")
     return xfiltered
 
