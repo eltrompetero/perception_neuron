@@ -1,7 +1,7 @@
 # A lot of smaller helper functions used for manipulating Axis Neuron files.
 # 
 # Edward Lee edl56@cornell.edu
-# 2016-08-11
+# 2017-03-28
 
 from __future__ import division
 try:
