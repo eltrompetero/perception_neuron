@@ -90,9 +90,12 @@ def hand_ix(fileix):
     if type(fileix) is int:
         fileix = str(fileix)
     
-    return {'43':0,
+    return {'23':0,
+            '24':1,
+            '43':0,
             '46':1,
             '49':1,
+            '53':1,
             '56':0,
             '57':1,
             '58':1,

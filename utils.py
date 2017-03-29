@@ -25,12 +25,15 @@ from scipy.optimize import minimize
 from scipy.signal import spectrogram,savgol_filter,fftconvolve
 
 
-def detrend(x,window=None):
+def detrend(x,window=None,inplace=False):
     """
-    Detrend by fitting a polynomial to the data and subtracting it.
+    Detrend by fitting a low order polynomial to the data and subtracting it.
     """
     T = np.arange(len(x))
-    return x - np.polyval(np.polyfit(T,x,3),T)
+    if inplace:
+        x[:] -= np.polyval(np.polyfit(T,x,3),T)
+    else:
+        return x - np.polyval(np.polyfit(T,x,3),T)
 
 def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
     """
@@ -78,12 +81,15 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
 
 def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
     """
-    Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase coherence.
+    Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase
+    coherence.
 
     Params:
     -------
-    X
-    noverlap (int)
+    X (ndarray)
+        1d signal
+    noverlap (float)
+        Fraction of overlap.
     dt (float=1/120)
     window (tuple,('gaussian',50))
         For scipy.signal.get_window()
@@ -96,7 +102,7 @@ def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
     t (ndarray)
         Times at which spectra occur.
     spec (ndarray)
-        Spectrogram.
+        Spectrogram. (n_freq,n_time)
     phase (ndarray)
         Array of phases for each frequency.
     """
