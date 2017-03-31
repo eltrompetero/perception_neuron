@@ -261,6 +261,7 @@ def moving_freq_filt(s,axis=-1,**kwargs):
     mx_filter_rows (int=100)
         Maximum number of rows to filter at once. This is limited by memory.
     """
+    # Multi-dimensional data.
     if s.ndim>1:
         if axis==0:
             s = s.T
@@ -268,7 +269,8 @@ def moving_freq_filt(s,axis=-1,**kwargs):
         elif axis==-1 or axis==1:
             return np.vstack([ _moving_freq_filt(x,**kwargs) for x in s])
 
-    return _moving_freq_filt(x,**kwargs)
+    # Single dimensional data.
+    return _moving_freq_filt(s,**kwargs)
         
 
 def _moving_freq_filt(s,

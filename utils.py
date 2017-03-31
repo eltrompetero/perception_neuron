@@ -23,7 +23,7 @@ from numba import jit
 import multiprocess as mp
 from scipy.optimize import minimize
 from scipy.signal import spectrogram,savgol_filter,fftconvolve
-
+from misc.angle import *
 
 def detrend(x,window=None,inplace=False):
     """
@@ -289,7 +289,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
                 dotprod[dotprod>1] = 1  # thresholded 0 vectors should be perfectly aligned as defined by 1
                 overlapcost[j] = (dotprod*filtwindow).mean()
 
-            #phase = (np.argmax(overlapcost)-maxshift)*-dt
+            # Look for local max starting from the center of the window where delay=0.
             maxix = local_argmax(overlapcost,windowlength//2)
             phase = (maxix-maxshift)*-dt
             overlaperror = overlapcost[maxix]
@@ -318,7 +318,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
                 if overlapcost.ndim>1:
                     overlapcost = overlapcost.sum(1)
                 
-                # Look for local max starting from the center of the window.
+                # Look for local max starting from the center of the window where delay=0.
                 maxix = local_argmax(overlapcost,L//2)
                 phase[counter] = (maxix-L//2)*-dt
                 overlaperror[counter] = overlapcost.max()
