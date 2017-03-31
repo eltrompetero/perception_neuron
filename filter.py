@@ -256,6 +256,10 @@ def moving_freq_filt(s,axis=-1,**kwargs):
         Default is 'butter' which is a Butterworth lowpass filter.
     cutoff_freq (float=5)
         Cutoff frequency for butterworth filter.
+    pass_freq (float=None)
+        Pass frequency for Gaussian bandpass filter.
+    bandwidth (float=None)
+        Standard deviation for width of Gaussian bandpass filter in units of index.
     sample_freq (float=60)
         Sampling frequency of input signal.
     mx_filter_rows (int=100)
@@ -304,6 +308,10 @@ def _moving_freq_filt(s,
         Default is 'butter' which is a Butterworth lowpass filter.
     cutoff_freq (float=5)
         Cutoff frequency for butterworth filter.
+    pass_freq (float=None)
+        Pass frequency for Gaussian bandpass filter.
+    bandwidth (float=None)
+        Standard deviation for width of Gaussian bandpass filter in units of index.
     sample_freq (float=60)
         Sampling frequency of input signal.
     mx_filter_rows (int=100)
@@ -345,10 +353,6 @@ def _moving_freq_filt(s,
             swindow += np.vstack( pool.map(f,range(i+mx_filter_rows,T)) ).sum(0)
     pool.close()
 
-    #swindow = butter_lowpass_filter( swindow,
-    #                                 cutoff_freq,
-    #                                 sample_freq,
-    #                                 axis=1 ).sum(0)
     return swindow/windowWeights
 
 def single_freq_pass_filter(x,pass_freq,bandwidth,sample_freq):
