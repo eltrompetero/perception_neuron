@@ -49,7 +49,11 @@ def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
         detrend(v2[:,2],inplace=True)
     return T,v1,v2
 
-def pipeline_phase_calc(fileixs,sample_freq='120',bandwidth=.1,down_sample=False):
+def pipeline_phase_calc(fileixs,
+                        sample_freq='120',
+                        bandwidth=.1,
+                        down_sample=False,
+                        suffix=''):
     """
     Pipeline loading pickled lowpass filtered data and running phase extraction after bandpass filtering.
     Pickles list of tuples phases, list of tuples vs (containing filtered velocities), and array fs
@@ -106,5 +110,5 @@ def pipeline_phase_calc(fileixs,sample_freq='120',bandwidth=.1,down_sample=False
             phases.append((phase1,phase2))
             vs.append((v1_,v2_))
 
-        pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('phase_files/phase_%d.p'%fileix,'wb'),-1)
+        pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('phase_files/phase_%d%s.p'%(fileix,suffix),'wb'),-1)
         print "Done with file %d."%fileix
