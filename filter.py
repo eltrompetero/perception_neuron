@@ -85,7 +85,7 @@ def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
     Value:
     -------
     f (ndarray)
-        Return only positive frequencies.
+        Frequencies.
     t (ndarray)
     spec
         (n_freq,n_time)
@@ -98,16 +98,16 @@ def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
     s = np.concatenate(( np.zeros((npadding))+padval,s,np.zeros((npadding))+padval ))
     t = (1/fs)*np.arange( lw//2-npadding,len(s)-(lw//2-npadding),shift )
     
-    spec = np.zeros((len(f)//2+1,len(t)),dtype=np.complex64)
+    spec = np.zeros((len(f),len(t)),dtype=np.complex64)
     #windowWeights = shifted_window_weights(window,shift,len(s),offset=lw//2)
     
     # Remember that the offset should be kept at lw//2 when padded because the only thing that the padding
     # does is to shift the beginning of the windowing over but you still want a full window to fit at the left
     # and right boundaries.
     for counter,i in enumerate(xrange(lw//2,len(s)-lw//2,shift)):
-        spec[:,counter] = fft.fft( window_signal(i,window,s) )[f>=0] 
+        spec[:,counter] = fft.fft( window_signal(i,window,s) )
 
-    return f[f>=0],t,spec
+    return f,t,spec
 
 def window_signal(i,window,signal,extract=True,return_index=False):
     """

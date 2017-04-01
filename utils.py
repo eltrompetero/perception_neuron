@@ -79,7 +79,11 @@ def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
     cumerror = np.abs(np.diff(phase1-phase2)).sum(1)
     return f,t,cumerror/len(t),phase1,phase2
 
-def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
+def spec_and_phase(X,noverlap,
+                   dt=1/120,
+                   window=('gaussian',50),
+                   nperseg=501,
+                   pos_freq=True):
     """
     Compute spectrogram and the corresponding phase for a 1D signal. This can be used to look at phase
     coherence.
@@ -94,6 +98,8 @@ def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
     window (tuple,('gaussian',50))
         For scipy.signal.get_window()
     nperseg (int=501)
+    pos_freq (bool=True)
+        If true, return only positive frequencies.
 
     Value:
     ------
@@ -114,6 +120,9 @@ def spec_and_phase(X,noverlap,dt=1/120,window=('gaussian',50),nperseg=501):
 
     window = get_window(window,nperseg)
     f,t,spec = spectrogram(X,window,nperseg-noverlap,fs=1/dt,npadding=nperseg//2)
+    if pos_freq:
+        spec = spec[f>0]
+        f = f[f>0]
 
     phase = np.angle(spec)
     return f,t,spec,phase
