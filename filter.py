@@ -77,13 +77,14 @@ def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
     s (ndarray)
     window (ndarray)
     shift (int)
+        Number of indices to shift window as taking moving spectrogram.
     fs (float=1)
         Sampling rate.
     npadding (int=0)
     padval (float=0.)
 
-    Value:
-    -------
+    Returns:
+    --------
     f (ndarray)
         Frequencies.
     t (ndarray)
@@ -357,13 +358,18 @@ def _moving_freq_filt(s,
 
 def single_freq_pass_filter(x,pass_freq,bandwidth,sample_freq):
     """
-    Single frequency filter using a Gaussian frequency filter.
+    Single frequency filter using a Gaussian frequency filter (signal assumed to be real).
     
     Params:
     -------
     x (ndarray)
     pass_freq (float)
     sample_freq (float)
+
+    Returns:
+    --------
+    filteredx (ndarray)
+        Bandpass filtered signal. Only the real part is taken because signal is assumed to be real.
     """
     from scipy.stats import norm
 
