@@ -74,14 +74,24 @@ def get_fnames():
           ('Caeli (J) Eddie (J) Hands','20170317'),
           ('Caeli (J) Eddie (J) Hands Half Occlusion','20170317'),
           ('Caeli (J) Eddie (J) Hands Full Occlusion','20170317'),
-          ('Caeli (J) Eddie (J) Hands Low Light','20170317')]
+          ('Caeli (J) Eddie (J) Hands Low Light','20170317'),
+          ('Henry (L) Winnie (F)','20170420'),
+          ('Henry (F) Winnie (L)','20170420'),
+          ('Henry (J) Winnie (J)','20170420'),
+          ('Henry (J) Winnie (J) 2','20170420'),
+          ('Henry (J) Winnie (J) Low Light','20170420'),
+          ('Eddie (L) Freya (F)','20170424'),
+          ('Eddie (F) Freya (L)','20170424'),
+          ('Eddie (J) Freya (J)','20170424'),
+          ('Eddie (J) Freya (J) Low Light','20170424')
+          ]
 
 def hand_ix(fileix):
     """
     Return the hand that was used for the trial given the trial number. This is returned as the index to
     bodyparts defined as 
     bodyparts  = [['RightHand','LeftHand'],
-                 ['LeftHand','RightHand']]
+                  ['LeftHand','RightHand']]
 
     Params:
     -------
@@ -322,9 +332,9 @@ def extract_calc(fname,dr,bodyparts,dt,
                  rotation_angle=False
                 ):
     """
-    Extract specific set of body parts from calculation file. If a file with coordination of hands is given,
-    then I have to align the subjects to a global coordinate frame defined by the initial orientation of their
-    hands.
+    Extract specific set of body parts from calculation file for both leader and follower. If a file with
+    coordination of hands is given, then I have to align the subjects to a global coordinate frame defined by
+    the initial orientation of their hands.
 
     For import of hands trials, the first axis is the direction along which the subjects are aligned.
 

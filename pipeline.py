@@ -18,7 +18,7 @@ def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
     v2
     """
     bodyparts  = [['RightHand','LeftHand'],
-                 ['LeftHand','RightHand']]
+                  ['LeftHand','RightHand']]
     bodypartix = hand_ix(fileix)
     fname = get_fnames()[fileix]
     if type(fname) is tuple:
