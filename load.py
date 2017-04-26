@@ -304,8 +304,13 @@ def load_calc(fname,cols='V',read_csv_kwargs={}):
 def extract_parts(df,bodyparts):
     """
     Extract columns for specific body parts from loaded calc file by comparing with column headers.
-    2017-03-19
+    
+    Params:
+    -------
+    df (pd.DataFrame)
+    bodyparts (list)
     """
+    bodyparts = [s.lower() for s in bodyparts]
     returnix = []
     columnBodyParts = [c.split('-')[0].lower() for c in df.columns]
     for i,c in enumerate(columnBodyParts):
