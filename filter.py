@@ -486,3 +486,12 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
     else: raise Exception("Invalid filter option.")
     return xfiltered
 
+def detrend(x,window=None,inplace=False):
+    """
+    Detrend by fitting a low order polynomial to the data and subtracting it.
+    """
+    T = np.arange(len(x))
+    if inplace:
+        x[:] -= np.polyval(np.polyfit(T,x,3),T)
+    else:
+        return x - np.polyval(np.polyfit(T,x,3),T)

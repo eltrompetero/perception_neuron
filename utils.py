@@ -25,15 +25,6 @@ from scipy.optimize import minimize
 from scipy.signal import spectrogram,savgol_filter,fftconvolve
 from misc.angle import *
 
-def detrend(x,window=None,inplace=False):
-    """
-    Detrend by fitting a low order polynomial to the data and subtracting it.
-    """
-    T = np.arange(len(x))
-    if inplace:
-        x[:] -= np.polyval(np.polyfit(T,x,3),T)
-    else:
-        return x - np.polyval(np.polyfit(T,x,3),T)
 
 def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
     """
