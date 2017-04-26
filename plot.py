@@ -11,7 +11,7 @@ except ImportError:
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-from numpy import sin,cos
+from numpy import sin,cos,pi
 import pandas as pd
 from ising.heisenberg import rotate
 from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline
@@ -25,6 +25,35 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def hist_dphase(delay,freq):
+    """
+    Plot histogram of delay for given frequencies.
+
+    Params:
+    --------
+    delay (ndarray)
+        (n_freq,n_samples) Phase distance between two trajectories.
+    freq (ndarray)
+    """
+    from misc.plot import set_ticks_radian
+
+    phaseLagPeaks = []
+    fig,ax = plt.subplots(figsize=(7,4))
+    for freqix in range(len(freq)):
+        n,x = np.histogram( delay[freqix],np.linspace(-pi,pi,30) )
+        p = n/n.sum()
+        
+        ax.plot( x[:-1]+(x[1]-x[0])/2,n/n.sum(),'o-',alpha=1 )
+        phaseLagPeaks.append( x[np.argmax(n)]+(x[1]-x[0])/2 )
+        
+    ax.set(xlim=[-pi,pi],xticks=[-pi,pi/2,0,pi/2,pi],ylim=[0,.15],
+           xlabel='Phase lag',ylabel='Relative frequency',
+           title='Histogram of phase lag')
+    set_ticks_radian(ax,axis='x')
+    ax.legend(freq,numpoints=1,title='Frequency',fontsize='small',
+              bbox_to_anchor=[1.4,1.03])
+    return fig,ax,phaseLagPeaks 
+
 def phase(T,v1,v2,phase,phasexyz,title='',maxshift=60,windowlength=100):
     """
     Plot normalized velocity phase lag graphs.
