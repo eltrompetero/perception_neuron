@@ -48,10 +48,8 @@ def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
     return T,v1,v2
 
 def pipeline_phase_calc(fileixs,
-                        sample_freq='120',
-                        bandwidth=.1,
-                        down_sample=False,
-                        suffix=''):
+                        suffix='',
+                        **phase_calc_kwargs):
     """
     Pipeline loading pickled lowpass filtered data and running phase extraction after bandpass filtering.
     Pickles list of tuples phases, list of tuples vs (containing filtered velocities), and array fs
@@ -65,15 +63,11 @@ def pipeline_phase_calc(fileixs,
         '120' or '60'
     bandwidth (float=.1)
         Bandwidth of bandpass filter.
+    down_sample (bool=False)
+        Down sample data by a factor of 2 if true.
     """
-    from scipy.signal import hilbert
-
-    if str(sample_freq)=='120':
-        windowLength,filtwidth = 501,50
-    else:
-        windowLength,filtwidth = 251,25
     fs = np.concatenate((np.arange(-3,0,.1),np.arange(.1,3.1,.1)))
-    
+
     for fileix in fileixs:
         print "Starting file %d..."%fileix
         T,v1,v2 = quick_load(fileix,dt=1/int(sample_freq))
@@ -82,31 +76,60 @@ def pipeline_phase_calc(fileixs,
             v1 = v1[::2]
             v2 = v2[::2]
 
-        phases = []
-        vs = []
-        for f in fs:
-            v1_ = moving_freq_filt(v1,window=windowLength,
-                                   window_type=('gaussian',filtwidth),
-                                   filter_type='single',
-                                   sample_freq=int(sample_freq),
-                                   pass_freq=f,
-                                   bandwidth=bandwidth,
-                                   axis=0)
-            v2_ = moving_freq_filt(v2,window=windowLength,
-                                   window_type=('gaussian',filtwidth),
-                                   filter_type='single',
-                                   sample_freq=int(sample_freq),
-                                   pass_freq=f,
-                                   bandwidth=bandwidth,
-                                   axis=0)
-            
-            h1 = hilbert(v1_,axis=0)
-            h2 = hilbert(v2_,axis=0)
-            phase1 = np.angle(h1)
-            phase2 = np.angle(h2)
-
-            phases.append((phase1,phase2))
-            vs.append((v1_,v2_))
+        phases,vs = phase_calc(fs,v1,v2,**phase_calc_kwargs) 
 
         pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('phase_files/phase_%d%s.p'%(fileix,suffix),'wb'),-1)
         print "Done with file %d."%fileix
+
+def phase_calc(fs,v1,v2,
+               sample_freq='120',
+               bandwidth=.1,
+               down_sample=False):
+    """
+    Params:
+    -------
+    fs (ndarray)
+        Frequencies at which to bandpass.
+    v1,v2 (ndarray)
+        1d arrays.
+    sample_freq (str='120')
+        '120' or '60'
+    bandwidth (float=.1)
+        Bandwidth of bandpass filter.
+    down_sample (bool=False)
+        Down sample data by a factor of 2 if true.
+    """
+    from scipy.signal import hilbert
+
+    if str(sample_freq)=='120':
+        windowLength,filtwidth = 501,50
+    else:
+        windowLength,filtwidth = 251,25
+    
+    phases = []
+    vs = []
+    for f in fs:
+        v1_ = moving_freq_filt(v1,window=windowLength,
+                               window_type=('gaussian',filtwidth),
+                               filter_type='single',
+                               sample_freq=int(sample_freq),
+                               pass_freq=f,
+                               bandwidth=bandwidth,
+                               axis=0)
+        v2_ = moving_freq_filt(v2,window=windowLength,
+                               window_type=('gaussian',filtwidth),
+                               filter_type='single',
+                               sample_freq=int(sample_freq),
+                               pass_freq=f,
+                               bandwidth=bandwidth,
+                               axis=0)
+        
+        h1 = hilbert(v1_,axis=0)
+        h2 = hilbert(v2_,axis=0)
+        phase1 = np.angle(h1)
+        phase2 = np.angle(h2)
+
+        phases.append((phase1,phase2))
+        vs.append((v1_,v2_))
+    
+    return phases,vs
