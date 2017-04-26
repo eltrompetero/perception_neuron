@@ -505,6 +505,6 @@ def detrend(x,inplace=False,return_fit=False):
             return p
     else:
         if return_fit:
-            return x - np.polyval(p,T)
-        return x - np.polyval(p,T),p
+            return x - np.polyval(p,T),p
+        return x - np.polyval(p,T)
 
