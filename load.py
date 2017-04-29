@@ -152,7 +152,8 @@ def get_dr(fname,date=None):
     if not date is None:
         return {'20170307':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Occlusion'),
                 '20170310':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Startup'),
-                '20170317':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie')}[date]
+                '20170317':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie'),
+                '20170418':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie')}[date]
 
     if 'Itai' in fname and 'Anja' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'

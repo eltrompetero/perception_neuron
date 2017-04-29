@@ -5,67 +5,6 @@ import numpy as np
 import multiprocess as mp
 from numpy import fft
 
-def filter_hand_trials(filesToFilter,dt=1/60,
-        extract_calc_kwargs={'rotate_to_face':False,
-                             'remove_hip_drift':True,
-                             'dotruncate':5},
-        filterparams='default'):
-    """
-    Shortcut for filtering hand trials data by just giving file number.
-    2017-03-19
-    
-    Params:
-    -------
-    filesToFilter (list)
-    dt (float=1/60)
-    extract_calc_kwargs (dict)
-    filterparams (str='default')
-        Choose between 'default' and '120'. Filter parameters for butterworth filter as in utils.smooth()
-    """
-    from filter import smooth
-    import cPickle as pickle
-    
-    bodyparts = [['RightHand','LeftHand'],
-                 ['LeftHand','RightHand']]
-
-    for fileix in filesToFilter:
-        # Read position, velocity and acceleration data from files.
-        fname = get_fnames()[fileix]
-        if type(fname) is tuple:
-            fname,date = fname
-        else:
-            date = None
-        T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
-                                                                   get_dr(fname,date),
-                                                                   bodyparts,
-                                                                   dt,
-                                                                   rotation_angle=global_rotation(fileix),
-                                                                   **extract_calc_kwargs)
-
-        for x in leaderX:
-            x-=x.mean(0)
-        for x in followerX:
-            x-=x.mean(0)
-
-        # Butterworth filter data and pickle it.
-        for x,v,a in zip(leaderX,leaderV,leaderA):
-            x[:] = smooth(x,filterparams=filterparams)[:]
-            v[:] = smooth(v,filterparams=filterparams)[:]
-            a[:] = smooth(a,filterparams=filterparams)[:]
-        for x,v,a in zip(followerX,followerV,followerA):
-            x[:] = smooth(x,filterparams=filterparams)[:]
-            v[:] = smooth(v,filterparams=filterparams)[:]
-            a[:] = smooth(a,filterparams=filterparams)[:]
-        
-        # Save into same directory as calc file.
-        savedr = '%s/%s.p'%(get_dr(fname,date),fname)
-        print "Saving as %s"%savedr
-        pickle.dump({'T':T,
-                     'leaderX':leaderX,'followerX':followerX,
-                     'leaderV':leaderV,'followerV':followerV,
-                     'leaderA':leaderA,'followerA':followerA},
-                    open(savedr,'wb'),-1)
-
 def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
     """
     This does not account for the proper normalization of the windowing function such that the original signal

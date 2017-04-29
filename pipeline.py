@@ -3,6 +3,7 @@
 from __future__ import division
 import pickle
 import numpy as np
+import os
 from load import *
 from utils import *
 from filter import *
@@ -75,6 +76,8 @@ def pipeline_phase_calc(fileixs=[],
     down_sample (bool=False)
         Down sample data by a factor of 2 if true.
     """
+    if not os.path.isdir('phase_files'):
+        os.makedirs('phase_files')
     fs = np.concatenate((np.arange(-3,0,.1),np.arange(.1,3.1,.1)))
     
     if len(fileixs)>0:
@@ -100,7 +103,7 @@ def pipeline_phase_calc(fileixs=[],
                 v2 = v2[::2]
 
             phases,vs = phase_calc(fs,v1,v2,**phase_calc_kwargs) 
-
+            
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},
                         open('phase_files/temp_phase_%d%s.p'%(counter,suffix),'wb'),-1)
             print "Done with file %d."%fileix
@@ -158,3 +161,65 @@ def phase_calc(fs,v1,v2,
         vs.append((v1_,v2_))
     
     return phases,vs
+
+def filter_hand_trials(filesToFilter,dt=1/60,
+        extract_calc_kwargs={'rotate_to_face':False,
+                             'remove_hip_drift':True,
+                             'dotruncate':5},
+        filterparams='default'):
+    """
+    Shortcut for filtering hand trials data by just giving file number.
+    2017-03-19
+    
+    Params:
+    -------
+    filesToFilter (list)
+    dt (float=1/60)
+    extract_calc_kwargs (dict)
+    filterparams (str='default')
+        Choose between 'default' and '120'. Filter parameters for butterworth filter as in utils.smooth()
+    """
+    from filter import smooth
+    import cPickle as pickle
+    
+    bodyparts = [['RightHand','LeftHand'],
+                 ['LeftHand','RightHand']]
+
+    for fileix in filesToFilter:
+        # Read position, velocity and acceleration data from files.
+        fname = get_fnames()[fileix]
+        if type(fname) is tuple:
+            fname,date = fname
+        else:
+            date = None
+        T,leaderX,leaderV,leaderA,followerX,followerV,followerA = extract_calc(fname,
+                                                                   get_dr(fname,date),
+                                                                   bodyparts,
+                                                                   dt,
+                                                                   rotation_angle=global_rotation(fileix),
+                                                                   **extract_calc_kwargs)
+
+        for x in leaderX:
+            x-=x.mean(0)
+        for x in followerX:
+            x-=x.mean(0)
+
+        # Butterworth filter data and pickle it.
+        for x,v,a in zip(leaderX,leaderV,leaderA):
+            x[:] = smooth(x,filterparams=filterparams)[:]
+            v[:] = smooth(v,filterparams=filterparams)[:]
+            a[:] = smooth(a,filterparams=filterparams)[:]
+        for x,v,a in zip(followerX,followerV,followerA):
+            x[:] = smooth(x,filterparams=filterparams)[:]
+            v[:] = smooth(v,filterparams=filterparams)[:]
+            a[:] = smooth(a,filterparams=filterparams)[:]
+        
+        # Save into same directory as calc file.
+        savedr = '%s/%s.p'%(get_dr(fname,date),fname)
+        print "Saving as %s"%savedr
+        pickle.dump({'T':T,
+                     'leaderX':leaderX,'followerX':followerX,
+                     'leaderV':leaderV,'followerV':followerV,
+                     'leaderA':leaderA,'followerA':followerA},
+                    open(savedr,'wb'),-1)
+
