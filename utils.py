@@ -663,6 +663,10 @@ def truncate(t,y,t0=10,t1=10):
     y (ndarray)
     t0 (float=10)
     t1 (float=10)
+
+    Returns:
+    --------
+    yTruncated
     """
     timeix = np.logical_and(t>t0,t<(t[-1]-t1))
     if type(y) is pd.core.frame.DataFrame:
