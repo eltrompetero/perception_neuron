@@ -78,6 +78,8 @@ def get_fnames():
           ('Caeli (L) Eddie (F)','20170418'),
           ('Caeli (F) Eddie (L)','20170418'),
           ('Caeli (J) Eddie (J)','20170418'),
+          ('Caeli (J) Eddie (J) Right Left Eye Closed','20170418'),
+          ('Caeli (J) Eddie (J) Left Right Eye Closed','20170418'),
           ('Caeli (J) Eddie (J) Half Occlusion','20170418'),
           ('Henry (L) Winnie (F)','20170420'),
           ('Henry (F) Winnie (L)','20170420'),

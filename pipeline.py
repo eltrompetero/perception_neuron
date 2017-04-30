@@ -106,7 +106,7 @@ def pipeline_phase_calc(fileixs=[],
             
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},
                         open('phase_files/temp_phase_%d%s.p'%(counter,suffix),'wb'),-1)
-            print "Done with file %d."%fileix
+            print "Done with file %d."%counter
             counter += 1
 
 def phase_calc(fs,v1,v2,
