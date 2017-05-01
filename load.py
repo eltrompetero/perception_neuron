@@ -129,7 +129,7 @@ def hand_ix(fileix):
             '61':1,
             '62':1,
             '63':0,
-            '64':1,
+            '64':0,
             '65':1}.get(fileix,None)
 
 def global_rotation(fileix):

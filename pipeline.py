@@ -78,7 +78,8 @@ def pipeline_phase_calc(fileixs=[],
     """
     if not os.path.isdir('phase_files'):
         os.makedirs('phase_files')
-    fs = np.concatenate((np.arange(-3,0,.1),np.arange(.1,3.1,.1)))
+    #fs = np.concatenate((np.arange(-3,0,.1),np.arange(.1,3.1,.1)))
+    fs = np.arange(.1,3.1,.1)
     
     if len(fileixs)>0:
         for fileix in fileixs:
