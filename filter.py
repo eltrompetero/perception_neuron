@@ -376,11 +376,13 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
     """
     if filtertype=='sav':
         from scipy.signal import savgol_filter
-        if filterparams=='default':
-            filterparams={'window':61,'order':4}
-        else:
+        if type(filterparams) is str:
+            if filterparams=='default':
+                filterparams={'window':61,'order':4}
+            else:
+                raise NotImplementedError
+        elif not type(filterparams) is dict:
             raise NotImplementedError
-
 
         if x.ndim==1:
             return savgol_filter(x,
@@ -390,11 +392,14 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
         for i in xrange(x.shape[1]):
             xfiltered[:,i]=savgol_filter(x[:,i],window,order)
     elif filtertype=='butter':
-        if filterparams=='default':
-            filterparams={'cutoff':10,'fs':60}
-        elif filterparams=='120':
-            filterparams={'cutoff':10,'fs':120}
-        else:
+        if type(filterparams) is str:
+            if filterparams=='default':
+                filterparams={'cutoff':10,'fs':60}
+            elif filterparams=='120':
+                filterparams={'cutoff':10,'fs':120}
+            else:
+                raise NotImplementedError
+        elif not type(filterparams) is dict:
             raise NotImplementedError
 
         if x.ndim==1:
@@ -406,11 +411,14 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
                                         filterparams['fs'],
                                         axis=axis) 
     elif filtertype=='moving_butter':
-        if filterparams=='default':
-            filterparams={'cutoff':10,'fs':60}
-        elif filterparams=='120':
-            filterparams={'cutoff':10,'fs':120}
-        else:
+        if type(filterparams) is str:
+            if filterparams=='default':
+                filterparams={'cutoff':10,'fs':60}
+            elif filterparams=='120':
+                filterparams={'cutoff':10,'fs':120}
+            else:
+                raise NotImplementedError
+        elif not type(filterparams) is dict:
             raise NotImplementedError
 
         if x.ndim==1:

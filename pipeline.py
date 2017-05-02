@@ -167,7 +167,8 @@ def filter_hand_trials(filesToFilter,dt=1/60,
         extract_calc_kwargs={'rotate_to_face':False,
                              'remove_hip_drift':True,
                              'dotruncate':5},
-        filterparams='default'):
+        filterparams='default',
+        suffix=''):
     """
     Shortcut for filtering hand trials data by just giving file number.
     2017-03-19
@@ -204,7 +205,7 @@ def filter_hand_trials(filesToFilter,dt=1/60,
             x-=x.mean(0)
         for x in followerX:
             x-=x.mean(0)
-
+        
         # Butterworth filter data and pickle it.
         for x,v,a in zip(leaderX,leaderV,leaderA):
             x[:] = smooth(x,filterparams=filterparams)[:]
@@ -216,7 +217,7 @@ def filter_hand_trials(filesToFilter,dt=1/60,
             a[:] = smooth(a,filterparams=filterparams)[:]
         
         # Save into same directory as calc file.
-        savedr = '%s/%s.p'%(get_dr(fname,date),fname)
+        savedr = '%s/%s%s.p'%(get_dr(fname,date),fname,suffix)
         print "Saving as %s"%savedr
         pickle.dump({'T':T,
                      'leaderX':leaderX,'followerX':followerX,
