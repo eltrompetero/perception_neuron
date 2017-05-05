@@ -337,6 +337,115 @@ def group_cols(columns):
     bodyparts = [c.split('-')[0] for c in columns[::3]]
     return pd.MultiIndex.from_product((bodyparts,['x','y','z'])) 
 
+def extract_calc_solo(fname,dr,bodyparts,dt,
+                      append=True,
+                      dotruncate=5,
+                      remove_hip_drift=True,
+                      rotate_to_face=False,
+                      usezd=False,
+                      read_csv_kwargs={},
+                      center_x=False,
+                      rotation_angle=False
+                      ):
+    """
+    Extract specific set of body parts from calculation file with one individual. This is modification of
+    extract_calc(). 
+
+    Params:
+    -------
+    fname (str)
+    dr (str)
+    bodyparts (list of strings)
+    dt (float)
+    append (bool=True)
+        If true, keep list of data from bodyparts else add all the velocities and acceleration together. This
+        is useful if we're looking at the motion of the feet and want to look at the sum of the motion of the
+        feet (because we don't care about stationary feet).
+    dotruncate (float=5)
+        Truncate beginning and end of data by this many seconds.
+    remove_hip_drift (bool=True)
+    rotate_to_face (bool=True)
+        Rotate the individuals to face each other.
+    usezd (bool=True)
+        Get initial body orientation from calc file's Zd entry. This seems to not work as well in capturing
+        the 3 dimension of hand movement. I'm not sure why, but I would assume because the orientation between
+        hands and the body is not totally accurate according to Axis Neuron.
+    read_csv_kwargs (dict)
+        Passed onto pandas.read_csv
+    center_x (bool=False)
+        Subtract mean from the mean of each body parts' displacement.
+    rotation_angle (int=False)
+        If an integer, both individuals will rotated by that many radians about the origin. Useful for trials
+        where individuals were set up facing a different direction in trials than in initial calibration.
+
+    Value:
+    ------
+    T,X,V,A
+    """
+    skeleton = calc_file_body_parts()
+
+    # Read position, velocity and acceleration data from files.
+    print "Loading file %s"%fname
+    leaderdf,leaderzd = load_calc('%s/%s.calc'%(dr,fname),
+                                  cols='XVA',
+                                  read_csv_kwargs=read_csv_kwargs)
+            
+    T = np.arange(len(leaderdf))*dt
+
+    if remove_hip_drift:
+        # Remove drift in hips.
+        Xix = np.array(['X' in c for c in leaderdf.columns])
+        leaderdf.iloc[:,Xix] -= np.tile(leaderdf.iloc[:,:3],(1,leaderdf.shape[1]//9))
+
+    if rotate_to_face:
+        raise NotImplementedError
+        
+    # Select out the body parts that we want.
+    bodypartix = [skeleton.index(b) for b in bodyparts]
+    
+    if append:
+        leaderX,leaderV,leaderA = [],[],[]
+        for i,ix in enumerate(bodypartix):
+            leaderX.append( leaderdf.values[:,ix*9:ix*9+3].copy() ) 
+            leaderV.append( leaderdf.values[:,ix*9+3:ix*9+6].copy() ) 
+            leaderA.append( leaderdf.values[:,ix*9+6:ix*9+9].copy() ) 
+    else:
+        for i,ix in enumerate(bodypartix):
+            if i==0:
+                leaderX = [leaderdf.values[:,ix*9:ix*9+3].copy()]
+                leaderV = [leaderdf.values[:,ix*9+3:ix*9+6].copy()]
+                leaderA = [leaderdf.values[:,ix*9+6:ix*9+9].copy()]
+            else:
+                leaderV[0] += leaderdf.values[:,ix*9+3:ix*9+6]
+                leaderA[0] += leaderdf.values[:,ix*9+6:ix*9+9]
+                
+    if rotate_to_face:
+        raise NotImplementedError
+    elif rotation_angle:
+        for x,v,a in zip(leaderX,leaderV,leaderA):
+            x[:,:] = rotate(x,np.array([0,0,1.]),rotation_angle)
+            v[:,:] = rotate(v,np.array([0,0,1.]),rotation_angle)
+            a[:,:] = rotate(a,np.array([0,0,1.]),rotation_angle)
+
+    # Truncate beginning and ends of data set.
+    if dotruncate:
+        if not type(dotruncate) is list:
+            dotruncate = [dotruncate]*2
+        
+        counter=0
+        for x,v,a in zip(leaderX,leaderV,leaderA):
+            leaderX[counter] = truncate(T,x,t0=dotruncate[0],t1=dotruncate[1])
+            leaderV[counter] = truncate(T,v,t0=dotruncate[0],t1=dotruncate[1])
+            leaderA[counter] = truncate(T,a,t0=dotruncate[0],t1=dotruncate[1])
+            counter += 1
+        T = truncate(T,T,t0=dotruncate[0],t1=dotruncate[1])
+
+    if center_x:
+        for x in leaderX:
+            x -= x.mean(0)
+
+    return T,leaderX,leaderV,leaderA
+
 def extract_calc(fname,dr,bodyparts,dt,
                  append=True,
                  dotruncate=5,
@@ -348,14 +457,13 @@ def extract_calc(fname,dr,bodyparts,dt,
                  rotation_angle=False
                 ):
     """
-    Extract specific set of body parts from calculation file for both leader and follower. If a file with
+    Extract specific set of body parts from calculation file with two individuals. If a file with
     coordination of hands is given, then I have to align the subjects to a global coordinate frame defined by
     the initial orientation of their hands.
 
     For import of hands trials, the first axis is the direction along which the subjects are aligned.
 
     The slowest part is loading the data from file.
-    2017-01-16
 
     Params:
     -------
