@@ -910,6 +910,27 @@ def read_hmd_orientation_position(fname):
     pT,p = position[:,0],position[:,1:]
     return rT,r,pT,p
 
+def load_hmd(fname,dr,t):
+    """
+    Read in data from HMD file and interpolate it to be in the desired uniform time units with given time
+    points.
+
+    Params:
+    -------
+    fname
+    dr
+    t (ndarray)
+        Time points to evaluate at. Assuming that this start at 0.
+    interp_kwargs (dict={'kind':'linear'})
+    """
+    rotT,rot,posT,pos = read_hmd_orientation_position('%s/%s'%(dr,fname))
+    rotT -= rotT[0]
+    posT -= posT[0]
+    interprot = interp1d(rotT,rot,kind='linear',axis=0,bounds_error=False,fill_value=0)(t)
+    interppos = interp1d(posT,pos,kind='linear',axis=0,bounds_error=False,fill_value=0)(t)
+ 
+    return interprot,interppos
+
 # ------------------ #
 # Class definitions. #
 # ------------------ #
