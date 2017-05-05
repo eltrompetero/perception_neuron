@@ -728,7 +728,79 @@ def load_skeleton(fname):
    
     return skeleton
 
+def subtract_hips_from_bvh(fname,dr,replace_file=True,temp_file='temp_bvh.bvh'):
+    """
+    Set hip displacement to 0 in given BVH file.
 
+    Params:
+    -------
+    fname (str)
+        Name of file to load
+    dr (str)
+    replace_file (bool=True)
+    """
+    import os
+    
+    tempf = open('%s/%s'%(dr,temp_file),'w')
+    
+    skeleton = load_skeleton('%s/%s'%(dr,fname))
+    bodyParts = skeleton.nodes
+    
+    # Find the line where data starts.
+    with open('%s/%s'%(dr,fname)) as f:
+        ln = f.readline()
+        while 'Frame Time' not in ln:
+            tempf.write(ln)
+            ln = f.readline()
+        tempf.write(ln)
+        
+        # Parse motion.
+        for ln in f:
+            ln = ln.split(' ')
+            ln[:3] = ['0.000000','0.000000','0.000000']
+            tempf.write(' '.join(ln))
+    tempf.close()
+    
+    if replace_file:
+        os.rename('%s/%s'%(dr,temp_file),'%s/%s'%(dr,fname))
+
+def read_hmd_orientation_position(fname):
+    """
+    Read in HMD rotations and position as output from OR blueprint.
+
+    Params:
+    -------
+    fname (str)
+        Path to file.
+
+    Returns:
+    --------
+    rotationT (ndarray)
+    rotation
+    positionT
+    position
+    """
+    rotation,position = [],[]
+    with open(fname,'r') as f:
+        f.readline()
+        ln = f.readline()
+        while not 'Position' in ln:
+            rotation.append(ln.split(' '))
+            rotation[-1] = [s.split('=')[-1] for s in rotation[-1]]
+            rotation[-1][-1] = rotation[-1][-1].rstrip()
+            rotation[-1] = [float(s) for s in rotation[-1]]
+            ln = f.readline()
+
+        for ln in f:
+            position.append(ln.split(' '))
+            position[-1] = [s.split('=')[-1] for s in position[-1]]
+            position[-1][-1] = position[-1][-1].rstrip()
+            position[-1] = [float(s) for s in position[-1]]
+    rotation = np.vstack(rotation)
+    position = np.vstack(position)
+    rT,r = rotation[:,0],rotation[:,1:]
+    pT,p = position[:,0],position[:,1:]
+    return rT,r,pT,p
 
 # ------------------ #
 # Class definitions. #

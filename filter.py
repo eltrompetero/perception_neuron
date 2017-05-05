@@ -356,7 +356,8 @@ def butter_plot(ax, b, a, fs):
     ax.grid(which='both', axis='both')
     ax.axvline(10, color='green') # cutoff frequency
 
-def smooth(x,filtertype='moving_butter',filterparams='default'):
+def smooth(x,filtertype='moving_butter',filterparams='default',
+           moving_freq_kwargs={}):
     """
     Smooth multidimensional curve. Currently, using Savitzy-Golay on each
     dimension independently. Ideally, I would implememnt some sort of smoothing
@@ -424,12 +425,14 @@ def smooth(x,filtertype='moving_butter',filterparams='default'):
         if x.ndim==1:
             xfiltered=moving_freq_filt(x,
                                        cutoff_freq=filterparams['cutoff'],
-                                       sample_freq=filterparams['fs'])
+                                       sample_freq=filterparams['fs'],
+                                       **moving_freq_kwargs)
         else:
             xfiltered = moving_freq_filt(x,
                                         cutoff_freq=filterparams['cutoff'],
                                         sample_freq=filterparams['fs'],
-                                        axis=0)
+                                        axis=0,
+                                        **moving_freq_kwargs)
     else: raise Exception("Invalid filter option.")
     return xfiltered
 
