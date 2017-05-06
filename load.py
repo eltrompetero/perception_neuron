@@ -922,14 +922,35 @@ def load_hmd(fname,dr,t):
     t (ndarray)
         Time points to evaluate at. Assuming that this start at 0.
     interp_kwargs (dict={'kind':'linear'})
+
+    Returns:
+    ---------
+    t (ndarray)
+        Only times that we have HMD data on.
+    hmdrotX
+    hmdposX
+    hmdrotV
+    hmdposV
     """
     rotT,rot,posT,pos = read_hmd_orientation_position('%s/%s'%(dr,fname))
     rotT -= rotT[0]
     posT -= posT[0]
-    interprot = interp1d(rotT,rot,kind='linear',axis=0,bounds_error=False,fill_value=0)(t)
-    interppos = interp1d(posT,pos,kind='linear',axis=0,bounds_error=False,fill_value=0)(t)
- 
-    return interprot,interppos
+    interprot = interp1d(rotT,rot,kind='linear',axis=0,bounds_error=False,fill_value=np.nan)(t)
+    interppos = interp1d(posT,pos,kind='linear',axis=0,bounds_error=False,fill_value=np.nan)(t)
+
+   # Truncate at end of data.
+    nanix = t>rotT[-1]
+    t = t[nanix==0]
+    interprot = interprot[nanix==0]
+    interppos = interppos[nanix==0]
+
+    # Use Savitzky-Golay filter with same default settings as with Vicon. 
+    hmdrotV = savgol_filter(interprot,61,3,deriv=1,delta=1/120,axis=0)
+    hmdposV = savgol_filter(interppos,61,3,deriv=1,delta=1/120,axis=0)
+    
+    return t,interprot,interppos,hmdrotV,hmdposV
+
+
 
 # ------------------ #
 # Class definitions. #
