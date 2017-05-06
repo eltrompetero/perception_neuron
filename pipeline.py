@@ -68,7 +68,7 @@ def pipeline_phase_calc(fileixs=[],
     fileix (list)
         List of ints of files to load.
     trajs (list of tuples)
-        (T,v1,v2)
+        (T,v1,v2) or ( T,(v1,v2,...,) )
     sample_freq (str='120')
         '120' or '60'
     bandwidth (float=.1)
@@ -96,21 +96,25 @@ def pipeline_phase_calc(fileixs=[],
             print "Done with file %d."%fileix
     else:
         counter = 0
-        for T,v1,v2 in trajs:
-            assert T.ndim==1 and v1.ndim==1 and v2.ndim==1
+        for T,v in trajs:
+            assert T.ndim==1 and all([i.ndim==1 for i in v])
             if down_sample:
                 T = T[::2]
-                v1 = v1[::2]
-                v2 = v2[::2]
-
-            phases,vs = phase_calc(fs,v1,v2,**phase_calc_kwargs) 
+                v = [i[::2] for i in v]
+            
+            phases = []
+            vs = []
+            for i in v:
+                phases_,vs_ = phase_calc(fs,i,**phase_calc_kwargs) 
+                phases.append(phases_)
+                vs.append(vs_)
             
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},
                         open('phase_files/temp_phase_%d%s.p'%(counter,suffix),'wb'),-1)
             print "Done with file %d."%counter
             counter += 1
 
-def phase_calc(fs,v1,v2,
+def phase_calc(fs,v1,v2=None,
                sample_freq='120',
                bandwidth=.1,
                down_sample=False):
@@ -119,8 +123,9 @@ def phase_calc(fs,v1,v2,
     -------
     fs (ndarray)
         Frequencies at which to bandpass.
-    v1,v2 (ndarray)
+    v1 (ndarray)
         1d arrays.
+    v2 (ndarray=None)
     sample_freq (str='120')
         '120' or '60'
     bandwidth (float=.1)
@@ -145,21 +150,25 @@ def phase_calc(fs,v1,v2,
                                pass_freq=f,
                                bandwidth=bandwidth,
                                axis=0)
-        v2_ = moving_freq_filt(v2,window=windowLength,
-                               window_type=('gaussian',filtwidth),
-                               filter_type='single',
-                               sample_freq=int(sample_freq),
-                               pass_freq=f,
-                               bandwidth=bandwidth,
-                               axis=0)
-        
         h1 = hilbert(v1_,axis=0)
-        h2 = hilbert(v2_,axis=0)
         phase1 = np.angle(h1)
-        phase2 = np.angle(h2)
 
-        phases.append((phase1,phase2))
-        vs.append((v1_,v2_))
+        if not v2 is None:
+            v2_ = moving_freq_filt(v2,window=windowLength,
+                                   window_type=('gaussian',filtwidth),
+                                   filter_type='single',
+                                   sample_freq=int(sample_freq),
+                                   pass_freq=f,
+                                   bandwidth=bandwidth,
+                                   axis=0)
+            h2 = hilbert(v2_,axis=0)
+        
+            phase2 = np.angle(h2)
+            phases.append((phase1,phase2))
+            vs.append((v1_,v2_))
+        else:
+            phases.append(phase1)
+            vs.append(v1_)
     
     return phases,vs
 
