@@ -130,7 +130,12 @@ def hand_ix(fileix):
             '62':1,
             '63':0,
             '64':0,
-            '65':1}.get(fileix,None)
+            '65':1,
+            '68':0,
+            '69':1,
+            '70':1,
+            '71':0,
+            '72':1}.get(fileix,None)
 
 def global_rotation(fileix):
     """
@@ -159,7 +164,8 @@ def get_dr(fname,date=None):
         return {'20170307':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Occlusion'),
                 '20170310':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Startup'),
                 '20170317':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie'),
-                '20170418':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie')}[date]
+                '20170418':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie'),
+                '20170420':'%s/%s/%s_%s'%(homedr,datadr,date,'Henry_Winnie')}[date]
 
     if 'Itai' in fname and 'Anja' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
@@ -489,8 +495,8 @@ def extract_calc(fname,dr,bodyparts,dt,
         Passed onto pandas.read_csv
     center_x (bool=False)
         Subtract mean from the mean of each body parts' displacement.
-    rotation_angle (int=False)
-        If an integer, both individuals will rotated by that many radians about the origin. Useful for trials
+    rotation_angle (float=False)
+        If a scalar, both individuals will rotated by that many radians about the origin. Useful for trials
         where individuals were set up facing a different direction in trials than in initial calibration.
 
     Value:

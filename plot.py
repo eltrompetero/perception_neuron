@@ -25,7 +25,7 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
-def hist_dphase(delay,freq):
+def hist_dphase(delay,freq,ylim='low'):
     """
     Plot histogram of delay for given frequencies.
 
@@ -45,8 +45,12 @@ def hist_dphase(delay,freq):
         
         ax.plot( x[:-1]+(x[1]-x[0])/2,n/n.sum(),'o-',alpha=1 )
         phaseLagPeaks.append( x[np.argmax(n)]+(x[1]-x[0])/2 )
-        
-    ax.set(xlim=[-pi,pi],xticks=[-pi,pi/2,0,pi/2,pi],ylim=[0,.15],
+    
+    if ylim=='high':
+        ylim = [0,1]
+    elif ylim=='low':
+        ylim = [0,.15]
+    ax.set(xlim=[-pi,pi],xticks=[-pi,pi/2,0,pi/2,pi],ylim=ylim,
            xlabel='Phase lag',ylabel='Relative frequency',
            title='Histogram of phase lag')
     set_ticks_radian(ax,axis='x')
