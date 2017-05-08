@@ -655,7 +655,6 @@ def transfer_info(leader,follower,timescale):
 def truncate(t,y,t0=10,t1=10):
     """
     Truncate ends of data set assuming that y is (n_time,n_dim).
-    2016-11-07
 
     Params:
     -------
@@ -668,7 +667,7 @@ def truncate(t,y,t0=10,t1=10):
     --------
     yTruncated
     """
-    timeix = np.logical_and(t>t0,t<(t[-1]-t1))
+    timeix = np.logical_and(t>=t0,t<=(t[-1]-t1))
     if type(y) is pd.core.frame.DataFrame:
         if y.ndim==2:
             return y.ix[timeix,:]

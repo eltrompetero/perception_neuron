@@ -374,6 +374,7 @@ def smooth(x,filtertype='moving_butter',filterparams='default',
         Savitzy-Golay: (window, order) typically {'window':61,'order':4}
         Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
         Moving Butterworth: (cutoff, fs) typically {'cutoff':10,'fs':60}
+    moving_freq_kwargs (dict)
     """
     if filtertype=='sav':
         from scipy.signal import savgol_filter

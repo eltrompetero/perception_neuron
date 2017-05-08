@@ -10,16 +10,21 @@ from filter import *
 
 def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
     """
-    Quick and dirty method for loading filtered velocities from hand trials. Currently returning the
-    y-velocities only.
+    Quick and dirty method for loading filtered velocities from hand trials. 
 
+    Params:
+    -------
+    fileix
+    dt (float=1/120)
+    negate_x (bool=True)
+    negate_y (bool=True)
+    disp (bool=True
+    
     Returns:
     --------
     T
     v1
-        y-axis
     v2
-        y-axis
     """
     bodypartix = hand_ix(fileix)
     fname = get_fnames()[fileix]
