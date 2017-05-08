@@ -59,25 +59,44 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
         recEndTime = recStartTime + timedelta(seconds=dt)
     
     data = []  # Port output.
+    portOut = [datetime.now()]*2
     pause.until(recStartTime)
-    while datetime.now()<recEndTime:
-        data.append(read_port())
+    while portOut[0]<recEndTime:
+        portOut = read_port()
+        data.append(portOut)
     
     headers = list(calc_file_headers())
-    headers[-1] = ''.join(headers[-1].split())
+    headers[-1] = ''.join(headers[-1].split())  # Remove space in last column header.
     with open(fname,'w') as f:
         f.write('Start time: %s\n'%data[0][0].isoformat())
         f.write('End time: %s\n\n'%data[-1][0].isoformat())
         f.write('Timestamp '+' '.join(headers)+'\n')
         for d in data:
-            f.write('%s %s'%(d[0].isoformat(),d[1]))
+            t = d[0].isoformat()
+            if len(t)<10:
+                t = 'NaN'
+            f.write('%s %s'%(t,d[1]))
 
-def load_AN_port(fname):
-    """With daa from a single individual at this moment."""
+def load_AN_port(fname,time_as_dt=True):
+    """
+    With daa from a single individual at this moment.
+
+    Params:
+    -------
+    fname (str)
+    time_as_dt (bool=True)
+    """
     #with open(fname,'r') as f:
     #    startTime = datetime.strptime( f.readline().split(' ')[-1] )
     #    stopTime = datetime.strptime( f.readline().split(' ')[-1] )
     
     df = pd.read_csv(fname,delimiter=' ',skiprows=3)
+    df.ix[:,0] = df.ix[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
+
+    if time_as_dt:
+        # Convert time stamp into time differences in seconds.
+        dt = np.concatenate(([0.],np.diff(df.ix[:,0]).astype(int)/1e9))
+        df['Timestamp'] = df['Timestamp'].apply(pd.to_numeric,errors='coerce')
+        df['Timestamp'] = dt
     return df
 
