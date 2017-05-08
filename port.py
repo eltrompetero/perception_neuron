@@ -61,7 +61,7 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
     while datetime.now()<recEndTime:
         data.append(read_port())
     
-    with open('test.txt','w') as f:
+    with open(fname,'w') as f:
         f.write('Start time: %s\n'%data[0][0].isoformat())
         f.write('End time: %s\n\n'%data[-1][0].isoformat())
         for d in data:
