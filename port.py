@@ -68,7 +68,7 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
     with open(fname,'w') as f:
         f.write('Start time: %s\n'%data[0][0].isoformat())
         f.write('End time: %s\n\n'%data[-1][0].isoformat())
-        f.write('Timestamp'+' '.join(headers)+'\n')
+        f.write('Timestamp '+' '.join(headers)+'\n')
         for d in data:
             f.write('%s %s'%(d[0].isoformat(),d[1]))
 
