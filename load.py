@@ -273,6 +273,13 @@ def calc_file_body_parts():
             'LeftHandPinky2',
             'LeftHandPinky3']
 
+def calc_file_headers():
+    """Load calc file headers from pickle."""
+    import os,pickle
+    headers = pickle.load(open('%s/%s'%(os.path.expanduser('~'),
+                          'Dropbox/Research/py_lib/perceptionneuron/calc_file_headers.p'),'rb'))['headers']
+    return headers
+
 def load_calc(fname,cols='V',read_csv_kwargs={}):
     """
     Load calculation file output by Axis Neuron. 

@@ -5,9 +5,11 @@
 import numpy as np
 from datetime import datetime,timedelta
 import os,time,pause,socket
+import pandas as pd
+from load import calc_file_headers
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
-PORT = 7003
+PORT = 7003  # Calculation data.
 
 # Functions for reading from broadcasting port.
 def read_port():
@@ -61,9 +63,21 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
     while datetime.now()<recEndTime:
         data.append(read_port())
     
+    headers = list(calc_file_headers())
+    headers[-1] = ''.join(headers[-1].split())
     with open(fname,'w') as f:
         f.write('Start time: %s\n'%data[0][0].isoformat())
         f.write('End time: %s\n\n'%data[-1][0].isoformat())
+        f.write('Datetime '+' '.join(headers)+'\n')
         for d in data:
-            f.write('%s %s\n'%(d[0].isoformat(),d[1]))
+            f.write('%s %s'%(d[0].isoformat(),d[1]))
+
+def load_AN_port(fname):
+    """With daa from a single individual at this moment."""
+    #with open(fname,'r') as f:
+    #    startTime = datetime.strptime( f.readline().split(' ')[-1] )
+    #    stopTime = datetime.strptime( f.readline().split(' ')[-1] )
+    
+    df = pd.read_csv(fname,delimiter=' ',skiprows=3)
+    return df
 
