@@ -13,7 +13,6 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from numpy import sin,cos
 import pandas as pd
-from ising.heisenberg import rotate
 from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline,interp1d
 import entropy.entropy as info
 from scipy.signal import fftconvolve
@@ -809,6 +808,8 @@ def convert_euler_to_polar(yxz):
     return phis,thetas
 
 def euler_to_vectors(*angles):
+    from ising.heisenberg import rotate
+
     x0=np.array([0,0,1.])
     x = rotate_by_angles(x0,*angles)
     

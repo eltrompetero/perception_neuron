@@ -77,10 +77,10 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
                 t = 'NaN'
             f.write('%s %s'%(t,d[1]))
 
-def load_AN_port(fname,time_as_dt=True):
+def load_AN_port(fname,time_as_dt=True,n_avatars=1):
     """
-    With daa from a single individual at this moment.
-
+    With data from a single individual at this moment.
+    
     Params:
     -------
     fname (str)
@@ -94,8 +94,10 @@ def load_AN_port(fname,time_as_dt=True):
     df.ix[:,0] = df.ix[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
 
     if time_as_dt:
-        # Convert time stamp into time differences in seconds.
-        dt = np.concatenate(([0.],np.diff(df.ix[:,0]).astype(int)/1e9))
+        # Convert time stamp into time differences in seconds. This means we have to remove the first data
+        # point.
+        dt = np.diff(df.ix[:,0]).astype(int)/1e9
+        df = df.ix[1:,:]
         df['Timestamp'] = df['Timestamp'].apply(pd.to_numeric,errors='coerce')
         df['Timestamp'] = dt
     return df
