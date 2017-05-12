@@ -885,6 +885,17 @@ def subtract_hips_from_bvh(fname,dr,replace_file=True,temp_file='temp_bvh.bvh'):
     if replace_file:
         os.rename('%s/%s'%(dr,temp_file),'%s/%s'%(dr,fname))
 
+def _parse_hmd_line(s):
+    """
+    Parse a single line from the HMD output from UE4 and return a date string with three floats representing
+    the three axes that were measured in that line.
+    """
+    from datetime import datetime
+    s = s.split(' ')
+    date = datetime.strptime(''.join(s[:2])+'000','%Y-%m-%d%H:%M:%S.%f')
+    xyz = [float(i.split('=')[1]) for i in s[2:]]
+    return date,xyz
+
 def read_hmd_orientation_position(fname):
     """
     Read in HMD rotations and position as output from OR blueprint.
@@ -901,29 +912,31 @@ def read_hmd_orientation_position(fname):
     positionT
     position
     """
+    from datetime import datetime
+    
+    rotationT,positionT = [],[]
     rotation,position = [],[]
     with open(fname,'r') as f:
         f.readline()
         ln = f.readline()
         while not 'Position' in ln:
-            rotation.append(ln.split(' '))
-            rotation[-1] = [s.split('=')[-1] for s in rotation[-1]]
-            rotation[-1][-1] = rotation[-1][-1].rstrip()
-            rotation[-1] = [float(s) for s in rotation[-1]]
+            d,r = _parse_hmd_line(ln)
+            rotationT.append(d)
+            rotation.append(r)
             ln = f.readline()
 
         for ln in f:
-            position.append(ln.split(' '))
-            position[-1] = [s.split('=')[-1] for s in position[-1]]
-            position[-1][-1] = position[-1][-1].rstrip()
-            position[-1] = [float(s) for s in position[-1]]
+            d,p = _parse_hmd_line(ln)
+            positionT.append(d)
+            position.append(p)
+    
+    rotationT = np.array(rotationT)
+    positionT = np.array(positionT)
     rotation = np.vstack(rotation)
     position = np.vstack(position)
-    rT,r = rotation[:,0],rotation[:,1:]
-    pT,p = position[:,0],position[:,1:]
-    return rT,r,pT,p
+    return rotationT,rotation,positionT,position
 
-def load_hmd(fname,dr,t):
+def load_hmd(fname,dr,t=None):
     """
     Read in data from HMD file and interpolate it to be in the desired uniform time units with given time
     points.
@@ -937,7 +950,11 @@ def load_hmd(fname,dr,t):
     interp_kwargs (dict={'kind':'linear'})
 
     Returns:
-    ---------
+    --------
+    Depending on input. If t is None:
+    rotationT,rotation,positionT,position
+
+    If t is given:
     t (ndarray)
         Only times that we have HMD data on.
     hmdrotX
@@ -946,8 +963,16 @@ def load_hmd(fname,dr,t):
     hmdposV
     """
     rotT,rot,posT,pos = read_hmd_orientation_position('%s/%s'%(dr,fname))
+
+    # Convert time stamps into seconds.
     rotT -= rotT[0]
     posT -= posT[0]
+    rotT = np.array([i.total_seconds() for i in rotT])
+    posT = np.array([i.total_seconds() for i in posT])
+
+    if t is None:
+        return rotT,rot,posT,pos
+    
     interprot = interp1d(rotT,rot,kind='linear',axis=0,bounds_error=False,fill_value=np.nan)(t)
     interppos = interp1d(posT,pos,kind='linear',axis=0,bounds_error=False,fill_value=np.nan)(t)
 
