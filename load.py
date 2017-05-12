@@ -983,8 +983,8 @@ def load_hmd(fname,dr,t=None):
     interppos = interppos[nanix==0]
 
     # Use Savitzky-Golay filter with same default settings as with Vicon. 
-    hmdrotV = savgol_filter(interprot,61,3,deriv=1,delta=1/120,axis=0)
-    hmdposV = savgol_filter(interppos,61,3,deriv=1,delta=1/120,axis=0)
+    hmdrotV = savgol_filter(interprot,61,3,deriv=1,delta=t[1]-t[0],axis=0)
+    hmdposV = savgol_filter(interppos,61,3,deriv=1,delta=t[1]-t[0],axis=0)
     
     return t,interprot,interppos,hmdrotV,hmdposV
 
