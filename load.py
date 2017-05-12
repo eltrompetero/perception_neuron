@@ -892,8 +892,8 @@ def _parse_hmd_line(s):
     """
     from datetime import datetime
     s = s.split(' ')
-    date = datetime.strptime(''.join(s[:2])+'000','%Y-%m-%d%H:%M:%S.%f')
-    xyz = [float(i.split('=')[1]) for i in s[2:]]
+    date = datetime.strptime(s[0],'%Y-%m-%dT%H:%M:%S.%f')
+    xyz = [float(i.split('=')[1]) for i in s[1:]]
     return date,xyz
 
 def read_hmd_orientation_position(fname):
@@ -936,7 +936,7 @@ def read_hmd_orientation_position(fname):
     position = np.vstack(position)
     return rotationT,rotation,positionT,position
 
-def load_hmd(fname,dr,t=None):
+def load_hmd(fname,dr='',t=None,time_as_dt=True):
     """
     Read in data from HMD file and interpolate it to be in the desired uniform time units with given time
     points.
@@ -962,13 +962,17 @@ def load_hmd(fname,dr,t=None):
     hmdrotV
     hmdposV
     """
-    rotT,rot,posT,pos = read_hmd_orientation_position('%s/%s'%(dr,fname))
+    if len(dr)>0:
+        fname = '%s/%s'%(dr,fname)
+
+    rotT,rot,posT,pos = read_hmd_orientation_position(fname)
 
     # Convert time stamps into seconds.
-    rotT -= rotT[0]
-    posT -= posT[0]
-    rotT = np.array([i.total_seconds() for i in rotT])
-    posT = np.array([i.total_seconds() for i in posT])
+    if time_as_dt:
+        rotT -= rotT[0]
+        posT -= posT[0]
+        rotT = np.array([i.total_seconds() for i in rotT])
+        posT = np.array([i.total_seconds() for i in posT])
 
     if t is None:
         return rotT,rot,posT,pos

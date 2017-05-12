@@ -73,23 +73,56 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
         f.write('Timestamp '+' '.join(headers)+'\n')
         for d in data:
             t = d[0].isoformat()
-            if len(t)<10:
-                t = 'NaN'
+            #if '\r' in d[1] or '\n' in d[1]:
+            #    raise Exception
             f.write('%s %s'%(t,d[1]))
 
-def load_AN_port(fname,time_as_dt=True,n_avatars=1):
+def _fix_problem_dates(f,fname):
+    """
+    Insert missing datetime or missing microseconds at beginning of line. Put in 1900-01-01T00:00:00.000 if
+    missing date completely.
+    """
+    with open('/tmp/temp.txt','w') as fout:
+        # skip header lines
+        for i in xrange(5):
+            fout.write(f.readline())
+
+        for ln in f:
+            try:
+                d = datetime.strptime(ln[:26], '%Y-%m-%dT%H:%M:%S.%f')
+            except ValueError:
+                if len(ln[:26].split()[0])==19:
+                    ln = ln.split()
+                    ln[0] += '.000000'
+                    ln = ' '.join(ln)+'\n'
+                else:
+                    ln = '1900-01-01T00:00:00.000 '+ln
+            fout.write(ln) 
+    os.rename('/tmp/temp.txt',fname)
+
+def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True):
     """
     With data from a single individual at this moment.
     
     Params:
     -------
     fname (str)
+    dr (str='')
     time_as_dt (bool=True)
     """
+    if len(dr)>0:
+        fname = '%s/%s'%(dr,fname)
+    
+    if fix_file:
+        # Insert missing times for the file to be read in.
+        with open(fname,'r') as f:
+            _fix_problem_dates(f,fname) 
+
+    # Read in start and stop times at beginning of file.
     #with open(fname,'r') as f:
     #    startTime = datetime.strptime( f.readline().split(' ')[-1] )
     #    stopTime = datetime.strptime( f.readline().split(' ')[-1] )
-    
+            
     df = pd.read_csv(fname,delimiter=' ',skiprows=3)
     df.ix[:,0] = df.ix[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
 
