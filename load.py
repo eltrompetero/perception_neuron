@@ -896,7 +896,7 @@ def _parse_hmd_line(s):
     xyz = [float(i.split('=')[1]) for i in s[1:]]
     return date,xyz
 
-def read_hmd_orientation_position(fname):
+def read_hmd_orientation_position(fname,dr=''):
     """
     Read in HMD rotations and position as output from OR blueprint.
 
@@ -912,6 +912,8 @@ def read_hmd_orientation_position(fname):
     positionT
     position
     """
+    if len(dr)==0:
+        fname = '%s/%s'%(dr,fname)
     from datetime import datetime
     
     rotationT,positionT = [],[]
@@ -943,8 +945,8 @@ def load_hmd(fname,dr='',t=None,time_as_dt=True):
 
     Params:
     -------
-    fname
-    dr
+    fname (str)
+    dr (str='')
     t (ndarray)
         Time points to evaluate at. Assuming that this start at 0.
     interp_kwargs (dict={'kind':'linear'})

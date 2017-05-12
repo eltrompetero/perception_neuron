@@ -109,6 +109,8 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True):
     fname (str)
     dr (str='')
     time_as_dt (bool=True)
+    fix_file (bool=True)
+        Parse input file and fix any problems with dates.
     """
     if len(dr)>0:
         fname = '%s/%s'%(dr,fname)
