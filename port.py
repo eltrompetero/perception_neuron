@@ -57,7 +57,7 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
         assert type(recStartTime) is datetime.datetime, "recStartTime must be seconds or datetime object."
     if recEndTime is None:
         recEndTime = recStartTime + timedelta(seconds=dt)
-    
+
     data = []  # Port output.
     portOut = [datetime.now()]*2
     pause.until(recStartTime)
@@ -92,12 +92,12 @@ def _fix_problem_dates(f,fname):
                 d = datetime.strptime(ln[:26], '%Y-%m-%dT%H:%M:%S.%f')
             except ValueError:
                 if len(ln[:26].split()[0])==19:
+                    # Some values seem to be cutoff because microseconds is precisely 0.
                     print "Inserting microseconds."
                     ln = ln.split()
                     ln[0] += '.000000'
                     ln = ' '.join(ln)+'\n'
                 else:
-                    print "Adding in date."
                     ln = '1900-01-01T00:00:00.000000 '+ln
                 # Sometimes, a single port broadcost seems to overlap with another.
                 if len(ln.split())>948:
@@ -132,6 +132,16 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True):
             
     df = pd.read_csv(fname,delimiter=' ',skiprows=3)
     df.ix[:,0] = df.ix[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
+
+    # Linearly interpolate missing date times. Assuming that no two sequential data points are missing
+    # times which seems to be the case...
+    ix = np.where( pd.DatetimeIndex(df['Timestamp']).year==1900 )[0]
+    for i in ix:
+        if i>0 and i<(len(df)-1):
+            df.ix[i,0] = timedelta((df.ix[i+1,0]-df.ix[i-1,0]).total_seconds())/2 + df.ix[i-1,0]
+    # Remove last data point if the time is uncertain.
+    if pd.DatetimeIndex(df.tail(1)['Timestamp']).year==1900:
+        df = df.iloc[:-1]
 
     if time_as_dt:
         # Convert time stamp into time differences in seconds. This means we have to remove the first data
