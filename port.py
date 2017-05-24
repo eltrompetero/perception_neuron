@@ -75,7 +75,7 @@ def record_AN_port(fname,recStartTime,recEndTime=None,dt=None):
             t = d[0].isoformat()
             #if '\r' in d[1] or '\n' in d[1]:
             #    raise Exception
-            f.write('%s %s'%(t,d[1]))
+            f.write('%s %s\n'%(t,d[1].rstrip()))
 
 def _fix_problem_dates(f,fname):
     """
@@ -92,11 +92,16 @@ def _fix_problem_dates(f,fname):
                 d = datetime.strptime(ln[:26], '%Y-%m-%dT%H:%M:%S.%f')
             except ValueError:
                 if len(ln[:26].split()[0])==19:
+                    print "Inserting microseconds."
                     ln = ln.split()
                     ln[0] += '.000000'
                     ln = ' '.join(ln)+'\n'
                 else:
-                    ln = '1900-01-01T00:00:00.000 '+ln
+                    print "Adding in date."
+                    ln = '1900-01-01T00:00:00.000000 '+ln
+                # Sometimes, a single port broadcost seems to overlap with another.
+                if len(ln.split())>948:
+                    ln = ' '.join(ln.split()[:948])+'\n'
             fout.write(ln) 
     os.rename('/tmp/temp.txt',fname)
 

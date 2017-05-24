@@ -792,14 +792,14 @@ def load_skeleton(fname):
     """
     from itertools import chain
     from pyparsing import nestedExpr
-    import string
+    import string,os
 
     # Parse skeleton.
     # Find the line where data starts and get skeleton tree lines.
     s = ''
     lineix = 0
     bodyParts = ['Hips']  # for keeping track of order of body parts
-    with open(fname) as f:
+    with open(fname,'r') as f:
         f.readline()
         f.readline()
         ln = f.readline()
@@ -859,9 +859,13 @@ def subtract_hips_from_bvh(fname,dr,replace_file=True,temp_file='temp_bvh.bvh'):
         Name of file to load
     dr (str)
     replace_file (bool=True)
+    temp_file (str="temp_bvh.bvh")
     """
     import os
-    
+    # Check if file extension is.
+    splitfname = fname.split('.')
+    if len(splitfname)==1 or splitfname[1]!='bvh':
+        fname += '.bvh'
     tempf = open('%s/%s'%(dr,temp_file),'w')
     
     skeleton = load_skeleton('%s/%s'%(dr,fname))

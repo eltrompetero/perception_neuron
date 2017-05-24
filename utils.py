@@ -25,6 +25,58 @@ from scipy.signal import spectrogram,savgol_filter,fftconvolve
 from misc.angle import *
 
 
+# ================== # 
+# Class definitions.
+# ================== # 
+class MultiUnivariateSpline(object):
+    def __init__(self,t,x,**kwargs):
+        """
+        Simple extension of UnivariateSpline to handle multidimensional data.
+        
+        Params:
+        -------
+        t
+        x
+        **kwargs
+        """
+        assert x.ndim==2
+        self.splines = []
+        
+        for i in xrange(x.shape[1]):
+            self.splines.append(UnivariateSpline(t,x[:,i],**kwargs))
+    
+    def __call__(self,t):
+        xSpline = np.zeros((len(t),len(self.splines)))
+        for i in xrange(len(self.splines)):
+            xSpline[:,i] = self.splines[i](t)
+        return xSpline
+
+
+
+# ===================== #
+# Function definitions. #
+# ===================== #
+def match_time(t,x,dt,spline_kwargs={}):
+    """
+    Given two data sets with different time stamps (as datetime), interpolate the data sets to have the
+    given time spacing.
+    
+    Params:
+    -------
+    t (ndarray of datetime.datetime)
+    x (ndarray)
+        n_time x n_dim
+    """
+    t = t-t[0]
+    t = np.array([t_.total_seconds() for t_ in t])
+    tLin = np.arange(t[-1]//dt)*dt
+    
+    if x.ndim==1:
+        xSpline = UnivariateSpline(t,x,**spline_kwargs)
+    else:
+        xSpline = MultiUnivariateSpline(t,x,**spline_kwargs)
+    return xSpline,tLin
+
 def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
     """
     Relative phase fluctuations per frequency across given signals.
