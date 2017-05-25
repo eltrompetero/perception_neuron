@@ -93,7 +93,7 @@ def _fix_problem_dates(f,fname):
             except ValueError:
                 if len(ln[:26].split()[0])==19:
                     # Some values seem to be cutoff because microseconds is precisely 0.
-                    print "Inserting microseconds."
+                    #print "Inserting microseconds."
                     ln = ln.split()
                     ln[0] += '.000000'
                     ln = ' '.join(ln)+'\n'
@@ -138,7 +138,7 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True):
     ix = np.where( pd.DatetimeIndex(df['Timestamp']).year==1900 )[0]
     for i in ix:
         if i>0 and i<(len(df)-1):
-            df.ix[i,0] = timedelta((df.ix[i+1,0]-df.ix[i-1,0]).total_seconds())/2 + df.ix[i-1,0]
+            df.ix[i,0] = timedelta(seconds=(df.ix[i+1,0]-df.ix[i-1,0]).total_seconds()/2) + df.ix[i-1,0]
     # Remove last data point if the time is uncertain.
     if pd.DatetimeIndex(df.tail(1)['Timestamp']).year==1900:
         df = df.iloc[:-1]
