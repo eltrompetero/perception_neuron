@@ -280,7 +280,7 @@ def calc_file_headers():
                           'Dropbox/Research/py_lib/perceptionneuron/calc_file_headers.p'),'rb'))['headers']
     return headers
 
-def load_calc(fname,cols='V',read_csv_kwargs={}):
+def load_calc(fname,cols='V',read_csv_kwargs={},zd=True,df=None):
     """
     Load calculation file output by Axis Neuron. 
     Note that z-axis points into the ground by default.
@@ -295,8 +295,9 @@ def load_calc(fname,cols='V',read_csv_kwargs={}):
         Data columns to keep. Columns are XVQAW (position, vel, quaternion, acc, angular vel)
     """
     from ising.heisenberg import rotate
-
-    df = pd.read_csv(fname,skiprows=5,sep='\t',**read_csv_kwargs)
+    
+    if df is None:
+        df = pd.read_csv(fname,skiprows=5,sep='\t',**read_csv_kwargs)
     
     # Only keep desired columns.
     keepix = np.zeros((len(df.columns)),dtype=bool)
@@ -316,14 +317,16 @@ def load_calc(fname,cols='V',read_csv_kwargs={}):
     df.columns = columns
     
     # Read Zd axis, the original direction that the wearer is facing.
-    with open(fname,'r') as f:
-        zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
+    if zd:
+        with open(fname,'r') as f:
+            zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
+        return df,zd
     #n = np.cross(zd,np.array([-1,0,0]))
     #theta = np.arccos(zd.dot([-1,0,0]))
     #for i in xrange(len(df.columns)):
     #    if any([c+'-x' in df.columns[i] for c in cols]):
     #        df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
-    return df,zd
+    return df
 
 def extract_parts(df,bodyparts):
     """
@@ -350,7 +353,8 @@ def group_cols(columns):
     bodyparts = [c.split('-')[0] for c in columns[::3]]
     return pd.MultiIndex.from_product((bodyparts,['x','y','z'])) 
 
-def extract_calc_solo(fname,dr,bodyparts,dt,
+def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
+                      leaderdf=None,
                       append=True,
                       dotruncate=5,
                       remove_hip_drift=True,
@@ -369,7 +373,10 @@ def extract_calc_solo(fname,dr,bodyparts,dt,
     fname (str)
     dr (str)
     bodyparts (list of strings)
+        Body parts to keep.
     dt (float)
+    leaderdf (pandas.DataFrame=None)
+        If given, this will be the data array used to extract data.
     append (bool=True)
         If true, keep list of data from bodyparts else add all the velocities and acceleration together. This
         is useful if we're looking at the motion of the feet and want to look at the sum of the motion of the
@@ -396,12 +403,13 @@ def extract_calc_solo(fname,dr,bodyparts,dt,
     T,X,V,A
     """
     skeleton = calc_file_body_parts()
-
-    # Read position, velocity and acceleration data from files.
-    print "Loading file %s"%fname
-    leaderdf,leaderzd = load_calc('%s/%s.calc'%(dr,fname),
-                                  cols='XVA',
-                                  read_csv_kwargs=read_csv_kwargs)
+    
+    if leaderdf is None:
+        # Read position, velocity and acceleration data from files.
+        print "Loading file %s"%fname
+        leaderdf,leaderzd = load_calc('%s/%s.calc'%(dr,fname),
+                                      cols='XVA',
+                                      read_csv_kwargs=read_csv_kwargs)
             
     T = np.arange(len(leaderdf))*dt
 
