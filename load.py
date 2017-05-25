@@ -712,8 +712,8 @@ def extract_W(fname,dr,bodyparts,dt,
 
 def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     """
-    Load data from BVD file. Euler angles are given as YXZ. Axis Neuron only keeps track of displacement for the hip.
-    Details about data files from Axis Neuron?
+    Load data from BVH file. Euler angles are given as YXZ. Axis Neuron only keeps track of displacement for
+    the hip. Details about data files from Axis Neuron?
     2016-11-07
 
     Params:
@@ -721,7 +721,7 @@ def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     fname (str)
         Name of file to load
     includeDisplacement (bool=False)
-        If displacement data is included for everything including root.
+        If displacement data is included in given bvh file for everything including root.
     removeBlank (bool=True)
         Remove entries where nothing changes over the entire recording session. This should mean that there
         was nothing being recorded in that field.
@@ -730,7 +730,9 @@ def load_bvh(fname,includeDisplacement=False,removeBlank=True):
     ------
     df (dataFrame)
     dt (float)
-        Frame rate.
+        Frame rate. Columns xx, yy, zz are positions and y, x, z are the Euler angles (assuming that the
+        rotation matrices were output in YXZ order as is defulat in Axis Neuron).
+    skeleton (list)
     """
     from itertools import chain
     from pyparsing import nestedExpr
@@ -1022,6 +1024,15 @@ class Node(object):
 
 class Tree(object):
     def __init__(self,nodes):
+        """
+        Data structure for BVH skeleton hierarchy.
+
+        Attributes:
+        -----------
+        _nodes (Node)
+        nodes
+        adjacency
+        """
         self._nodes = nodes
         self.nodes = [n.name for n in nodes]
         names = [n.name for n in nodes]
@@ -1043,4 +1054,21 @@ class Tree(object):
         
     def print_tree(self):
         print self.adjacency
+    
+    def parents(self,node):
+        """
+        Return parents of particular node.
 
+        Returns:
+        --------
+        parents (list)
+            Parents starting from immediate parent and ascending up the tree.
+        """
+        parents = []
+        ix = self.nodes.index(node)
+
+        while np.any(self.adjacency[:,ix]):
+            ix = np.where(self.adjacency[:,ix])[0][0]
+            parents.append(self.nodes[ix])
+
+        return parents

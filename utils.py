@@ -773,8 +773,13 @@ def spline_smooth(t,Y,T=None,S=None,fixedKnots=True,spline_kwargs={}):
 
 def Ryxz(a,b,c):
     """
-    BVH rotation matrix. As from bvhplayer's skeleton.py process_bvhkeyframe(). For multiplication on the right side of the vector to be transformed. These rotation matrices are the canonical rotation matrices transposed (for left side multiplication).
-    The convention as stated in http://www.dcs.shef.ac.uk/intranet/research/public/resmes/CS0111.pdf does not correspond to that used in Perception Neuron. I tested this by collecting some data with my wrist moving in a circle. Reversing the order of the multiplication gives weird results whereas this one gives the correct results.
+    BVH rotation matrix. As from bvhplayer's skeleton.py process_bvhkeyframe(). For multiplication on the
+    right side of the vector to be transformed. These rotation matrices are the canonical rotation matrices
+    transposed (for left side multiplication).
+    The convention as stated in http://www.dcs.shef.ac.uk/intranet/research/public/resmes/CS0111.pdf does not
+    correspond to that used in Perception Neuron. I tested this by collecting some data with my wrist moving
+    in a circle. Reversing the order of the multiplication gives weird results whereas this one gives the
+    correct results.
     2016-10-24
     """
     ry = np.array([[cos(a),0,-sin(a)],[0,1,0],[sin(a),0,cos(a)]]).T
@@ -791,9 +796,10 @@ def rotate_by_angles(v0,a,b,c,*args):
     -------
     v0
     a,b,c (vectors)
-        Rotation angles.
+        Rotation angles (y,x,z).
     *args (vectors)
-        More rotation angles. Children after the parents. Because this means that the children are multiplied further to the left and precede the vector to be rotated immediately.
+        More rotation angles. Children after the parents. Because this means that the children are multiplied
+        further to the left and precede the vector to be rotated immediately.
     """
     assert (len(args)%3)==0
 
