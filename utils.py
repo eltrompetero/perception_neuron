@@ -229,6 +229,7 @@ def quaternion_to_rot(q,normalize=False):
 def optimize_time(t1,x1,t2,x2,
                   scale=1.0,
                   scale_bounds=[.98,1.02],
+                  fix_scale=False,
                   offset=-5,
                   max_offset=10,
                   method='powell'):
@@ -236,44 +237,52 @@ def optimize_time(t1,x1,t2,x2,
     Find best way to overlap curves by rescaling and translating in time. This is used primarily for Vicon and
     Perception Neuron comoparisons.
     Cost function for finding optimal time scale factor and offset between two data sets.
-    Offset and scaling are for second set of trajectories.
+    Offset and scaling are for second set of given trajectories.
     2017-03-07
     
     Params:
     -------
     t1 (ndarray)
+        Time should be ordered.
     x1 (list of ndarrays)
     t2 (ndarray)
     x2 (list of ndarrays)
     scale (float=1.0)
     scale_bounds (list)
+    fix_scale (bool=False)
+        If True, scale will be fixed at given value.
     offset (float=-5)
     max_offset (float)
     method (str='powell')
     """
-    def f(scale,offset,):
+    assert abs(offset)<max_offset, "Given offset is outside of bounds."
+
+    def f(offset=offset,scale=scale):
         if scale>scale_bounds[1] or scale<scale_bounds[0]:
             return [1e30]
         if abs(offset)>max_offset:
             return [1e30]
+        t2Transform = t2*scale + offset
         
         cost = 0.
         for x1_,x2_ in zip(x1,x2):
-            tmx = max([t1[-1],t2[-1]])
-            tmn = min([t1[0],t2[0]])
+            # Assuming that the second set of data is small enough to be shifted and scaled within the time
+            # range fo the first data set. And that the times are all ordered.
+            t1Ix = (t1>t2Transform[0]) & (t1<t2Transform[-1])
 
-            t1Ix = np.logical_and(t1>(tmn+max_offset),t1<(tmx-max_offset))
-            t2Ix = np.logical_and(t2>(tmn+max_offset),t2<(tmx-max_offset))
-
-            interp = interp1d(t2,x2_,axis=0,bounds_error=True)
-            t = t1[t1Ix]
-            thisCost = np.linalg.norm( interp(t*scale+offset) - x1_[t1Ix] )
+            interp = interp1d(t2Transform,x2_,axis=0,bounds_error=True)
+            thisCost = np.linalg.norm( interp(t1[t1Ix]) - x1_[t1Ix] )
             cost += thisCost
         return cost
-
-    soln = minimize(lambda params: f(*params),[scale,offset],method=method )
-    scale,offset = soln['x']
-    return scale,offset
+    
+    if fix_scale:
+        soln = minimize(lambda params: f(*params),offset,method=method )
+        offset = soln['x']
+        return offset
+    else:
+        soln = minimize(lambda params: f(*params),[offset,scale],method=method )
+        offset,scale = soln['x']
+        return scale,offset
 
 def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_threshold=0):
     """
