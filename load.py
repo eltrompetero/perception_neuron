@@ -1008,6 +1008,22 @@ def load_hmd(fname,dr='',t=None,time_as_dt=True):
     
     return t,interprot,interppos,hmdrotV,hmdposV
 
+def load_csv(fname,dr=''):
+    """
+    Load csv exported from Mokka.
+
+    Params:
+    -------
+    fname (str)
+    dr (str='')
+    """
+    if len(dr)>0:
+        fname = '%s/%s'%(dr,fname)
+    
+    df = pd.read_csv(fname,skiprows=5)
+    df.drop([0,1],inplace=True)
+    df.columns = pd.MultiIndex.from_product([df.columns[1::3].tolist(),['x','y','z']]).insert(0,'Time')
+    return df
 
 
 # ------------------ #
