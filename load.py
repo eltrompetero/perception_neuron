@@ -1010,7 +1010,7 @@ def load_hmd(fname,dr='',t=None,time_as_dt=True):
 
 def load_csv(fname,dr=''):
     """
-    Load csv exported from Mokka.
+    Load csv exported from Mokka. First column is time.
 
     Params:
     -------
@@ -1024,6 +1024,42 @@ def load_csv(fname,dr=''):
     df.drop([0,1],inplace=True)
     df.columns = pd.MultiIndex.from_product([df.columns[1::3].tolist(),['x','y','z']]).insert(0,'Time')
     return df
+
+def load_visibility(fname,dr=''):
+    """
+    Load visible/invisible toggle times.
+
+    Params:
+    -------
+    fname (str)
+    dr (str='')
+
+    Returns:
+    --------
+    visible (ndarray)
+        First time is when animation starts. Second time is when first visibility countdown starts.
+    invisible (ndarray)
+    """
+    from datetime import datetime
+
+    if len(dr)>0:
+        fname = '%s/%s'%(dr,fname)
+        
+    visible,invisible = [],[]
+    with open(fname,'r') as f:
+        f.readline()
+        ln = f.readline().rstrip()
+        while not 'Invisible' in ln:
+            visible.append(datetime.strptime(ln,'%Y-%m-%dT%H:%M:%S.%f'))
+            ln = f.readline().rstrip()
+
+        for ln in f:
+            invisible.append(datetime.strptime(ln.rstrip(),'%Y-%m-%dT%H:%M:%S.%f'))
+    
+    visible = np.array(visible,dtype=datetime)
+    invisible = np.array(invisible,dtype=datetime)
+    return visible,invisible
+
 
 
 # ------------------ #
