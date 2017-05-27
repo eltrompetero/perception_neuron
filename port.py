@@ -105,7 +105,7 @@ def _fix_problem_dates(f,fname):
             fout.write(ln) 
     os.rename('/tmp/temp.txt',fname)
 
-def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True):
+def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_kwargs={}):
     """
     With data from a single individual at this moment.
     
@@ -130,7 +130,7 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True):
     #    startTime = datetime.strptime( f.readline().split(' ')[-1] )
     #    stopTime = datetime.strptime( f.readline().split(' ')[-1] )
             
-    df = pd.read_csv(fname,delimiter=' ',skiprows=3)
+    df = pd.read_csv(fname,delimiter=' ',skiprows=3,**read_csv_kwargs)
     df.ix[:,0] = df.ix[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
 
     # Linearly interpolate missing date times. Assuming that no two sequential data points are missing
