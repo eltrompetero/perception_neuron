@@ -4,7 +4,7 @@
 # ===================================================================================== #
 import numpy as np
 from datetime import datetime,timedelta
-import os,time,pause,socket
+import os,time,pause,socket,shutil
 import pandas as pd
 from load import calc_file_headers
 
@@ -82,7 +82,9 @@ def _fix_problem_dates(f,fname):
     Insert missing datetime or missing microseconds at beginning of line. Put in 1900-01-01T00:00:00.000 if
     missing date completely.
     """
-    with open('/tmp/temp.txt','w') as fout:
+    import uuid
+    tmpfile = str(uuid.uuid4())
+    with open('/tmp/'+tmpfile,'w') as fout:
         # skip header lines
         for i in xrange(5):
             fout.write(f.readline())
@@ -103,7 +105,7 @@ def _fix_problem_dates(f,fname):
                 if len(ln.split())>948:
                     ln = ' '.join(ln.split()[:948])+'\n'
             fout.write(ln) 
-    os.rename('/tmp/temp.txt',fname)
+    shutil.move('/tmp/'+tmpfile,fname)
 
 def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_kwargs={}):
     """

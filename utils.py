@@ -56,25 +56,35 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
-def match_time(t,x,dt,spline_kwargs={}):
+def match_time(x,t,dt,spline_kwargs={},offset=0):
     """
-    Given two data sets with different time stamps (as datetime), interpolate the data sets to have the
+    Given a data set with non-uniform time stamps (as datetime), interpolate it to have the
     given time spacing.
     
+    Note: It is not clear how to choose the spline parameters in some optimal (or even similar) way.
+
     Params:
     -------
-    t (ndarray of datetime.datetime)
     x (ndarray)
         n_time x n_dim
+    t (ndarray of datetime.datetime)
+    spline_kwargs (dict)
+    offset (float)
+        Offset to time vector.
+
+    Returns:
+    --------
+    xSpline (UnivariateSpline or MultiUnivariateSpline)
+    tLin (ndarray)
     """
     t = t-t[0]
     t = np.array([t_.total_seconds() for t_ in t])
-    tLin = np.arange(t[-1]//dt)*dt
+    tLin = np.arange(t[-1]//dt)*dt+offset
     
     if x.ndim==1:
-        xSpline = UnivariateSpline(t,x,**spline_kwargs)
+        xSpline = UnivariateSpline(t,x,ext=1,**spline_kwargs)
     else:
-        xSpline = MultiUnivariateSpline(t,x,**spline_kwargs)
+        xSpline = MultiUnivariateSpline(t,x,ext=1,**spline_kwargs)
     return xSpline,tLin
 
 def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
