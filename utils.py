@@ -29,22 +29,32 @@ from misc.angle import *
 # Class definitions.
 # ================== # 
 class MultiUnivariateSpline(object):
-    def __init__(self,t,x,**kwargs):
+    def __init__(self,t,x,knot_spacing=1/30,fit_type='LSQ',**kwargs):
         """
         Simple extension of UnivariateSpline to handle multidimensional data.
         
         Params:
         -------
-        t
-        x
+        t (ndarray)
+        x (ndarray)
+            If 2d, then (n_samples,n_dim).
         **kwargs
         """
         assert x.ndim==2
         self.splines = []
+        self.knot_spacing = knot_spacing
         
-        for i in xrange(x.shape[1]):
-            self.splines.append(UnivariateSpline(t,x[:,i],**kwargs))
-    
+        if fit_type=='LSQ':
+            for i in xrange(x.shape[1]):
+                self.splines.append(LSQUnivariateSpline(t,x[:,i],
+                                        np.linspace(t[1],t[-2],int((t[-2]-t[1])/knot_spacing)),
+                                        **kwargs))
+        elif fit_type=='Uni':
+            for i in xrange(x.shape[1]):
+                self.splines.append(UnivariateSpline(t,x[:,i],**kwargs))
+        else:
+            raise NotImplementedError
+
     def __call__(self,t):
         xSpline = np.zeros((len(t),len(self.splines)))
         for i in xrange(len(self.splines)):
@@ -56,10 +66,11 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
-def match_time(x,t,dt,spline_kwargs={},offset=0):
+def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
+               knot_spacing=1/30):
     """
     Given a data set with non-uniform time stamps (as datetime), interpolate it to have the
-    given time spacing.
+    given time spacing. Spline values outside of given range are automatically set to 0.
     
     Note: It is not clear how to choose the spline parameters in some optimal (or even similar) way.
 
@@ -71,6 +82,11 @@ def match_time(x,t,dt,spline_kwargs={},offset=0):
     spline_kwargs (dict)
     offset (float)
         Offset to time vector.
+    use_univariate (bool=False)
+        By default, use LSQUnivariateSpline which allows us to choose the knots which is useful for comparable
+        fits on data sets of different sizes.
+    knot_spacing (float=1/30)
+        Distance between uniformly spaced knots.
 
     Returns:
     --------
@@ -82,9 +98,15 @@ def match_time(x,t,dt,spline_kwargs={},offset=0):
     tLin = np.arange(t[-1]//dt)*dt+offset
     
     if x.ndim==1:
-        xSpline = UnivariateSpline(t,x,ext=1,**spline_kwargs)
+        if use_univariate:
+            xSpline = UnivariateSpline(t,x,ext=1,**spline_kwargs)
+        else:
+            xSpline = LSQUnivariateSpline(t,x,np.linspace(t[1],t[-2],int((t[-2]-t[1])/knot_spacing)),
+                                          ext=1,check_finite=False,**spline_kwargs)
     else:
-        xSpline = MultiUnivariateSpline(t,x,ext=1,**spline_kwargs)
+        xSpline = MultiUnivariateSpline(t,x,
+                                        knot_spacing=knot_spacing,
+                                        ext=1,check_finite=False,**spline_kwargs)
     return xSpline,tLin
 
 def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
