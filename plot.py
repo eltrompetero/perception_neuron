@@ -25,6 +25,44 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def time_occlusion_trial(mbT,mbV,anT,anV,startEnd,visible,invisible,
+                         fig=None,ax=None,
+                         ylabel='Velocity (m/s)'):
+    """
+    Plot the temporal occlusion trial data.
+
+    Params:
+    -------
+    mbT (ndarray of datetime)
+        Model that is being tracked.
+    mbV (ndarray)
+    anT (ndarray of datetime)
+        Axis Neuron calculation data of subject.
+    anV (ndarray)
+    visible,invisible (ndarray of datetime)
+        Times at which tracked object becomes visible or invisible.
+    """
+    if fig is None:
+        if ax is None:
+            fig,ax = plt.subplots(figsize=(15,4))
+        else:
+            ax = fig.add_subplot(111)
+    
+    showIx = (mbT>startEnd[0]) & (mbT<startEnd[1])
+    ax.plot(mbT[showIx],mbV[showIx],'b-')
+
+    showIx = (anT>startEnd[0]) & (anT<startEnd[1])
+    ax.plot(anT[showIx],anV[showIx],'r-')
+
+    ylim = ax.get_ylim()
+    for v,i in zip(visible,invisible):
+        ax.fill_between([i,v],ylim[0],ylim[1],color='k',alpha=.2,lw=0)
+
+    [l.set_rotation(90) for l in ax.xaxis.get_ticklabels()];
+    ax.legend(('Model','Subject'),fontsize='x-small',loc=0)
+    ax.set(ylabel=ylabel,xlim=startEnd)
+    return fig
+
 def hist_dphase(delay,freq,ylim='low'):
     """
     Plot histogram of delay for given frequencies.
