@@ -104,9 +104,15 @@ def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
             xSpline = LSQUnivariateSpline(t,x,np.linspace(t[1],t[-2],int((t[-2]-t[1])/knot_spacing)),
                                           ext=1,check_finite=False,**spline_kwargs)
     else:
-        xSpline = MultiUnivariateSpline(t,x,
-                                        knot_spacing=knot_spacing,
-                                        ext=1,check_finite=False,**spline_kwargs)
+        if use_univariate:
+            xSpline = MultiUnivariateSpline(t,x,
+                                            ext=1,check_finite=False,fit_type='Uni',
+                                            **spline_kwargs)
+        else:
+            xSpline = MultiUnivariateSpline(t,x,
+                                            knot_spacing=knot_spacing,
+                                            ext=1,check_finite=False,**spline_kwargs)
+
     return xSpline,tLin
 
 def phase_d_error(x,y,filt_x_params=None,filt_phase_params=(11,2),noverlap=7/8):
