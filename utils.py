@@ -66,6 +66,47 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def project_gaze_to_plane(pitch,yaw,pos,distance_to_plane=.5):
+    """
+    Given pitch and yaw, project the gaze of the person to a plane in front of him.
+    
+    Params:
+    -------
+    p (ndarray)
+        Pitch
+    y (ndarray)
+        Yaw
+    pos (ndarray)
+        xyz coordinates of headset
+    distances_to_plane (float)
+        Distance in meters from headset starting position.
+    """
+    xp = pos[:,0] + distance_to_plane*np.sin(yaw)
+    yp = pos[:,1] + distance_to_plane*np.sin(pitch)
+    return xp,yp
+
+def match_bool_indices(ix1,ix2):
+    """
+    With two boolean indices, reduce the number of True values in one til it matches the number of True values
+    in the other. This might be necessary when selecting times from two different time series to plot against
+    one another.
+
+    Params:
+    -------
+    ix1,ix2 (ndarray)
+
+    Returns:
+    --------
+    None
+    """
+    d = ix1.sum()-ix2.sum()
+    if d<0:
+        lastix = np.where(ix2)[0][d:]
+        ix2[lastix] = False
+    elif d>0:
+        lastix = np.where(ix1)[0][-d:]
+        ix1[lastix] = False
+
 def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
                knot_spacing=1/30):
     """
@@ -94,8 +135,8 @@ def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
     tLin (ndarray)
     """
     t = t-t[0]
-    t = np.array([t_.total_seconds() for t_ in t])
-    tLin = np.arange(t[-1]//dt)*dt+offset
+    t = np.array([t_.total_seconds() for t_ in t])+offset
+    tLin = np.arange(t[-1]/dt)*dt+offset
     
     if x.ndim==1:
         if use_univariate:

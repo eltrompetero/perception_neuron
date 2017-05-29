@@ -75,7 +75,7 @@ def pipeline_phase_calc(fileixs=[],
     trajs (list of tuples)
         (T,v1,v2) or ( T,(v1,v2,...,) )
     sample_freq (str='120')
-        '120' or '60'
+        '120','60','30'
     bandwidth (float=.1)
         Bandwidth of bandpass filter.
     down_sample (bool=False)
@@ -142,8 +142,12 @@ def phase_calc(fs,v1,v2=None,
 
     if str(sample_freq)=='120':
         windowLength,filtwidth = 501,50
-    else:
+    elif str(sample_freq=='60'):
         windowLength,filtwidth = 251,25
+    elif str(sample_freq=='30'):
+        windowLength,filtwidth = 125,13
+    else:
+        raise NotImplementedError
     
     phases = []
     vs = []

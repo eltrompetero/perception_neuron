@@ -72,6 +72,7 @@ def hist_dphase(delay,freq,ylim='low'):
     delay (ndarray)
         (n_freq,n_samples) Phase distance between two trajectories.
     freq (ndarray)
+        Frequencies that are given.
     """
     from misc.plot import set_ticks_radian
 
