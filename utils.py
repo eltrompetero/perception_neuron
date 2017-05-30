@@ -61,12 +61,25 @@ class MultiUnivariateSpline(object):
             xSpline[:,i] = self.splines[i](t)
         return xSpline
 
+    def derivative(self):
+        self.dsplines = []
+        for i in xrange(len(self.splines)):
+            self.dsplines.append(self.splines[i].derivative())
+        
+        def f(t):
+            xSpline = np.zeros((len(t),len(self.splines)))
+            for i in xrange(len(self.splines)):
+                xSpline[:,i] = self.dsplines[i](t)
+            return xSpline
+        return f
 
 
 # ===================== #
 # Function definitions. #
 # ===================== #
-def project_gaze_to_plane(pitch,yaw,pos,distance_to_plane=.5):
+def project_gaze_to_plane(pitch,yaw,pos,
+                          dpitch=None,dyaw=None,dpos=None,
+                          distance_to_plane=.5,return_vel=False):
     """
     Given pitch and yaw, project the gaze of the person to a plane in front of him.
     
@@ -83,7 +96,12 @@ def project_gaze_to_plane(pitch,yaw,pos,distance_to_plane=.5):
     """
     xp = pos[:,0] + distance_to_plane*np.sin(yaw)
     yp = pos[:,1] + distance_to_plane*np.sin(pitch)
-    return xp,yp
+    if not return_vel:
+        return xp,yp
+
+    xpv = dpos[:,0] + distance_to_plane*np.cos(yaw)*dyaw
+    ypv = dpos[:,1] + distance_to_plane*np.cos(pitch)*dpitch
+    return xp,yp,xpv,ypv
 
 def match_bool_indices(ix1,ix2):
     """
@@ -113,7 +131,9 @@ def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
     Given a data set with non-uniform time stamps (as datetime), interpolate it to have the
     given time spacing. Spline values outside of given range are automatically set to 0.
     
-    Note: It is not clear how to choose the spline parameters in some optimal (or even similar) way.
+    Note: It is not clear how to choose the spline parameters in some optimal way. I am keeping fits
+    "proportional" the length of the data by fixing the number of knots to be proportional to the length of
+    the data set.
 
     Params:
     -------
