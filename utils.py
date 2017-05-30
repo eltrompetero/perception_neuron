@@ -103,27 +103,26 @@ def project_gaze_to_plane(pitch,yaw,pos,
     ypv = dpos[:,1] + distance_to_plane*np.cos(pitch)*dpitch
     return xp,yp,xpv,ypv
 
-def match_bool_indices(ix1,ix2):
+def match_bool_indices(*args):
     """
-    With two boolean indices, reduce the number of True values in one til it matches the number of True values
-    in the other. This might be necessary when selecting times from two different time series to plot against
-    one another.
+    With multiple boolean indices, reduce the number of True values in one (starting from the end) til it
+    matches the number of True values in the other. This might be necessary when selecting times from two
+    different time series to plot against one another.
 
     Params:
     -------
-    ix1,ix2 (ndarray)
+    *args (iterable of ndarrays)
 
     Returns:
     --------
     None
     """
-    d = ix1.sum()-ix2.sum()
-    if d<0:
-        lastix = np.where(ix2)[0][d:]
-        ix2[lastix] = False
-    elif d>0:
-        lastix = np.where(ix1)[0][-d:]
-        ix1[lastix] = False
+    mn = min([a.sum() for a in args])
+    d = [a.sum()-mn for a in args]
+    for i,d_ in enumerate(d):
+        if d_>0:
+            lastix = np.where(args[i])[0][-d_:]
+            args[i][lastix] = False
 
 def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
                knot_spacing=1/30):

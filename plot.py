@@ -74,15 +74,16 @@ def hist_dphase(delay,freq,ylim='low'):
     freq (ndarray)
         Frequencies that are given.
     """
-    from misc.plot import set_ticks_radian
+    from misc.plot import set_ticks_radian,colorcycle
 
     phaseLagPeaks = []
     fig,ax = plt.subplots(figsize=(7,4))
+    c = colorcycle(len(freq))
     for freqix in range(len(freq)):
         n,x = np.histogram( delay[freqix],np.linspace(-pi,pi,30) )
         p = n/n.sum()
         
-        ax.plot( x[:-1]+(x[1]-x[0])/2,n/n.sum(),'o-',alpha=1 )
+        ax.plot( x[:-1]+(x[1]-x[0])/2,n/n.sum(),'o-',alpha=1,c=c.next() )
         phaseLagPeaks.append( x[np.argmax(n)]+(x[1]-x[0])/2 )
     
     if ylim=='high':
