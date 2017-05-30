@@ -100,6 +100,36 @@ def hist_dphase(delay,freq,ylim='low',laplace_counting=False):
               bbox_to_anchor=[1.4,1.03])
     return fig,ax,phaseLagPeaks 
 
+def cdf_dphase(delay,freq):
+    """
+    Plot cdf of delay for given frequencies.
+
+    Params:
+    --------
+    delay (ndarray)
+        (n_freq,n_samples) Phase distance between two trajectories.
+    freq (ndarray)
+        Frequencies that are given.
+    """
+    from misc.plot import set_ticks_radian,colorcycle
+    from statsmodels.distributions import ECDF
+
+    fig,ax = plt.subplots(figsize=(7,4))
+    c = colorcycle(len(freq))
+    for freqix in range(len(freq)):
+        ecdf = ECDF( delay[freqix] )
+        
+        ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=c.next() )
+    
+    ax.set(xlim=[-pi,pi],xticks=[-pi,pi/2,0,pi/2,pi],
+           xlabel='Phase lag',ylabel='CDF',
+           title='Histogram of phase lag')
+    set_ticks_radian(ax,axis='x')
+    ax.legend(freq,numpoints=1,title='Frequency',fontsize='small',
+              bbox_to_anchor=[1.4,1.03])
+    ax.grid()
+    return fig,ax
+
 def phase(T,v1,v2,phase,phasexyz,title='',maxshift=60,windowlength=100):
     """
     Plot normalized velocity phase lag graphs.
