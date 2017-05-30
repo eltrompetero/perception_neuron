@@ -63,7 +63,7 @@ def time_occlusion_trial(mbT,mbV,anT,anV,startEnd,visible,invisible,
     ax.set(ylabel=ylabel,xlim=startEnd)
     return fig
 
-def hist_dphase(delay,freq,ylim='low'):
+def hist_dphase(delay,freq,ylim='low',laplace_counting=False):
     """
     Plot histogram of delay for given frequencies.
 
@@ -81,6 +81,8 @@ def hist_dphase(delay,freq,ylim='low'):
     c = colorcycle(len(freq))
     for freqix in range(len(freq)):
         n,x = np.histogram( delay[freqix],np.linspace(-pi,pi,30) )
+        if laplace_counting:
+            n += 1
         p = n/n.sum()
         
         ax.plot( x[:-1]+(x[1]-x[0])/2,n/n.sum(),'o-',alpha=1,c=c.next() )
