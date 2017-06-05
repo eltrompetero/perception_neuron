@@ -330,13 +330,13 @@ def optimize_time(t1,x1,t2,x2,
                   fix_scale=False,
                   offset=-5,
                   max_offset=10,
-                  method='powell'):
+                  method='minimize',
+                  full_output=False):
     """
     Find best way to overlap curves by rescaling and translating in time. This is used primarily for Vicon and
     Perception Neuron comoparisons.
     Cost function for finding optimal time scale factor and offset between two data sets.
-    Offset and scaling are for second set of given trajectories.
-    2017-03-07
+    Offset and scaling are applied to second set of given trajectories.
     
     Params:
     -------
@@ -351,9 +351,19 @@ def optimize_time(t1,x1,t2,x2,
         If True, scale will be fixed at given value.
     offset (float=-5)
     max_offset (float)
-    method (str='powell')
+    method (str='minimize')
+        'grid','minimize'
+    full_output (bool=False)
+
+    Returns:
+    --------
+    scale (float)
+    offset (float)
     """
-    assert abs(offset)<max_offset, "Given offset is outside of bounds."
+    if type(offset) is float or type(offset) is int:
+        assert abs(offset)<max_offset, "Given offset is outside of bounds."
+    else:
+        assert abs(offset[-1])<max_offset, "Given offset is outside of bounds."
 
     def f(offset=offset,scale=scale):
         if scale>scale_bounds[1] or scale<scale_bounds[0]:
@@ -373,14 +383,35 @@ def optimize_time(t1,x1,t2,x2,
             cost += thisCost
         return cost
     
-    if fix_scale:
-        soln = minimize(lambda params: f(*params),offset,method=method )
-        offset = soln['x']
-        return offset
+    # Simple grid search.
+    if method=='grid':
+        if fix_scale:
+            cost = np.zeros_like(offset)
+            for i,o in enumerate(offset):
+                cost[i] = f(o)
+            minix = np.argmin(cost)
+            output = [offset[minix]]
+        else:
+            cost = np.zeros_like(offset)
+            for i in xrange(scale.shape[0]):
+                for j in xrange(offset.shape[1]):
+                    scale,offset = scale[i,j],offset[i,j]
+                    cost[i,j] = f(offset,scale)
+            minix = np.argmin(cost)
+            output = [scale[minix[0]],offset[minix[1]]]
+
+        if full_output:
+            output.append(cost)
+        return tuple(output)
     else:
-        soln = minimize(lambda params: f(*params),[offset,scale],method=method )
-        offset,scale = soln['x']
-        return scale,offset
+        if fix_scale:
+            soln = minimize(lambda params: f(*params),offset,method=method )
+            offset = soln['x']
+            return offset
+        else:
+            soln = minimize(lambda params: f(*params),[offset,scale],method=method )
+            offset,scale = soln['x']
+            return scale,offset
 
 def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_threshold=0):
     """
