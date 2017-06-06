@@ -47,7 +47,7 @@ class MultiUnivariateSpline(object):
         if fit_type=='LSQ':
             for i in xrange(x.shape[1]):
                 self.splines.append(LSQUnivariateSpline(t,x[:,i],
-                                        np.linspace(t[1],t[-2],int((t[-2]-t[1])/knot_spacing)),
+                                        np.linspace(t[1],t[-2],int(np.floor(t[-2]-t[1])/knot_spacing)),
                                         **kwargs))
         elif fit_type=='Uni':
             for i in xrange(x.shape[1]):

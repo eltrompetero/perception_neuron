@@ -398,8 +398,8 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
         If an integer, both individuals will rotated by that many radians about the origin. Useful for trials
         where individuals were set up facing a different direction in trials than in initial calibration.
 
-    Value:
-    ------
+    Returns:
+    --------
     T,X,V,A
     """
     skeleton = calc_file_body_parts()
