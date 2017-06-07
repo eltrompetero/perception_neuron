@@ -124,6 +124,46 @@ def match_bool_indices(*args):
             lastix = np.where(args[i])[0][-d_:]
             args[i][lastix] = False
 
+def select_time_index(tbds,t1,t2):
+    """
+    Given a time range to select, return a boolean index such taht the number of selected entries are the same
+    from t1 and from t2.
+
+    Params:
+    -------
+    tbds (list)
+    t1 (ndarray)
+    t2 (ndarray)
+
+    Returns:
+    --------
+    ix1 (ndarray)
+    ix2
+    """
+    ix1 = (tbds[0]<t1) & (t1<tbds[1])
+    ix2 = (tbds[0]<t2) & (t2<tbds[1])
+    
+    ix1sum = ix1.sum()
+    ix2sum = ix2.sum()
+    while ix1sum!=ix2sum:
+        # Should we take from the beginning or the end?
+        if abs(t1[ix1][0]-t2[ix2][0]) < abs(t1[ix1][-1]-t2[ix2][-1]):
+            if ix1sum>ix2sum:
+                ix1[np.argmax[ix1]] = False
+                ix1sum -= 1
+            else:
+                ix2[np.argmax[ix2]] = False
+                ix2sum -= 1
+        else:  # take from end
+            if ix1sum>ix2sum:
+                ix1[len(ix1)-1-np.argmax(ix1[::-1])] = False
+                ix1sum -= 1
+            else:
+                ix2[len(ix2)-1-np.argmax(ix2[::-1])] = False
+                ix2sum -= 1
+
+    return ix1,ix2
+
 def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
                knot_spacing=1/30):
     """
@@ -159,14 +199,14 @@ def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
     
     if x.ndim==1:
         if use_univariate:
-            xSpline = UnivariateSpline(t,x,ext=1,**spline_kwargs)
+            xSpline = UnivariateSpline(t,x,ext=1,s=0,**spline_kwargs)
         else:
             xSpline = LSQUnivariateSpline(t,x,np.linspace(t[1],t[-2],int((t[-2]-t[1])/knot_spacing)),
                                           ext=1,check_finite=False,**spline_kwargs)
     else:
         if use_univariate:
             xSpline = MultiUnivariateSpline(t,x,
-                                            ext=1,check_finite=False,fit_type='Uni',
+                                            ext=1,check_finite=False,fit_type='Uni',s=0,
                                             **spline_kwargs)
         else:
             xSpline = MultiUnivariateSpline(t,x,

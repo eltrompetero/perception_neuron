@@ -118,7 +118,6 @@ def cdf_dphase(delay,freq):
     c = colorcycle(len(freq))
     for freqix in range(len(freq)):
         ecdf = ECDF( delay[freqix] )
-        
         ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=c.next() )
     
     ax.set(xlim=[-pi,pi],xticks=[-pi,pi/2,0,pi/2,pi],

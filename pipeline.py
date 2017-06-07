@@ -8,6 +8,60 @@ from load import *
 from utils import *
 from filter import *
 
+def extract_motionbuilder_model(trialno,person,modelhand):
+    """
+    Load model motion data. Assuming the play rate is a constant 1/60 Hz.
+    
+    Directory where animation data is stored is hard-coded.
+    """
+    from datetime import datetime,timedelta
+    from workspace.utils import load_pickle
+
+    dr = os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/Animations'
+    fname = ['Eddie_%s_Hand_Model_19000_Recorded.p'%modelhand,
+             'Eddie_%s_Hand_Model_Recorded.p'%modelhand,
+             'Freya_(F)_Eddie_(L)_%s_Anim_Recorded.p'%modelhand][trialno]
+    load_pickle('%s/%s'%(dr,fname))
+    mbT = mbdf['Time'].values.astype(float)
+    mbT -= mbT[0]
+    mbV = savgol_filter( mbdf['%sHand'%modelhand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
+
+    # The time when the model starts is given in units of seconds. Convert to date time.
+    dr = os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%person
+    fname = '%s_visibility.txt'%['hand','arm','avatar'][trialno]
+    visible,invisible = load_visibility(fname,dr)
+    mbT = np.array([timedelta(seconds=t)+visible[0] for t in mbT])
+
+    # Put these in the standard global coordinate system.
+    mbV[:,:] = mbV[:,[1,0,2]]
+    mbV[:,1] *= -1
+    return mbT,mbV
+    
+def extract_AN_port(df,modelhand):
+    """
+    Take dataframe created from load_AN_port() and pull out the X, V, A data.
+    """
+    anT = array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
+    # anT = vectorize(datetime.utcfromtimestamp)(df['Timestamp'].values.astype(int)*1e-9)
+    
+    # Extract only necessary body part from the dataframe.
+    df = load_calc('',cols='XVA',zd=False,df=df.ix[:,1:])
+    if modelhand=='Left':
+        _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],dotruncate=0)
+    else:
+        _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['RightHand'],dotruncate=0)
+
+    # Put these in the standard global coordinate system.
+    for x,v,a in zip(anX,anV,anA):
+        x[:,:] = x[:,[1,0,2]]
+        x[:,2] *= -1
+        v[:,:] = v[:,[1,0,2]]
+        v[:,2] *= -1
+        a[:,:] = a[:,[1,0,2]]
+        a[:,2] *= -1
+        
+    return anT,anX,anV,anA
+
 def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
     """
     Quick and dirty method for loading filtered velocities from hand trials. 
