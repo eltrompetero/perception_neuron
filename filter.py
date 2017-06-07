@@ -204,6 +204,11 @@ def moving_freq_filt(s,axis=-1,**kwargs):
         Sampling frequency of input signal.
     mx_filter_rows (int=100)
         Maximum number of rows to filter at once. This is limited by memory.
+
+    Returns:
+    --------
+    filtereds (ndarray)
+        Filtered signal. Same size as given signal.
     """
     # Multi-dimensional data.
     if s.ndim>1:

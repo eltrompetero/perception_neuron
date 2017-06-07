@@ -40,8 +40,19 @@ def extract_motionbuilder_model(trialno,person,modelhand):
 def extract_AN_port(df,modelhand):
     """
     Take dataframe created from load_AN_port() and pull out the X, V, A data.
+
+    Params:
+    -------
+    df (pd.DataFrame)
+    modelhand (str)
+
+    Returns:
+    --------
+    T,X,V,A
     """
-    anT = array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
+    from datetime import datetime
+
+    anT = np.array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
     # anT = vectorize(datetime.utcfromtimestamp)(df['Timestamp'].values.astype(int)*1e-9)
     
     # Extract only necessary body part from the dataframe.
@@ -112,7 +123,7 @@ def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
 
 def pipeline_phase_calc(fileixs=[],
                         trajs=[],
-                        suffix='',
+                        file_names='temp_phase',
                         down_sample=False,
                         **phase_calc_kwargs):
     """
@@ -139,6 +150,8 @@ def pipeline_phase_calc(fileixs=[],
         os.makedirs('phase_files')
     #fs = np.concatenate((np.arange(-3,0,.1),np.arange(.1,3.1,.1)))
     fs = np.arange(.1,3.1,.1)
+    if type(file_names) is str:
+        file_names = [file_names+'_%d'%i for i in range(len(trajs))]
     
     if len(fileixs)>0:
         for fileix in fileixs:
@@ -161,15 +174,14 @@ def pipeline_phase_calc(fileixs=[],
                 T = T[::2]
                 v = [i[::2] for i in v]
             
-            phases = []
-            vs = []
+            phases,vs = [],[]
             for i in v:
                 phases_,vs_ = phase_calc(fs,i,**phase_calc_kwargs) 
                 phases.append(phases_)
                 vs.append(vs_)
             
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},
-                        open('phase_files/temp_phase_%d%s.p'%(counter,suffix),'wb'),-1)
+                        open('phase_files/%s.p'%filenames[counter],'wb'),-1)
             print "Done with file %d."%counter
             counter += 1
 
@@ -191,6 +203,12 @@ def phase_calc(fs,v1,v2=None,
         Bandwidth of bandpass filter.
     down_sample (bool=False)
         Down sample data by a factor of 2 if true.
+
+    Returns:
+    --------
+    phases (list of ndarrays)
+    vs (list of ndarrays)
+        Bandpass filtered velocities.
     """
     from scipy.signal import hilbert
 
