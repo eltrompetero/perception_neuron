@@ -2,6 +2,7 @@
 # Module for reading data from Axis Neuron broadcast port.
 # Author: Eddie Lee edl56@cornell.edu
 # ===================================================================================== #
+from __future__ import division
 import numpy as np
 from datetime import datetime,timedelta
 import os,time,pause,socket,shutil
