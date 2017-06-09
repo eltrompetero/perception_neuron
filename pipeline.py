@@ -56,7 +56,7 @@ def extract_AN_port(df,modelhand):
     # anT = vectorize(datetime.utcfromtimestamp)(df['Timestamp'].values.astype(int)*1e-9)
     
     # Extract only necessary body part from the dataframe.
-    df = load_calc('',cols='XVA',zd=False,df=df.ix[:,1:])
+    df = load_calc('',cols='XVA',zd=False,df=df.iloc[:,1:])
     if modelhand=='Left':
         _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],dotruncate=0)
     else:
@@ -181,7 +181,7 @@ def pipeline_phase_calc(fileixs=[],
                 vs.append(vs_)
             
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},
-                        open('phase_files/%s.p'%filenames[counter],'wb'),-1)
+                        open('phase_files/%s.p'%file_names[counter],'wb'),-1)
             print "Done with file %d."%counter
             counter += 1
 

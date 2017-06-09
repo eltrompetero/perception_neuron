@@ -899,9 +899,9 @@ def truncate(t,y,t0=10,t1=10):
     timeix = np.logical_and(t>=t0,t<=(t[-1]-t1))
     if type(y) is pd.core.frame.DataFrame:
         if y.ndim==2:
-            return y.ix[timeix,:]
+            return y.iloc[timeix,:]
         else:
-            return y.ix[timeix]
+            return y.iloc[timeix]
     else:
         if y.ndim==2:
             return y[timeix,:]

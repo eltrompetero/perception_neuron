@@ -31,10 +31,10 @@ def format_port_output(s):
 
 def _format_port_output(s):
     """For BVH file."""
-    ix=s.find('Caeli')
-    if ix==-1:
+    iloc=s.find('Caeli')
+    if iloc==-1:
         return ['NaN']*10
-    s=s[ix:].split(' ')[1:11]
+    s=s[iloc:].split(' ')[1:11]
     f=[float(i) for i in s]
     return f
 # end port section
@@ -139,14 +139,14 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_
     #    stopTime = datetime.strptime( f.readline().split(' ')[-1] )
             
     df = pd.read_csv(fname,delimiter=' ',skiprows=3,**read_csv_kwargs)
-    df.ix[:,0] = df.ix[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
+    df.iloc[:,0] = df.iloc[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
 
     # Linearly interpolate missing date times. Assuming that no two sequential data points are missing
     # times which seems to be the case...
-    ix = np.where( pd.DatetimeIndex(df['Timestamp']).year==1900 )[0]
-    for i in ix:
+    iloc = np.where( pd.DatetimeIndex(df['Timestamp']).year==1900 )[0]
+    for i in iloc:
         if i>0 and i<(len(df)-1):
-            df.ix[i,0] = timedelta(seconds=(df.ix[i+1,0]-df.ix[i-1,0]).total_seconds()/2) + df.ix[i-1,0]
+            df.iloc[i,0] = timedelta(seconds=(df.iloc[i+1,0]-df.iloc[i-1,0]).total_seconds()/2) + df.iloc[i-1,0]
     # Remove last data point if the time is uncertain.
     if pd.DatetimeIndex(df.tail(1)['Timestamp']).year==1900:
         df = df.iloc[:-1]
@@ -154,8 +154,8 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_
     if time_as_dt:
         # Convert time stamp into time differences in seconds. This means we have to remove the first data
         # point.
-        dt = np.diff(df.ix[:,0]).astype(int)/1e9
-        df = df.ix[1:,:]
+        dt = np.diff(df.iloc[:,0]).astype(int)/1e9
+        df = df.iloc[1:,:]
         df['Timestamp'] = df['Timestamp'].apply(pd.to_numeric,errors='coerce')
         df['Timestamp'] = dt
     return df

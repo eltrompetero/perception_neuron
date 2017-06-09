@@ -303,7 +303,7 @@ def load_calc(fname,cols='V',read_csv_kwargs={},zd=True,df=None):
     keepix = np.zeros((len(df.columns)),dtype=bool)
     for s in cols:
         keepix += np.array([s in c for c in df.columns])
-    df = df.ix[:,keepix]
+    df = df.iloc[:,keepix]
     columns = list(df.columns)
 
     # Rename numbered columns by body parts.
@@ -325,7 +325,7 @@ def load_calc(fname,cols='V',read_csv_kwargs={},zd=True,df=None):
     #theta = np.arccos(zd.dot([-1,0,0]))
     #for i in xrange(len(df.columns)):
     #    if any([c+'-x' in df.columns[i] for c in cols]):
-    #        df.ix[:,i:i+3].values[:,:] = rotate(df.ix[:,i:i+3].values,n,theta)
+    #        df.iloc[:,i:i+3].values[:,:] = rotate(df.iloc[:,i:i+3].values,n,theta)
     return df
 
 def extract_parts(df,bodyparts):
@@ -343,7 +343,7 @@ def extract_parts(df,bodyparts):
     for i,c in enumerate(columnBodyParts):
         if c in bodyparts:
             returnix.append(i)
-    return df.ix[:,returnix]
+    return df.iloc[:,returnix]
 
 def group_cols(columns):
     """
@@ -426,19 +426,19 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
     
     if append:
         leaderX,leaderV,leaderA = [],[],[]
-        for i,ix in enumerate(bodypartix):
-            leaderX.append( leaderdf.values[:,ix*9:ix*9+3].copy() ) 
-            leaderV.append( leaderdf.values[:,ix*9+3:ix*9+6].copy() ) 
-            leaderA.append( leaderdf.values[:,ix*9+6:ix*9+9].copy() ) 
+        for i,iloc in enumerate(bodypartix):
+            leaderX.append( leaderdf.values[:,iloc*9:iloc*9+3].copy() ) 
+            leaderV.append( leaderdf.values[:,iloc*9+3:iloc*9+6].copy() ) 
+            leaderA.append( leaderdf.values[:,iloc*9+6:iloc*9+9].copy() ) 
     else:
-        for i,ix in enumerate(bodypartix):
+        for i,iloc in enumerate(bodypartix):
             if i==0:
-                leaderX = [leaderdf.values[:,ix*9:ix*9+3].copy()]
-                leaderV = [leaderdf.values[:,ix*9+3:ix*9+6].copy()]
-                leaderA = [leaderdf.values[:,ix*9+6:ix*9+9].copy()]
+                leaderX = [leaderdf.values[:,iloc*9:iloc*9+3].copy()]
+                leaderV = [leaderdf.values[:,iloc*9+3:iloc*9+6].copy()]
+                leaderA = [leaderdf.values[:,iloc*9+6:iloc*9+9].copy()]
             else:
-                leaderV[0] += leaderdf.values[:,ix*9+3:ix*9+6]
-                leaderA[0] += leaderdf.values[:,ix*9+6:ix*9+9]
+                leaderV[0] += leaderdf.values[:,iloc*9+3:iloc*9+6]
+                leaderA[0] += leaderdf.values[:,iloc*9+6:iloc*9+9]
                 
     if rotate_to_face:
         raise NotImplementedError
@@ -560,32 +560,32 @@ def extract_calc(fname,dr,bodyparts,dt,
     
     if append:
         leaderX,leaderV,leaderA,followerX,followerV,followerA = [],[],[],[],[],[]
-        for i,ix in enumerate(bodypartix[leaderix]):
-            leaderX.append( leaderdf.values[:,ix*9:ix*9+3].copy() ) 
-            leaderV.append( leaderdf.values[:,ix*9+3:ix*9+6].copy() ) 
-            leaderA.append( leaderdf.values[:,ix*9+6:ix*9+9].copy() ) 
-        for i,ix in enumerate(bodypartix[1-leaderix]):
-            followerX.append( followerdf.values[:,ix*9:ix*9+3].copy() )
-            followerV.append( followerdf.values[:,ix*9+3:ix*9+6].copy() )
-            followerA.append( followerdf.values[:,ix*9+6:ix*9+9].copy() )
+        for i,iloc in enumerate(bodypartix[leaderix]):
+            leaderX.append( leaderdf.values[:,iloc*9:iloc*9+3].copy() ) 
+            leaderV.append( leaderdf.values[:,iloc*9+3:iloc*9+6].copy() ) 
+            leaderA.append( leaderdf.values[:,iloc*9+6:iloc*9+9].copy() ) 
+        for i,iloc in enumerate(bodypartix[1-leaderix]):
+            followerX.append( followerdf.values[:,iloc*9:iloc*9+3].copy() )
+            followerV.append( followerdf.values[:,iloc*9+3:iloc*9+6].copy() )
+            followerA.append( followerdf.values[:,iloc*9+6:iloc*9+9].copy() )
     else:
-        for i,ix in enumerate(bodypartix[leaderix]):
+        for i,iloc in enumerate(bodypartix[leaderix]):
             if i==0:
-                leaderX = [leaderdf.values[:,ix*9:ix*9+3].copy()]
-                leaderV = [leaderdf.values[:,ix*9+3:ix*9+6].copy()]
-                leaderA = [leaderdf.values[:,ix*9+6:ix*9+9].copy()]
+                leaderX = [leaderdf.values[:,iloc*9:iloc*9+3].copy()]
+                leaderV = [leaderdf.values[:,iloc*9+3:iloc*9+6].copy()]
+                leaderA = [leaderdf.values[:,iloc*9+6:iloc*9+9].copy()]
             else:
-                leaderV[0] += leaderdf.values[:,ix*9+3:ix*9+6]
-                leaderA[0] += leaderdf.values[:,ix*9+6:ix*9+9]
+                leaderV[0] += leaderdf.values[:,iloc*9+3:iloc*9+6]
+                leaderA[0] += leaderdf.values[:,iloc*9+6:iloc*9+9]
                 
-        for i,ix in enumerate(bodypartix[1-leaderix]):
+        for i,iloc in enumerate(bodypartix[1-leaderix]):
             if i==0:
-                followerX = [followerdf.values[:,ix*9:ix*9+3].copy()]
-                followerV = [followerdf.values[:,ix*9+3:ix*9+6].copy()]
-                followerA = [followerdf.values[:,ix*9+6:ix*9+9].copy()]
+                followerX = [followerdf.values[:,iloc*9:iloc*9+3].copy()]
+                followerV = [followerdf.values[:,iloc*9+3:iloc*9+6].copy()]
+                followerA = [followerdf.values[:,iloc*9+6:iloc*9+9].copy()]
             else:
-                followerV[0] += followerdf.values[:,ix*9+3:ix*9+6]
-                followerA[0] += followerdf.values[:,ix*9+6:ix*9+9]
+                followerV[0] += followerdf.values[:,iloc*9+3:iloc*9+6]
+                followerA[0] += followerdf.values[:,iloc*9+6:iloc*9+9]
 
     if rotate_to_face:
         # Make sure that first dimension corresponds to the axis towards the other person.
@@ -692,10 +692,10 @@ def extract_W(fname,dr,bodyparts,dt,
                    for bodyparts_ in bodyparts]
     
     leaderW,followerW = [],[]
-    for i,ix in enumerate(bodypartix[leaderix]):
-        leaderW.append( leaderdf.values[:,ix*9:ix*9+3].copy() ) 
-    for i,ix in enumerate(bodypartix[1-leaderix]):
-        followerW.append( followerdf.values[:,ix*9:ix*9+3].copy() )
+    for i,iloc in enumerate(bodypartix[leaderix]):
+        leaderW.append( leaderdf.values[:,iloc*9:iloc*9+3].copy() ) 
+    for i,iloc in enumerate(bodypartix[1-leaderix]):
+        followerW.append( followerdf.values[:,iloc*9:iloc*9+3].copy() )
     
     # Truncate beginning and ends of data set.
     if dotruncate:
@@ -1117,10 +1117,10 @@ class Tree(object):
             Parents starting from immediate parent and ascending up the tree.
         """
         parents = []
-        ix = self.nodes.index(node)
+        iloc = self.nodes.index(node)
 
-        while np.any(self.adjacency[:,ix]):
-            ix = np.where(self.adjacency[:,ix])[0][0]
-            parents.append(self.nodes[ix])
+        while np.any(self.adjacency[:,iloc]):
+            iloc = np.where(self.adjacency[:,iloc])[0][0]
+            parents.append(self.nodes[iloc])
 
         return parents
