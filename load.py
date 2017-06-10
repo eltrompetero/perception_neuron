@@ -392,13 +392,14 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
     center_x (bool=False)
         Subtract mean from the mean of each body parts' displacement.
     rotation_angle (int=False)
-        If an integer, both individuals will rotated by that many radians about the origin. Useful for trials
-        where individuals were set up facing a different direction in trials than in initial calibration.
+        If an integer or float, X, V, A will be rotated about the local [0,0,1] z-axis. Note that this z-axis
+        points into the ground.
 
     Returns:
     --------
     T,X,V,A
     """
+    from ising.heisenberg import rotate
     skeleton = calc_file_body_parts()
     
     if leaderdf is None:
