@@ -358,7 +358,6 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
                       append=True,
                       dotruncate=5,
                       remove_hip_drift=True,
-                      rotate_to_face=False,
                       usezd=False,
                       read_csv_kwargs={},
                       center_x=False,
@@ -384,8 +383,6 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
     dotruncate (float=5)
         Truncate beginning and end of data by this many seconds.
     remove_hip_drift (bool=True)
-    rotate_to_face (bool=True)
-        Rotate the individuals to face each other.
     usezd (bool=True)
         Get initial body orientation from calc file's Zd entry. This seems to not work as well in capturing
         the 3 dimension of hand movement. I'm not sure why, but I would assume because the orientation between
@@ -418,9 +415,6 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
         Xix = np.array(['X' in c for c in leaderdf.columns])
         leaderdf.iloc[:,Xix] -= np.tile(leaderdf.iloc[:,:3],(1,leaderdf.shape[1]//9))
 
-    if rotate_to_face:
-        raise NotImplementedError
-        
     # Select out the body parts that we want.
     bodypartix = [skeleton.index(b) for b in bodyparts]
     
@@ -440,9 +434,7 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
                 leaderV[0] += leaderdf.values[:,iloc*9+3:iloc*9+6]
                 leaderA[0] += leaderdf.values[:,iloc*9+6:iloc*9+9]
                 
-    if rotate_to_face:
-        raise NotImplementedError
-    elif rotation_angle:
+    if rotation_angle:
         for x,v,a in zip(leaderX,leaderV,leaderA):
             x[:,:] = rotate(x,np.array([0,0,1.]),rotation_angle)
             v[:,:] = rotate(v,np.array([0,0,1.]),rotation_angle)
