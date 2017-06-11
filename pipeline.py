@@ -131,6 +131,7 @@ def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
 
 def pipeline_phase_calc(fileixs=[],
                         trajs=[],
+                        dr='phase_files',
                         file_names='temp_phase',
                         down_sample=False,
                         **phase_calc_kwargs):
@@ -154,8 +155,8 @@ def pipeline_phase_calc(fileixs=[],
     down_sample (bool=False)
         Down sample data by a factor of 2 if true.
     """
-    if not os.path.isdir('phase_files'):
-        os.makedirs('phase_files')
+    if not os.path.isdir(dr):
+        os.makedirs(dr)
     #fs = np.concatenate((np.arange(-3,0,.1),np.arange(.1,3.1,.1)))
     fs = np.arange(.1,3.1,.1)
     if type(file_names) is str:
@@ -172,7 +173,7 @@ def pipeline_phase_calc(fileixs=[],
 
             phases,vs = phase_calc(fs,v1,v2,**phase_calc_kwargs) 
 
-            pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('phase_files/phase_%d%s.p'%(fileix,suffix),'wb'),-1)
+            pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('%s/phase_%d%s.p'%(dr,fileix,suffix),'wb'),-1)
             print "Done with file %d."%fileix
     else:
         counter = 0
@@ -189,7 +190,7 @@ def pipeline_phase_calc(fileixs=[],
                 vs.append(vs_)
             
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},
-                        open('phase_files/%s.p'%file_names[counter],'wb'),-1)
+                        open('%s/%s.p'%(dr,file_names[counter]),'wb'),-1)
             print "Done with file %d."%counter
             counter += 1
 
