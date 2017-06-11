@@ -8,9 +8,10 @@ from load import *
 from utils import *
 from filter import *
 
-def extract_motionbuilder_model(trialno,person,modelhand):
+def extract_motionbuilder_model(trial_type,person,modelhand):
     """
-    Load model motion data. Assuming the play rate is a constant 1/60 Hz.
+    Load model motion data. Assuming the play rate is a constant 1/60 Hz. Returned data is put into standard
+    global coordinate frame.
     
     Directory where animation data is stored is hard-coded.
     """
@@ -18,9 +19,9 @@ def extract_motionbuilder_model(trialno,person,modelhand):
     from workspace.utils import load_pickle
 
     dr = os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/Animations'
-    fname = ['Eddie_%s_Hand_Model_19000_Recorded.p'%modelhand,
-             'Eddie_%s_Hand_Model_Recorded.p'%modelhand,
-             'Freya_(F)_Eddie_(L)_%s_Anim_Recorded.p'%modelhand][trialno]
+    fname = {'hand':'Eddie_%s_Hand_Model_19000_Recorded.p'%modelhand,
+             'arm':'Eddie_%s_Hand_Model_Recorded.p'%modelhand,
+             'avatar':'Freya_(F)_Eddie_(L)_%s_Anim_Recorded.p'%modelhand}[trial_type]
     load_pickle('%s/%s'%(dr,fname))
     mbT = mbdf['Time'].values.astype(float)
     mbT -= mbT[0]
@@ -28,7 +29,7 @@ def extract_motionbuilder_model(trialno,person,modelhand):
 
     # The time when the model starts is given in units of seconds. Convert to date time.
     dr = os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%person
-    fname = '%s_visibility.txt'%['hand','arm','avatar'][trialno]
+    fname = '%s_visibility.txt'%trial_type
     visible,invisible = load_visibility(fname,dr)
     mbT = np.array([timedelta(seconds=t)+visible[0] for t in mbT])
 
@@ -59,7 +60,7 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     
     # Extract only necessary body part from the dataframe.
     df = load_calc('',cols='XVA',zd=False,df=df.iloc[:,1:])
-    if modelhand=='Left':
+    if modelhand=='Right':
         _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],
                                           dotruncate=0,
                                           rotation_angle=rotation_angle)
