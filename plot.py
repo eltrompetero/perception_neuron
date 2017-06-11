@@ -100,7 +100,7 @@ def hist_dphase(delay,freq,ylim='low',laplace_counting=False):
               bbox_to_anchor=[1.4,1.03])
     return fig,ax,phaseLagPeaks 
 
-def cdf_dphase(delay,freq):
+def cdf_dphase(delay,freq,title='Histogram of phase lag'):
     """
     Plot cdf of delay for given frequencies.
 
@@ -118,11 +118,11 @@ def cdf_dphase(delay,freq):
     c = colorcycle(len(freq))
     for freqix in range(len(freq)):
         ecdf = ECDF( delay[freqix] )
-        ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=c.next() )
+        ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=c.next(),lw=2 )
     
     ax.set(xlim=[-pi,pi],xticks=[-pi,pi/2,0,pi/2,pi],
            xlabel='Phase lag',ylabel='CDF',
-           title='Histogram of phase lag')
+           title=title)
     set_ticks_radian(ax,axis='x')
     ax.legend(freq,numpoints=1,title='Frequency',fontsize='small',
               bbox_to_anchor=[1.4,1.03])

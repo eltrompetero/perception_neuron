@@ -149,10 +149,10 @@ def select_time_index(tbds,t1,t2):
         # Should we take from the beginning or the end?
         if abs(t1[ix1][0]-t2[ix2][0]) < abs(t1[ix1][-1]-t2[ix2][-1]):
             if ix1sum>ix2sum:
-                ix1[np.argmax[ix1]] = False
+                ix1[np.argmax(ix1)] = False
                 ix1sum -= 1
             else:
-                ix2[np.argmax[ix2]] = False
+                ix2[np.argmax(ix2)] = False
                 ix2sum -= 1
         else:  # take from end
             if ix1sum>ix2sum:

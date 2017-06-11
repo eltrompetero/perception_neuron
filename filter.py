@@ -51,7 +51,7 @@ def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
 
 def window_signal(i,window,signal,extract=True,return_index=False):
     """
-    Slow way of getting view of each shifted window. Each row is the window shifted over.
+    Slow way of getting view one shifted window.
     2017-03-23
     
     Params:
@@ -62,6 +62,11 @@ def window_signal(i,window,signal,extract=True,return_index=False):
         If true, only return the nonzero part of window multiplied with the signal.
     return_index (bool=False)
         If true, return the index range that we are windowing. This only applies if extract is True.
+
+    Returns:
+    --------
+    swindow (ndarray)
+        Windowed view of signal.
     """
     lw,T = len(window),len(signal)
     if extract:

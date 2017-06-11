@@ -8,7 +8,7 @@ from load import *
 from utils import *
 from filter import *
 
-def extract_motionbuilder_model(trial_type,person,modelhand):
+def extract_motionbuilder_model(trial_type,visible_start,modelhand):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz. Returned data is put into standard
     global coordinate frame.
@@ -27,11 +27,7 @@ def extract_motionbuilder_model(trial_type,person,modelhand):
     mbT -= mbT[0]
     mbV = savgol_filter( mbdf['%sHand'%modelhand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
 
-    # The time when the model starts is given in units of seconds. Convert to date time.
-    dr = os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%person
-    fname = '%s_visibility.txt'%trial_type
-    visible,invisible = load_visibility(fname,dr)
-    mbT = np.array([timedelta(seconds=t)+visible[0] for t in mbT])
+    mbT = np.array([timedelta(seconds=t)+visible_start for t in mbT])
 
     # Put these in the standard global coordinate system.
     mbV[:,:] = mbV[:,[1,0,2]]
@@ -207,7 +203,7 @@ def phase_calc(fs,v1,v2=None,
         1d arrays.
     v2 (ndarray=None)
     sample_freq (str='120')
-        '120' or '60'
+        '120','60','30'
     bandwidth (float=.1)
         Bandwidth of bandpass filter.
     down_sample (bool=False)
