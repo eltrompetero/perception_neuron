@@ -8,6 +8,33 @@ from load import *
 from utils import *
 from filter import *
 
+def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
+    """
+    Load model motion data. Assuming the play rate is a constant 1/60 Hz. Returned data is put into standard
+    global coordinate frame.
+    
+    Directory where animation data is stored is hard-coded.
+    """
+    from datetime import datetime,timedelta
+    from workspace.utils import load_pickle
+
+    dr = ( os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/'+
+           'Animations' )
+    fname = {'hand':'Eddie_Smooth_Model_%s.p'%modelhand,
+             'arm':'Eddie_Smooth_Model_%s_6000.p'%modelhand,
+             'avatar':'Eddie_Smooth_Model_%s_12000.p'%modelhand}[trial_type]
+    load_pickle('%s/%s'%(dr,fname))
+    mbT = mbdf['Time'].values.astype(float)
+    mbT -= mbT[0]
+    mbV = savgol_filter( mbdf['%sHand'%modelhand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
+
+    mbT = np.array([timedelta(seconds=t)+visible_start for t in mbT])
+
+    # Put these in the standard global coordinate system.
+    mbV[:,:] = mbV[:,[1,0,2]]
+    mbV[:,1] *= -1
+    return mbT,mbV
+
 def extract_motionbuilder_model(trial_type,visible_start,modelhand):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz. Returned data is put into standard

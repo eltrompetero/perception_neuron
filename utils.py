@@ -127,7 +127,7 @@ def match_bool_indices(*args):
 def select_time_index(tbds,t1,t2):
     """
     Given a time range to select, return a boolean index such taht the number of selected entries are the same
-    from t1 and from t2.
+    from t1 and from t2. This assumes that there is a close match between the time samples given in t1 and t2.
 
     Params:
     -------
