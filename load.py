@@ -1300,7 +1300,7 @@ class VRTrial(object):
         ix = []
         i = 0
         for spec,_ in self.windowsByPart[trialType]:
-            if np.isclose(windowSpec[1],spec[1]) and np.isclose(windowSpec[0],spec[0]):
+            if spec in windowSpec:
                 ix.append(i)
             i += 1
         
@@ -1320,7 +1320,6 @@ class VRTrial(object):
             selection.append(( self.windowsByPart[trialType][i][0],phases ))
         return selection
 
-
     def dphase_by_window_dur(self,windowDur,trialType):
         """
         Difference in phase between subject and template motion.
@@ -1336,14 +1335,14 @@ class VRTrial(object):
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         return dphase
 
-    def dphase_by_window_spec(self,windowDur,trialType):
+    def dphase_by_window_spec(self,windowSpec,trialType):
         """
         Difference in phase between subject and template motion.
         """
         from misc.angle import mod_angle
         
-        subjectPhase = self.phase_by_window_spec('s',windowDur,trialType)
-        templatePhase = self.phase_by_window_spec('t',windowDur,trialType)
+        subjectPhase = self.phase_by_window_spec('s',windowSpec,trialType)
+        templatePhase = self.phase_by_window_spec('t',windowSpec,trialType)
         dphase = []
         
         for i in xrange(len(subjectPhase)):

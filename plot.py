@@ -100,7 +100,7 @@ def hist_dphase(delay,freq,ylim='low',laplace_counting=False):
               bbox_to_anchor=[1.4,1.03])
     return fig,ax,phaseLagPeaks 
 
-def cdf_dphase(delay,freq,title='Histogram of phase lag'):
+def cdf_dphase(delay,freq,title='Histogram of phase lag',xscale='f'):
     """
     Plot cdf of delay for given frequencies.
 
@@ -110,6 +110,9 @@ def cdf_dphase(delay,freq,title='Histogram of phase lag'):
         (n_freq,n_samples) Phase distance between two trajectories.
     freq (ndarray)
         Frequencies that are given.
+    title (str)
+    xscale (str)
+        'f' means frequency scale and 't' means time scale
     """
     from misc.plot import set_ticks_radian,colorcycle
     from statsmodels.distributions import ECDF
@@ -118,9 +121,18 @@ def cdf_dphase(delay,freq,title='Histogram of phase lag'):
     c = colorcycle(len(freq))
     for freqix in range(len(freq)):
         ecdf = ECDF( delay[freqix] )
-        ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=c.next(),lw=2 )
+        if xscale=='t':
+            ax.plot( ecdf.x/(2*np.pi)/freq[freqix],ecdf.y,'-',alpha=1,c=c.next(),lw=2 )
+        else:
+            ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=c.next(),lw=2 )
     
-    ax.set(xlim=[-pi,pi],xticks=[-pi,pi/2,0,pi/2,pi],
+    if xscale=='t':
+        xlim = [-1/freq[0],1/freq[0]]
+        xticks = np.arange(*xlim)
+    else:
+        xlim = [-pi,pi]
+        xticks = [-pi,pi/2,0,pi/2,pi]
+    ax.set(xlim=xlim,xticks=xticks,
            xlabel='Phase lag',ylabel='CDF',
            title=title)
     set_ticks_radian(ax,axis='x')
