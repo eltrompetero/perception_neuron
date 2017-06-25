@@ -1296,6 +1296,31 @@ class VRTrial(object):
             selection.append(( self.windowsByPart[trialType][i][0],phases ))
         return selection
 
+    def phase_by_window_spec(self,source,windowSpec,trialType):
+        ix = []
+        i = 0
+        for spec,_ in self.windowsByPart[trialType]:
+            if np.isclose(windowSpec[1],spec[1]) and np.isclose(windowSpec[0],spec[0]):
+                ix.append(i)
+            i += 1
+        
+        if len(ix)==0:
+            return
+        
+        selection = []
+        for i in ix:
+            if source=='subject' or source=='s':
+                phases = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
+            elif source=='template' or source=='t':
+                phases = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
+            else:
+                raise Exception
+
+            phases = [np.vstack(p) for p in phases]
+            selection.append(( self.windowsByPart[trialType][i][0],phases ))
+        return selection
+
+
     def dphase_by_window_dur(self,windowDur,trialType):
         """
         Difference in phase between subject and template motion.
@@ -1304,6 +1329,21 @@ class VRTrial(object):
         
         subjectPhase = self.phase_by_window_dur('s',windowDur,trialType)
         templatePhase = self.phase_by_window_dur('t',windowDur,trialType)
+        dphase = []
+        
+        for i in xrange(len(subjectPhase)):
+            dphase.append(( subjectPhase[i][0], 
+                            [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
+        return dphase
+
+    def dphase_by_window_spec(self,windowDur,trialType):
+        """
+        Difference in phase between subject and template motion.
+        """
+        from misc.angle import mod_angle
+        
+        subjectPhase = self.phase_by_window_spec('s',windowDur,trialType)
+        templatePhase = self.phase_by_window_spec('t',windowDur,trialType)
         dphase = []
         
         for i in xrange(len(subjectPhase)):

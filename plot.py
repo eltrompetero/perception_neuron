@@ -124,8 +124,8 @@ def cdf_dphase(delay,freq,title='Histogram of phase lag'):
            xlabel='Phase lag',ylabel='CDF',
            title=title)
     set_ticks_radian(ax,axis='x')
-    ax.legend(freq,numpoints=1,title='Frequency',fontsize='small',
-              bbox_to_anchor=[1.4,1.03])
+    ax.legend(['%1.1f Hz'%f for f in freq],numpoints=1,title='Frequency',fontsize='small',
+              bbox_to_anchor=[1.4,1.03],labelspacing=.1)
     ax.grid()
     return fig,ax
 
