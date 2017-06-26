@@ -1482,6 +1482,10 @@ class VRTrial(object):
             timeSplitTrials[part].insert(0,t)
             subjectSplitTrials[part].insert( 0,subjectTrial[part+'V'](t) )
             templateSplitTrials[part].insert( 0,templateTrial[part+'V'](t) )
+
+            timeix = (templateTrial[part+'T']<=invisibleStart[0])&(templateTrial[part+'T']>=0)
+            templateSplitTrials[part+'visibility'].insert( 0,visibility[timeix] )
+
         
         pickle.dump({'templateTrial':templateTrial,'subjectTrial':subjectTrial,
                      'timeSplitTrials':timeSplitTrials,
