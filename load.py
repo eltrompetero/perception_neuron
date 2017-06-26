@@ -1254,6 +1254,24 @@ class VRTrial(object):
                                self.subjectSplitTrials[part][i] ))
         return selection
 
+    def subject_by_window_spec(self,windowSpec,trialType):
+        ix = []
+        i = 0
+        for spec,_ in self.windowsByPart[trialType]:
+            if spec in windowSpec:
+                ix.append(i)
+            i += 1
+        
+        if len(ix)==0:
+            return
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[trialType][i][0],
+                               self.timeSplitTrials[trialType][i],
+                               self.subjectSplitTrials[trialType][i] ))
+        return selection
+
     def template_by_invisible_dur(self,windowDur,part):
         ix = []
         i=0
@@ -1270,6 +1288,42 @@ class VRTrial(object):
             selection.append(( self.windowsByPart[part][i][0],
                                self.timeSplitTrials[part][i],
                                self.templateSplitTrials[part][i] ))
+        return selection
+
+    def template_by_window_spec(self,windowSpec,trialType):
+        ix = []
+        i = 0
+        for spec,_ in self.windowsByPart[trialType]:
+            if spec in windowSpec:
+                ix.append(i)
+            i += 1
+        
+        if len(ix)==0:
+            return
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[trialType][i][0],
+                               self.timeSplitTrials[trialType][i],
+                               self.templateSplitTrials[trialType][i] ))
+        return selection
+
+    def visibility_by_window_spec(self,windowSpec,trialType):
+        ix = []
+        i = 0
+        for spec,_ in self.windowsByPart[trialType]:
+            if spec in windowSpec:
+                ix.append(i)
+            i += 1
+        
+        if len(ix)==0:
+            return
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[trialType][i][0],
+                               self.timeSplitTrials[trialType][i],
+                               self.templateSplitTrials[trialType+'visibility'][i] ))
         return selection
 
     def phase_by_window_dur(self,source,windowDur,trialType):
