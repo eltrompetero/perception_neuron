@@ -14,6 +14,13 @@ def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
     global coordinate frame.
     
     Directory where animation data is stored is hard-coded.
+
+    Params:
+    -------
+    trial_type (str)
+    visible_start (datetime.datetime)
+    modelhand (str)
+
     """
     from datetime import datetime,timedelta
     from workspace.utils import load_pickle
@@ -41,6 +48,12 @@ def extract_motionbuilder_model(trial_type,visible_start,modelhand):
     global coordinate frame.
     
     Directory where animation data is stored is hard-coded.
+
+    Params:
+    -------
+    trial_type (str)
+    visible_start (datetime.datetime)
+    modelhand (str)
     """
     from datetime import datetime,timedelta
     from workspace.utils import load_pickle

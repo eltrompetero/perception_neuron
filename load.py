@@ -1405,6 +1405,7 @@ class VRTrial(object):
             templateTrial[part+'visibility'] = visibility
 
             timeSplitTrials[part],subjectSplitTrials[part],templateSplitTrials[part] = [],[],[]
+            templateSplitTrials[part+'visibility'] = []
             for spec,startendt in windowsByPart[part]:
                 startendt = ((startendt[0]-startEnd[0]).total_seconds(),
                              (startendt[1]-startEnd[0]).total_seconds())
@@ -1414,6 +1415,10 @@ class VRTrial(object):
                 timeSplitTrials[part].append(t)
                 subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
                 templateSplitTrials[part].append( templateTrial[part+'V'](t) )
+
+                timeix = (templateTrial[part+'T']<=startendt[1])&(templateTrial[part+'T']>=startendt[0])
+                t = templateTrial[part+'T'][timeix]
+                templateSplitTrials[part+'visibility'].append( visibility[timeix] )
             
             # Get the beginning fully visible window. Inser this into the beginning of the list.
             windowsByPart[part].insert(0,((0,0),(0,invisibleStart[0])))

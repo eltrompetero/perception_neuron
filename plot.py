@@ -27,7 +27,8 @@ import load,utils
 # ------------------- #
 def time_occlusion_trial(mbT,mbV,anT,anV,startEnd,visible,invisible,
                          fig=None,ax=None,
-                         ylabel='Velocity (m/s)'):
+                         ylabel='Velocity (m/s)',
+                         ylim=None,xlim=None):
     """
     Plot the temporal occlusion trial data.
 
@@ -54,13 +55,14 @@ def time_occlusion_trial(mbT,mbV,anT,anV,startEnd,visible,invisible,
     showIx = (anT>startEnd[0]) & (anT<startEnd[1])
     ax.plot(anT[showIx],anV[showIx],'r-')
 
-    ylim = ax.get_ylim()
+    ylim = ylim or ax.get_ylim()
     for v,i in zip(visible,invisible):
         ax.fill_between([i,v],ylim[0],ylim[1],color='k',alpha=.2,lw=0)
 
     [l.set_rotation(90) for l in ax.xaxis.get_ticklabels()];
     ax.legend(('Model','Subject'),fontsize='x-small',loc=0)
-    ax.set(ylabel=ylabel,xlim=startEnd)
+    xlim = xlim or startEnd
+    ax.set(ylabel=ylabel,xlim=xlim,ylim=ylim)
     return fig
 
 def hist_dphase(delay,freq,ylim='low',laplace_counting=False):
