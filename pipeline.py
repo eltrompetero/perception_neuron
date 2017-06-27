@@ -199,9 +199,10 @@ def pipeline_phase_calc(fileixs=[],
         file_names = [file_names+'_%d'%i for i in range(len(trajs))]
     
     if len(fileixs)>0:
+        counter = 0
         for fileix in fileixs:
             print "Starting file %d..."%fileix
-            T,v1,v2 = quick_load(fileix,dt=1/int(sample_freq))
+            T,v1,v2 = quick_load(fileix,dt=1/int(phase_calc_kwargs['sample_freq']))
             if down_sample:
                 T = T[::2]
                 v1 = v1[::2]
@@ -209,8 +210,9 @@ def pipeline_phase_calc(fileixs=[],
 
             phases,vs = phase_calc(fs,v1,v2,**phase_calc_kwargs) 
 
-            pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('%s/phase_%d%s.p'%(dr,fileix,suffix),'wb'),-1)
+            pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('%s/%s.p'%(dr,file_names[counter]),'wb'),-1)
             print "Done with file %d."%fileix
+            counter += 1
     else:
         counter = 0
         for T,v in trajs:

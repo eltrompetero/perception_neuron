@@ -77,6 +77,71 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def phase_entropy(d,n_bins=20):
+    """
+    Calculate entropy for each row in d.
+
+    Params:
+    -------
+    d (ndarray)
+        Each row corresponds to a single frequency.
+    n_bins (int=20)
+
+    Returns:
+    --------
+    S (ndarray)
+    """
+    S = np.zeros((len(d)))
+    for i,row in enumerate(d):
+        bins = np.linspace(-np.pi,np.pi,n_bins)
+
+        n = np.histogram(row,bins=bins)[0]
+        n = n/n.sum()
+        S[i] = np.nansum( -n*np.log2(n) )
+    return S
+
+def phase_peakiness(d,bds=.8):
+    """
+    Calculate density within bds.
+    
+    Params:
+    -------
+    d (ndarray)
+        Each row corresponds to a single frequency.
+    bds (float=0.8)
+    
+    Returns:
+    --------
+    peakiness (ndarray)
+        Peakiness per given row of d.
+    """
+    if type(bds) is int or type(bds) is float:
+        bds = [-bds,bds]
+    
+    peakiness = np.zeros((len(d)))
+    for i,row in enumerate(d):
+        ix = (bds[0]<=row)&(row<=bds[1])
+        peakiness[i] = ix.sum()/len(row)
+    
+    return peakiness
+
+def subtract_freq_phase(subtractIx,f,dphase):
+    """
+    Subtract lower frequency phase from higher frequencies.
+
+    Params:
+    -------
+    subtractIx (int)
+    f (ndarray)
+    dphase (ndarray)
+    """
+    dphase = dphase.copy()
+    dphase /= f[:,None]*2*np.pi
+    dphase = dphase-dphase[subtractIx]
+    dphase *= f[:,None]*2*np.pi
+    dphase = mod_angle(dphase)
+    return dphase
+
 def project_gaze_to_plane(pitch,yaw,pos,
                           dpitch=None,dyaw=None,dpos=None,
                           distance_to_plane=.5,return_vel=False):
