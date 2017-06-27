@@ -136,7 +136,10 @@ def hand_ix(fileix):
             '69':1,
             '70':1,
             '71':0,
-            '72':1}.get(fileix,None)
+            '72':1,
+            '73':0,
+            '74':1,
+            '75':0}.get(fileix,None)
 
 def global_rotation(fileix):
     """
@@ -166,7 +169,8 @@ def get_dr(fname,date=None):
                 '20170310':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Startup'),
                 '20170317':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie'),
                 '20170418':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie'),
-                '20170420':'%s/%s/%s_%s'%(homedr,datadr,date,'Henry_Winnie')}[date]
+                '20170420':'%s/%s/%s_%s'%(homedr,datadr,date,'Henry_Winnie'),
+                '20170424':'%s/%s/%s_%s'%(homedr,datadr,date,'Eddie_Freya')}[date]
 
     if 'Itai' in fname and 'Anja' in fname:
         return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
