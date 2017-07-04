@@ -40,35 +40,23 @@ def _format_port_output(s):
     return f
 # end port section
 
-def record_AN_port(fname,recStartTime=None,recEndTime=None,dt=None):
+def record_AN_port(fname):
     """
     Start recording data from Axis Neuron port at some predetermined time and saves it to file name.
     
     Params:
     -------
     fname (str)
-    startTime (float or datetime.datetime)
-    endTime (datetime.datetime=None)
-    dt (float=None)
-        If this is given instead of endTime, then record for dt seconds.
     """
-    #if type(recStartTime) is int or type(recStartTime) is float:
-    #    recStartTime = datetime.now() + timedelta(seconds=recStartTime)
-    #else:
-    #    assert type(recStartTime) is datetime.datetime, "recStartTime must be seconds or datetime object."
-    #if recEndTime is None:
-    #    recEndTime = recStartTime + timedelta(seconds=dt)
-    while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/start.txt'):
+    while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/start.txt'):
         pause.seconds(1)
 
     data = []  # Port output.
     portOut = [datetime.now()]*2
-    #pause.until(recStartTime)
     startTime = datetime.now()
     max_wait_time = 1000
-    while ( (not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/end.txt')) and
+    while ( (not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/end.txt')) and
             (datetime.now()-startTime).total_seconds()<max_wait_time ):
-        #portOut[0]<recEndTime:
         portOut = read_port()
         data.append(portOut)
     

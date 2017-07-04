@@ -117,7 +117,7 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
         
     return anT,anX,anV,anA
 
-def quick_load(fileix,dt=1/120,negate_x=True,negate_y=False,disp=True):
+def quick_load(fileix,dt=1/120,negate_x=False,negate_y=False,disp=True):
     """
     Quick and dirty method for loading filtered velocities from hand trials. 
 
