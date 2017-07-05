@@ -139,7 +139,7 @@ def hand_ix(fileix):
             '72':1,
             '73':0,
             '74':1,
-            '75':0}.get(fileix,None)
+            '75':1}.get(fileix,None)
 
 def global_rotation(fileix):
     """
@@ -1060,7 +1060,8 @@ def load_visibility(fname,dr=''):
 
 def window_specs(person,dr):
     """
-    Get when the different visible/invisible cycles occur in the given experiment.
+    Get when the different visible/invisible cycles occur in the given experiment. These data are obtained
+    from visibility text files output from UE4.
     
     Returns:
     --------
@@ -1071,11 +1072,14 @@ def window_specs(person,dr):
     from workspace.utils import load_pickle
 
     # Load AN subject data.
-    load_pickle('%s/%s'%(dr,'quickload.p'))
+    load_pickle('%s/%s'%(dr,'quickload_an_port_vr.p'))
     windowsByPart = {}
     
-    for trialno,part in enumerate(['avatar','arm','hand']):
-        fname = part+'_visibility.txt'
+    for trialno,part in enumerate(['avatar','avatar0','hand','hand0']):
+        if part.isalpha():
+            fname = part+'_visibility.txt'
+        else:
+            fname = part[:-1]+'_visibility_0.txt'
 
         visible,invisible = load_visibility(fname,dr)
 
@@ -1157,6 +1161,11 @@ class VRTrial(object):
 
         Methods:
         --------
+        info
+        subject_by_window_dur
+        subject_by_window_spec
+        pickle_trial_dicts
+        pickle_phase
         """
         self.person = person
         self.modelhandedness = modelhandedness
@@ -1416,17 +1425,20 @@ class VRTrial(object):
         from pipeline import extract_motionbuilder_model2,extract_AN_port
 
         # Load AN data.
-        df = pickle.load(open('%s/%s'%(self.dr,'quickload.p'),'rb'))['df']
+        df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
         windowsByPart = window_specs(self.person,self.dr)
         
         # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial, hmdTrials.
         subjectTrial,templateTrial,hmdTrials = {},{},{}
         timeSplitTrials,subjectSplitTrials,templateSplitTrials = {},{},{}
 
-        for trialno,part in enumerate(['avatar','arm','hand']):
+        for trialno,part in enumerate(['avatar','avatar0','hand','hand0']):
             print "Processing %s..."%part
             # Select time interval during which the trial happened.
-            visible,invisible = load_visibility(part+'_visibility.txt',self.dr)
+            if part.isalpha():
+                visible,invisible = load_visibility(part+'_visibility.txt',self.dr)
+            else:
+                visible,invisible = load_visibility(part[:-1]+'_visibility_0.txt',self.dr)
             startEnd = [visible[0],visible[-1]]
 
             mbT,mbV = extract_motionbuilder_model2(part,startEnd[0],self.modelhandedness[trialno])

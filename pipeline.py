@@ -15,20 +15,20 @@ def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
     
     Directory where animation data is stored is hard-coded.
 
-    Params:
-    -------
+    Returns:
+    --------
     trial_type (str)
     visible_start (datetime.datetime)
     modelhand (str)
-
     """
     from datetime import datetime,timedelta
     from workspace.utils import load_pickle
 
     dr = ( os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/'+
            'Animations' )
-    fname = {'hand':'Eddie_Smooth_Model_%s.p'%modelhand,
-             'arm':'Eddie_Smooth_Model_%s_6000.p'%modelhand,
+    fname = {'hand0':'Eddie_Smooth_Model_%s_12000.p'%modelhand,
+             'hand':'Eddie_Smooth_Model_%s.p'%modelhand,
+             'avatar0':'Eddie_Smooth_Model_%s_6000.p'%modelhand,
              'avatar':'Eddie_Smooth_Model_%s_12000.p'%modelhand}[trial_type]
     load_pickle('%s/%s'%(dr,fname))
     mbT = mbdf['Time'].values.astype(float)
