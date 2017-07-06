@@ -1368,20 +1368,47 @@ class VRTrial(object):
                 ix.append(i)
             i += 1
         
-        if len(ix)==0:
-            return
-        
         selection = []
         for i in ix:
             if source=='subject' or source=='s':
-                phases = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
+                data = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
+                phases,vs = data['phases'],data['vs']
             elif source=='template' or source=='t':
-                phases = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
+                data = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
+                phases,vs = data['phases'],data['vs']
             else:
                 raise Exception
 
             phases = [np.vstack(p) for p in phases]
             selection.append(( self.windowsByPart[trialType][i][0],phases ))
+        return selection
+
+    def filtv_by_window_spec(self,source,windowSpec,trialType):
+        """
+        Returns:
+        --------
+        list of twoples (windowSpec, filtv) where filtv is a list of 3 arrays corresponding to each dimension
+        """
+        ix = []
+        i = 0
+        for spec,_ in self.windowsByPart[trialType]:
+            if spec in windowSpec:
+                ix.append(i)
+            i += 1
+        
+        selection = []
+        for i in ix:
+            if source=='subject' or source=='s':
+                data = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
+                phases,vs = data['phases'],data['vs']
+            elif source=='template' or source=='t':
+                data = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
+                phases,vs = data['phases'],data['vs']
+            else:
+                raise Exception
+
+            vs = [np.vstack(p) for p in vs]
+            selection.append(( self.windowsByPart[trialType][i][0],vs[0] ))
         return selection
 
     def dphase_by_window_dur(self,windowDur,trialType):
