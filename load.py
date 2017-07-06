@@ -1194,10 +1194,10 @@ class VRTrial(object):
     def info(self):
         print "Person %s"%self.person
         print "Trials available:"
-        for part in ['avatar','arm','hand']:
+        for part in ['avatar','avatar0','hand','hand0']:
             print "%s\tInvisible\tTotal"%part
             for spec,_ in self.windowsByPart[part]:
-                print "\t%1.1f\t\t%1.1f"%(spec[0],spec[1])
+                print "\t%1.2f\t\t%1.2f"%(spec[0],spec[1])
     
     def subject_by_window_dur(self,windowDur,part):
         """
@@ -1275,32 +1275,14 @@ class VRTrial(object):
                 ix.append(i)
             i += 1
         
-        if len(ix)==0:
-            return
-        
         selection = []
         for i in ix:
             selection.append(( self.windowsByPart[trialType][i][0],
                                self.timeSplitTrials[trialType][i],
                                self.subjectSplitTrials[trialType][i] ))
-        return selection
-
-    def template_by_invisible_dur(self,windowDur,part):
-        ix = []
-        i=0
-        for spec,_ in self.windowsByPart[part]:
-            if np.isclose(windowDur,spec[0]):
-                ix.append(i)
-            i += 1
         
-        if len(ix)==0:
-            return
-        
-        selection = []
-        for i in ix:
-            selection.append(( self.windowsByPart[part][i][0],
-                               self.timeSplitTrials[part][i],
-                               self.templateSplitTrials[part][i] ))
+        if trialType.isalpha():
+            return selection + self.subject_by_window_spec(windowSpec,trialType+'0')
         return selection
 
     def template_by_window_spec(self,windowSpec,trialType):
@@ -1311,14 +1293,30 @@ class VRTrial(object):
                 ix.append(i)
             i += 1
         
-        if len(ix)==0:
-            return
-        
         selection = []
         for i in ix:
             selection.append(( self.windowsByPart[trialType][i][0],
                                self.timeSplitTrials[trialType][i],
                                self.templateSplitTrials[trialType][i] ))
+        if trialType.isalpha():
+            return selection + self.template_by_window_spec(windowSpec,trialType+'0')
+        return selection
+
+    def template_by_invisible_dur(self,windowDur,part):
+        ix = []
+        i=0
+        for spec,_ in self.windowsByPart[part]:
+            if np.isclose(windowDur,spec[0]):
+                ix.append(i)
+            i += 1
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[part][i][0],
+                               self.timeSplitTrials[part][i],
+                               self.templateSplitTrials[part][i] ))
+        if trialType.isalpha():
+            return selection + self.template_by_invisible_dur(windowSpec,trialType+'0')
         return selection
 
     def visibility_by_window_spec(self,windowSpec,trialType):
@@ -1329,14 +1327,13 @@ class VRTrial(object):
                 ix.append(i)
             i += 1
         
-        if len(ix)==0:
-            return
-        
         selection = []
         for i in ix:
             selection.append(( self.windowsByPart[trialType][i][0],
                                self.timeSplitTrials[trialType][i],
                                self.templateSplitTrials[trialType+'visibility'][i] ))
+        if trialType.isalpha():
+            return selection + self.visibility_by_window_spec(windowSpec,trialType+'0')
         return selection
 
     def phase_by_window_dur(self,source,windowDur,trialType):
@@ -1400,6 +1397,8 @@ class VRTrial(object):
         for i in xrange(len(subjectPhase)):
             dphase.append(( subjectPhase[i][0], 
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
+        if trialType.isalpha():
+            return dphase + self.dphase_by_window_dur(windowDur,trialType+'0')
         return dphase
 
     def dphase_by_window_spec(self,windowSpec,trialType):
@@ -1411,10 +1410,12 @@ class VRTrial(object):
         subjectPhase = self.phase_by_window_spec('s',windowSpec,trialType)
         templatePhase = self.phase_by_window_spec('t',windowSpec,trialType)
         dphase = []
-        
+            
         for i in xrange(len(subjectPhase)):
             dphase.append(( subjectPhase[i][0], 
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
+        if trialType.isalpha():
+            return dphase + self.dphase_by_window_spec(windowSpec,trialType+'0')
         return dphase
 
     def pickle_trial_dicts(self):
@@ -1516,7 +1517,7 @@ class VRTrial(object):
         """
         from pipeline import pipeline_phase_calc
         
-        for part in ['avatar','arm','hand']:
+        for part in ['avatar','avatar0','hand','hand0']:
             nTrials = len(self.windowsByPart[part])
             toProcess = []
             for i in xrange(nTrials):

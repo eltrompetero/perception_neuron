@@ -174,7 +174,7 @@ def pipeline_phase_calc(fileixs=[],
     """
     Pipeline loading pickled lowpass filtered data and running phase extraction after bandpass filtering.
     Pickles list of tuples phases, list of tuples vs (containing filtered velocities), and array fs
-    (frequencies that were bandpassed).  Pickles are saved in phase_files/phase_%d.p
+    (frequencies that were bandpassed).  
 
     If fileix's are given, those are loaded then processed. Otherwise, the data given is processed.
     
