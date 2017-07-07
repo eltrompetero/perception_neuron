@@ -1408,7 +1408,7 @@ class VRTrial(object):
                 raise Exception
 
             vs = [np.vstack(p) for p in vs]
-            selection.append(( self.windowsByPart[trialType][i][0],vs[0] ))
+            selection.append(( self.windowsByPart[trialType][i][0],vs ))
         return selection
 
     def dphase_by_window_dur(self,windowDur,trialType):
