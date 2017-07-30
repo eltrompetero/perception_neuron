@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from utils import *
 import cPickle as pickle
+import os
 
 def get_fnames():
     return ['Eddie L Caeli F March',
