@@ -1174,22 +1174,16 @@ class VRTrial(object):
         
         try:
             data = pickle.load(open('%s/trial_dictionaries.p'%self.dr,'rb'))
-            self.templateTrial = data['templateTrial']
-            self.subjectTrial = data['subjectTrial']
-            self.timeSplitTrials = data['timeSplitTrials']
-            self.templateSplitTrials = data['templateSplitTrials']
-            self.subjectSplitTrials = data['subjectSplitTrials']
-            self.windowsByPart = data['windowsByPart']
         except Exception:
             self.pickle_trial_dicts()
             
-            data = pickle.load(open('%s/trial_dictionaries.p'%self.dr,'rb'))
-            self.templateTrial = data['templateTrial']
-            self.subjectTrial = data['subjectTrial']
-            self.timeSplitTrials = data['timeSplitTrials']
-            self.templateSplitTrials = data['templateSplitTrials']
-            self.subjectSplitTrials = data['subjectSplitTrials']
-            self.windowsByPart = data['windowsByPart']
+        data = pickle.load(open('%s/trial_dictionaries.p'%self.dr,'rb'))
+        self.templateTrial = data['templateTrial']
+        self.subjectTrial = data['subjectTrial']
+        self.timeSplitTrials = data['timeSplitTrials']
+        self.templateSplitTrials = data['templateSplitTrials']
+        self.subjectSplitTrials = data['subjectSplitTrials']
+        self.windowsByPart = data['windowsByPart']
 
     def info(self):
         print "Person %s"%self.person
