@@ -285,6 +285,48 @@ def calc_file_headers():
                           'Dropbox/Research/py_lib/perceptionneuron/calc_file_headers.p'),'rb'))['headers']
     return headers
 
+def subject_settings_v3(index,return_list=True):
+    settings = [{'person':'Zimu3',
+                  'modelhandedness':['Left','Right','Left','Right'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Darshna3',
+                  'modelhandedness':['Left','Right','Left','Right'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Richard3',
+                  'modelhandedness':['Right','Left','Right','Left'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Rachel3',
+                  'modelhandedness':['Right','Left','Right','Left'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Priyanka3',
+                  'modelhandedness':['Left','Right','Left','Right'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Emily3',
+                  'modelhandedness':['Left','Right','Left','Right'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Sam3',
+                  'modelhandedness':['Right','Left','Right','Left'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Najila3',
+                  'modelhandedness':['Left','Right','Left','Right'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']}
+                ][index]
+    dr = (os.path.expanduser('~')+
+          '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
+    if return_list:
+        output = [settings[k] for k in ['person','modelhandedness','rotation']]
+        output.append(dr)
+        return output
+    return settings,dr
+
 def load_calc(fname,cols='V',read_csv_kwargs={},zd=True,df=None):
     """
     Load calculation file output by Axis Neuron. 
