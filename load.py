@@ -1473,11 +1473,15 @@ class VRTrial(object):
 
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             # Since the AN trial starts after the mbTrial...the offset is positive.
-            subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],subjectTrial[part+'T'],1/60,
+            subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
+                                       subjectTrial[part+'T'],
+                                       1/60,
                                        offset=(subjectTrial[part+'T'][0]-templateTrial[part+'T'][0]).total_seconds(),
                                        use_univariate=True)
-            templateTrial[part+'V'],templateTrial[part+'T'] = match_time(templateTrial[part+'V'],templateTrial[part+'T'],1/60,
-                                                               use_univariate=True)
+            templateTrial[part+'V'],templateTrial[part+'T'] = match_time(templateTrial[part+'V'],
+                                                                templateTrial[part+'T'],
+                                                                1/60,
+                                                                use_univariate=True)
             
 
             # Times for when visible/invisible windows start.
@@ -1525,7 +1529,8 @@ class VRTrial(object):
             templateSplitTrials[part+'visibility'].insert( 0,visibility[timeix] )
 
         
-        pickle.dump({'templateTrial':templateTrial,'subjectTrial':subjectTrial,
+        pickle.dump({'templateTrial':templateTrial,
+                     'subjectTrial':subjectTrial,
                      'timeSplitTrials':timeSplitTrials,
                      'templateSplitTrials':templateSplitTrials,
                      'subjectSplitTrials':subjectSplitTrials,
