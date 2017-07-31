@@ -318,6 +318,14 @@ def subject_settings_v3(index,return_list=True):
                 {'person':'Najila3',
                   'modelhandedness':['Left','Right','Left','Right'],
                   'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Kemper3',
+                  'modelhandedness':['Left','Right','Left','Right'],
+                  'rotation':[0,0,0,0],
+                  'trials':['avatar0','avatar1','hand0','hand1']},
+                {'person':'Lauren3',
+                  'modelhandedness':['Right','Left','Right','Left'],
+                  'rotation':[0,0,0,0],
                   'trials':['avatar0','avatar1','hand0','hand1']}
                 ][index]
     dr = (os.path.expanduser('~')+
@@ -1379,6 +1387,17 @@ class VRTrial(object):
         return selection
 
     def phase_by_window_dur(self,source,windowDur,trialType):
+        """
+        Return instantaneous phase from bandpass filtered velocities on trial specificied by window
+        duration.
+
+        Params:
+        -------
+        source (str)
+        windowDur (list of floats)
+        trialType (str)
+            'avatar', 'avatar0', 'hand', 'hand0'
+        """
         ix = []
         i = 0
         for spec,_ in self.windowsByPart[trialType]:
@@ -1386,20 +1405,18 @@ class VRTrial(object):
                 ix.append(i)
             i += 1
         
-        if len(ix)==0:
-            return
-        
         selection = []
         for i in ix:
-            if source=='subject' or source=='s':
-                phases = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
-            elif source=='template' or source=='t':
-                phases = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
-            else:
-                raise Exception
+            try:
+                if source=='subject' or source=='s':
+                    phases = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
+                elif source=='template' or source=='t':
+                    phases = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
 
-            phases = [np.vstack(p) for p in phases]
-            selection.append(( self.windowsByPart[trialType][i][0],phases ))
+                phases = [np.vstack(p) for p in phases]
+                selection.append(( self.windowsByPart[trialType][i][0],phases ))
+            except IOError:
+                print "Trial %d in trial type %s not found."%(i,trialType)
         return selection
 
     def phase_by_window_spec(self,source,windowSpec,trialType):
