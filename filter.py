@@ -163,7 +163,7 @@ def shifted_window_weights(window,shift,T,offset=None):
         offset = [lw//2]*2
     elif type(offset) is int:
         offset = [offset]*2
-
+    # Off by one index error on smaller arrays...358. wnorm is too small by one. or rather window is too large by one.
     for i in xrange(offset[0],lw//2,shift):
         wnorm[:i+lw//2+1] += window[-(i-lw//2):]
 
@@ -238,7 +238,7 @@ def _moving_freq_filt(s,
                       sample_freq=60,
                       mx_filter_rows=100):
     """
-    Called in _moving_freq_filt().
+    Called in moving_freq_filt().
 
     Moving frequency filter using Butterworth lowpass filter. First, construct windowed input as given
     window type is dragged across. Frequency filter each of those samples and then add them all up 
