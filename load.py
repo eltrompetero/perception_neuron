@@ -1601,7 +1601,9 @@ class VRTrial(object):
             trialNumbers = []
             for i in xrange(nTrials):
                 # Only run process if we have data points. Some trials are missing data points.
-                if len(self.timeSplitTrials[part][i])>0:
+                # NOTE: At some point the min length should made to correspond to the min window
+                # size in the windowing function for filtering.
+                if len(self.timeSplitTrials[part][i])>300:
                     trialNumbers.append(i)
                     toProcess.append( (self.timeSplitTrials[part][i],
                                        (self.subjectSplitTrials[part][i][:,0],
@@ -1617,7 +1619,7 @@ class VRTrial(object):
             toProcess = []
             trialNumbers = []
             for i in xrange(nTrials):
-                if len(self.timeSplitTrials[part][i])>0:
+                if len(self.timeSplitTrials[part][i])>300:
                     trialNumbers.append(i)
                     toProcess.append( (self.timeSplitTrials[part][i],
                                        (self.templateSplitTrials[part][i][:,0],
