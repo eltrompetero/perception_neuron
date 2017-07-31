@@ -1171,6 +1171,11 @@ def window_specs(person,dr):
             windowEnd.append(visible[windowIx[ix][-1]])
 
         windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
+
+        # In buggy trials where animation did not stop properly, there is a segment at the end that
+        # needs to be removed, corresponding to when the avatar was flashing very quickly.
+        if windowsByPart[part][-1][0][0]==0:
+            windowsByPart[part] = windowsByPart[part][:-1]
     return windowsByPart
 
 
@@ -1493,7 +1498,8 @@ class VRTrial(object):
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
         windowsByPart = window_specs(self.person,self.dr)
         
-        # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial, hmdTrials.
+        # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial,
+        # templateTrial, hmdTrials.
         subjectTrial,templateTrial,hmdTrials = {},{},{}
         timeSplitTrials,subjectSplitTrials,templateSplitTrials = {},{},{}
 
@@ -1510,21 +1516,22 @@ class VRTrial(object):
             showIx = (mbT>startEnd[0]) & (mbT<startEnd[1])
             templateTrial[part+'T'],templateTrial[part+'V'] = mbT[showIx],mbV[showIx]
 
-            anT,anX,anV,anA = extract_AN_port(df,self.modelhandedness[trialno],rotation_angle=self.rotation[trialno])
+            anT,anX,anV,anA = extract_AN_port(df,self.modelhandedness[trialno],
+                                              rotation_angle=self.rotation[trialno])
             showIx = (anT>startEnd[0]) & (anT<startEnd[1])
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
 
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             # Since the AN trial starts after the mbTrial...the offset is positive.
             subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
-                                       subjectTrial[part+'T'],
-                                       1/60,
-                                       offset=(subjectTrial[part+'T'][0]-templateTrial[part+'T'][0]).total_seconds(),
-                                       use_univariate=True)
+                               subjectTrial[part+'T'],
+                               1/60,
+                               offset=(subjectTrial[part+'T'][0]-templateTrial[part+'T'][0]).total_seconds(),
+                               use_univariate=True)
             templateTrial[part+'V'],templateTrial[part+'T'] = match_time(templateTrial[part+'V'],
-                                                                templateTrial[part+'T'],
-                                                                1/60,
-                                                                use_univariate=True)
+                                                                         templateTrial[part+'T'],
+                                                                         1/60,
+                                                                         use_univariate=True)
             
 
             # Times for when visible/invisible windows start.
@@ -1580,33 +1587,45 @@ class VRTrial(object):
                      'windowsByPart':windowsByPart},
                     open('%s/trial_dictionaries.p'%self.dr,'wb'),-1)
 
-    def pickle_phase(self):
+    def pickle_phase(self,trial_types=['avatar','avatar0','hand','hand0']):
         """
-        Calculate phase and pickle.
+        Calculate bandpass filtered phase and pickle.
         """
         from pipeline import pipeline_phase_calc
         
-        for part in ['avatar','avatar0','hand','hand0']:
-            nTrials = len(self.windowsByPart[part])
+        for part in trial_types:
+            nTrials = len(self.windowsByPart[part])  # number of trials for that part
+
+            # Subject.
             toProcess = []
+            trialNumbers = []
             for i in xrange(nTrials):
-                toProcess.append( (self.timeSplitTrials[part][i],
-                                   (self.subjectSplitTrials[part][i][:,0],
-                                    self.subjectSplitTrials[part][i][:,1],
-                                    self.subjectSplitTrials[part][i][:,2])) )
+                # Only run process if we have data points. Some trials are missing data points.
+                if len(self.timeSplitTrials[part][i])>0:
+                    trialNumbers.append(i)
+                    toProcess.append( (self.timeSplitTrials[part][i],
+                                       (self.subjectSplitTrials[part][i][:,0],
+                                        self.subjectSplitTrials[part][i][:,1],
+                                        self.subjectSplitTrials[part][i][:,2])) )
+                else:
+                    print "Ignoring %s trial no %d with windowspec (%1.1f,%1.1f)."%(part,i,
+                        self.windowsByPart[part][i][0][0],self.windowsByPart[part][i][0][1])
             pipeline_phase_calc(trajs=toProcess,dr=self.dr,
                                 file_names=['subject_phase_%s_%d'%(part,i)
-                                            for i in xrange(nTrials)])
-
+                                            for i in trialNumbers])
+            # Template.
             toProcess = []
+            trialNumbers = []
             for i in xrange(nTrials):
-                toProcess.append( (self.timeSplitTrials[part][i],
-                                   (self.templateSplitTrials[part][i][:,0],
-                                    self.templateSplitTrials[part][i][:,1],
-                                    self.templateSplitTrials[part][i][:,2])) )
+                if len(self.timeSplitTrials[part][i])>0:
+                    trialNumbers.append(i)
+                    toProcess.append( (self.timeSplitTrials[part][i],
+                                       (self.templateSplitTrials[part][i][:,0],
+                                        self.templateSplitTrials[part][i][:,1],
+                                        self.templateSplitTrials[part][i][:,2])) )
             pipeline_phase_calc(trajs=toProcess,dr=self.dr,
                                 file_names=['template_phase_%s_%d'%(part,i)
-                                            for i in xrange(nTrials)])
+                                            for i in trialNumbers])
 # end VRTrial
 
 
