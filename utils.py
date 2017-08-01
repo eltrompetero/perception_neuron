@@ -127,7 +127,7 @@ def phase_peakiness(d,bds=.8):
 
 def subtract_freq_phase(subtractIx,f,dphase):
     """
-    Subtract lower frequency phase from higher frequencies.
+    Subtract lower frequency phase from higher frequencies in temporal domain.
 
     Params:
     -------
@@ -141,6 +141,45 @@ def subtract_freq_phase(subtractIx,f,dphase):
     dphase *= f[:,None]*2*np.pi
     dphase = mod_angle(dphase)
     return dphase
+
+def shift_phase_by_time(f,phase,time_shift):
+    """
+    Subtract lower frequency phase from higher frequencies in temporal domain.
+
+    Params:
+    -------
+    f (ndarray)
+        Frequencies of each row of phase.
+    phase (ndarray)
+        In units of radians.
+    time_shift (ndarray)
+    """
+    phase = phase.copy()
+    phase /= f[:,None]*2*np.pi
+    phase = phase-time_shift
+    phase *= f[:,None]*2*np.pi
+    phase = mod_angle(phase)
+    return phase
+
+def find_closest_dtheta(t1,t2,window=101,dt=1):
+    """
+    Return relative index of closest data point. How much t2 has to be shifted to match t1.
+
+    Params:
+    -------
+    t1 (ndarray)
+    t2 (ndarray)
+    window (int=101)
+        Width of window for searching for min distance. Must be odd.
+    dt (float=1)
+        dt spacing corresponding to index.
+    """
+    assert (window%2)==1
+    
+    mnix = np.zeros((len(t1)-window),dtype=int)
+    for i,tix in enumerate(xrange(window//2,len(t1)-window//2-1)):
+        mnix[i] = np.argmin(abs(t2[tix]-t1[tix-window//2:tix+window//2]))-window//2
+    return mnix*dt
 
 def project_gaze_to_plane(pitch,yaw,pos,
                           dpitch=None,dyaw=None,dpos=None,
