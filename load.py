@@ -1443,7 +1443,7 @@ class VRTrial(object):
                 print "Trial %d in trial type %s not found."%(i,trialType)
         return selection
 
-    def filtv_by_window_spec(self,source,windowSpec,trialType):
+    def filtv_by_window_spec(self,source,windowSpec,trialType,search_all=True):
         """
         Returns:
         --------
@@ -1469,6 +1469,10 @@ class VRTrial(object):
 
             vs = [np.vstack(p) for p in vs]
             selection.append(( self.windowsByPart[trialType][i][0],vs ))
+
+        if trialType.isalpha() and search_all:
+            return selection + self.filtv_by_window_spec(source,windowSpec,trialType+'0',False)
+
         return selection
 
     def dphase_by_window_dur(self,windowDur,trialType):
