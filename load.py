@@ -1272,9 +1272,6 @@ class VRTrial(object):
                 ix.append(i)
             i += 1
         
-        if len(ix)==0:
-            return
-        
         selection = []
         for i in ix:
             selection.append(( self.windowsByPart[part][i][0],
@@ -1290,9 +1287,6 @@ class VRTrial(object):
                 ix.append(i)
             i += 1
         
-        if len(ix)==0:
-            return
-        
         selection = []
         for i in ix:
             selection.append(( self.windowsByPart[part][i][0],
@@ -1307,9 +1301,6 @@ class VRTrial(object):
             if np.isclose(windowDur,spec[0]):
                 ix.append(i)
             i += 1
-        
-        if len(ix)==0:
-            return
         
         selection = []
         for i in ix:
