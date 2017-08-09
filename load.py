@@ -1309,13 +1309,41 @@ class VRTrial(object):
                                self.subjectSplitTrials[part][i] ))
         return selection
 
-    def subject_by_window_spec(self,windowSpec,trialType):
+    def _fetch_windowspec_indices(self,specs,trial_type,precision=None):
+        """
+        Given a particular trial type and a window specification, return all the indices within that
+        trial type that match the given specification.  Options for adjusting the precision for
+        matching windows.
+
+        Params
+        ------
+        trial_type : str
+        spec : list of tuples
+        
+        Returns
+        -------
+        ix : list of ints
+        """
         ix = []
         i = 0
-        for spec,_ in self.windowsByPart[trialType]:
-            if spec in windowSpec:
-                ix.append(i)
-            i += 1
+
+        if precision is None:
+            for spec,_ in self.windowsByPart[trial_type]:
+                if spec in specs:
+                    ix.append(i)
+                i += 1
+        else:
+            for spec,_ in self.windowsByPart[trial_type]:
+                specDiffs = np.abs( np.array(specs)-np.array(spec)[None,:] )
+                ix_ = (specDiffs<=precision).all(1)
+                if ix_.any():
+                    ix.append(i)
+                i += 1
+        return ix
+
+    def subject_by_window_spec(self,windowSpec,trialType,precision=None):
+        """Automatically search through left and right hand trials."""
+        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
         
         selection = []
         for i in ix:
@@ -1324,16 +1352,13 @@ class VRTrial(object):
                                self.subjectSplitTrials[trialType][i] ))
         
         if trialType.isalpha():
-            return selection + self.subject_by_window_spec(windowSpec,trialType+'0')
+            return selection + self.subject_by_window_spec(windowSpec,trialType+'0',
+                                                           precision=precision)
         return selection
 
     def template_by_window_spec(self,windowSpec,trialType):
-        ix = []
-        i = 0
-        for spec,_ in self.windowsByPart[trialType]:
-            if spec in windowSpec:
-                ix.append(i)
-            i += 1
+        """Automatically search through left and right hand trials."""
+        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
         
         selection = []
         for i in ix:
@@ -1341,7 +1366,8 @@ class VRTrial(object):
                                self.timeSplitTrials[trialType][i],
                                self.templateSplitTrials[trialType][i] ))
         if trialType.isalpha():
-            return selection + self.template_by_window_spec(windowSpec,trialType+'0')
+            return selection + self.template_by_window_spec(windowSpec,trialType+'0',
+                                                            precision=precision)
         return selection
 
     def template_by_invisible_dur(self,windowDur,part):
