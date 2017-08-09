@@ -80,15 +80,21 @@ class MultiUnivariateSpline(object):
 # ===================== #
 def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],
                             freqs=np.arange(1,31)*.1,
+                            weights=None,
                             return_all=False):
     """
-    Find the optimal uniform time shift.
+    Find the optimal uniform time shift by shifting by each frequency one at a time.
     
     Parameters
     ----------
     dphase : ndarray
+        (n_freq,n_time)
     dphase_bds : tuple,(-pi/10,pi/10)
         Integration domain.
+    freqs : ndarray,np.arange(1,31)*.1
+        Frequency of each row of dphase.
+    weights : ndarray,None
+        Weight to assign to each frequency when taking mean over frequencies.
     return_all : bool,False
     
     Returns
@@ -96,15 +102,23 @@ def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],
     fopt : float
         Optimal frequency for uniform temporal shift.
     """
+    from misc.plot import colorcycle
     avgDensity = np.zeros(len(freqs))
-    # fig,ax = plt.subplots()
-    # cc = colorcycle(len(freqs))
+    #fig,ax = plt.subplots()
+    #cc = colorcycle(len(freqs))
+
+    # Iterate over subtracting temporal delays from different frequencies.
     for i in xrange(len(freqs)):
         shifteddphase = subtract_freq_phase(i,freqs,dphase)
-    #     ax.plot( [((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
-    #                              for s in shifteddphase] ,c=cc.next(),lw=2)
-        avgDensity[i] = np.mean([((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
-                                 for s in np.delete(shifteddphase,i,axis=0)])
+        if weights is None:
+            weights_ = np.ones(len(freqs)-1)/(len(freqs)-1)
+        else:
+            weights_ = np.delete(weights,i)
+
+        #ax.plot( [((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
+        #                         for s in shifteddphase] ,c=cc.next(),lw=2)
+        avgDensity[i] = np.array([((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
+                                 for s in np.delete(shifteddphase,i,axis=0)]).dot(weights_)
     if return_all:
         return freqs[np.argmax(avgDensity)],avgDensity
     return freqs[np.argmax(avgDensity)]
