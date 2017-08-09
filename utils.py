@@ -11,7 +11,7 @@ except ImportError:
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-from numpy import sin,cos
+from numpy import sin,cos,pi
 import pandas as pd
 from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline,interp1d
 import entropy.entropy as info
@@ -74,9 +74,41 @@ class MultiUnivariateSpline(object):
         return f
 
 
+
 # ===================== #
 # Function definitions. #
 # ===================== #
+def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],
+                            freqs=np.arange(1,31)*.1,
+                            return_all=False):
+    """
+    Find the optimal uniform time shift.
+    
+    Parameters
+    ----------
+    dphase : ndarray
+    dphase_bds : tuple,(-pi/10,pi/10)
+        Integration domain.
+    return_all : bool,False
+    
+    Returns
+    -------
+    fopt : float
+        Optimal frequency for uniform temporal shift.
+    """
+    avgDensity = np.zeros(len(freqs))
+    # fig,ax = plt.subplots()
+    # cc = colorcycle(len(freqs))
+    for i in xrange(len(freqs)):
+        shifteddphase = subtract_freq_phase(i,freqs,dphase)
+    #     ax.plot( [((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
+    #                              for s in shifteddphase] ,c=cc.next(),lw=2)
+        avgDensity[i] = np.mean([((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
+                                 for s in np.delete(shifteddphase,i,axis=0)])
+    if return_all:
+        return freqs[np.argmax(avgDensity)],avgDensity
+    return freqs[np.argmax(avgDensity)]
+
 def phase_and_dphase(x,y):
     """
     Calculate complex phase per frequency per time and dphase for two signals
@@ -89,21 +121,22 @@ def phase_and_dphase(x,y):
 
     Returns
     -------
+    freqs : ndarray
     phasex : ndarray
     phasey : ndarray
     dphase : ndarray
     """
     import pywt
 
-    xcwtmat,freq = pywt.cwt(x,np.arange(1,100),'cgau1',1/60,precision=10)
-    ycwtmat,freq = pywt.cwt(y,np.arange(1,100),'cgau1',1/60,precision=10)
+    xcwtmat,freqs = pywt.cwt(x,np.arange(1,100),'cgau1',1/60,precision=10)
+    ycwtmat,freqs = pywt.cwt(y,np.arange(1,100),'cgau1',1/60,precision=10)
 
     phasex = np.arctan2( xcwtmat.imag,xcwtmat.real )
     phasey = np.arctan2( ycwtmat.imag,ycwtmat.real )
 
     dphase = mod_angle(phasex-phasey)
 
-    return phasex,phasey,dphase
+    return freqs,phasex,phasey,dphase
 
 def select_freqs(freqs,precision=1):
     """
