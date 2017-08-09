@@ -77,6 +77,25 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def select_freqs(freqs,precision=1):
+    """
+    Only return a subset of the frequencies (unique by number of decimal points) and the 
+    indices of the selected frequencies.
+
+    Params
+    ------
+    freqs : ndarray
+    precision : int,1
+
+    Returns
+    -------
+    ufreqs : ndarray
+    freqix : ndarray
+    """
+    freqs = np.around(freqs,precision)
+    ufreqs,freqix = np.unique(freqs,return_index=True)
+    return ufreqs,freqix  # remember frequencies are return in reverse order
+
 def phase_entropy(d,n_bins=20):
     """
     Calculate entropy for each row in d.
