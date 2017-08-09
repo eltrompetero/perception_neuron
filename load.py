@@ -1356,7 +1356,7 @@ class VRTrial(object):
                                                            precision=precision)
         return selection
 
-    def template_by_window_spec(self,windowSpec,trialType):
+    def template_by_window_spec(self,windowSpec,trialType,precision=None):
         """Automatically search through left and right hand trials."""
         ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
         
