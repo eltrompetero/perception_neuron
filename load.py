@@ -1223,6 +1223,7 @@ class VRTrial(object):
         subject_by_window_spec
         pickle_trial_dicts
         pickle_phase
+        _fetch_windowspec_indices
         """
         self.person = person
         self.modelhandedness = modelhandedness
@@ -1309,38 +1310,6 @@ class VRTrial(object):
                                self.subjectSplitTrials[part][i] ))
         return selection
 
-    def _fetch_windowspec_indices(self,specs,trial_type,precision=None):
-        """
-        Given a particular trial type and a window specification, return all the indices within that
-        trial type that match the given specification.  Options for adjusting the precision for
-        matching windows.
-
-        Params
-        ------
-        trial_type : str
-        spec : list of tuples
-        
-        Returns
-        -------
-        ix : list of ints
-        """
-        ix = []
-        i = 0
-
-        if precision is None:
-            for spec,_ in self.windowsByPart[trial_type]:
-                if spec in specs:
-                    ix.append(i)
-                i += 1
-        else:
-            for spec,_ in self.windowsByPart[trial_type]:
-                specDiffs = np.abs( np.array(specs)-np.array(spec)[None,:] )
-                ix_ = (specDiffs<=precision).all(1)
-                if ix_.any():
-                    ix.append(i)
-                i += 1
-        return ix
-
     def subject_by_window_spec(self,windowSpec,trialType,precision=None):
         """Automatically search through left and right hand trials."""
         ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
@@ -1388,12 +1357,7 @@ class VRTrial(object):
         return selection
 
     def visibility_by_window_spec(self,windowSpec,trialType):
-        ix = []
-        i = 0
-        for spec,_ in self.windowsByPart[trialType]:
-            if spec in windowSpec:
-                ix.append(i)
-            i += 1
+        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
         
         selection = []
         for i in ix:
@@ -1401,7 +1365,8 @@ class VRTrial(object):
                                self.timeSplitTrials[trialType][i],
                                self.templateSplitTrials[trialType+'visibility'][i] ))
         if trialType.isalpha():
-            return selection + self.visibility_by_window_spec(windowSpec,trialType+'0')
+            return selection + self.visibility_by_window_spec(windowSpec,trialType+'0',
+                                                              precision=precision)
         return selection
 
     def phase_by_window_dur(self,source,windowDur,trialType):
@@ -1438,14 +1403,9 @@ class VRTrial(object):
         return selection
 
     def phase_by_window_spec(self,source,windowSpec,trialType):
-        ix = []
-        i = 0
-        for spec,_ in self.windowsByPart[trialType]:
-            if spec in windowSpec:
-                ix.append(i)
-            i += 1
-        
+        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
         selection = []
+
         for i in ix:
             try:
                 if source=='subject' or source=='s':
@@ -1467,14 +1427,9 @@ class VRTrial(object):
         --------
         list of twoples (windowSpec, filtv) where filtv is a list of 3 arrays corresponding to each dimension
         """
-        ix = []
-        i = 0
-        for spec,_ in self.windowsByPart[trialType]:
-            if spec in windowSpec:
-                ix.append(i)
-            i += 1
-        
+        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
         selection = []
+
         for i in ix:
             if source=='subject' or source=='s':
                 data = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
@@ -1668,6 +1623,38 @@ class VRTrial(object):
             pipeline_phase_calc(trajs=toProcess,dr=self.dr,
                                 file_names=['template_phase_%s_%d'%(part,i)
                                             for i in trialNumbers])
+
+    def _fetch_windowspec_indices(self,specs,trial_type,precision=None):
+        """
+        Given a particular trial type and a window specification, return all the indices within that
+        trial type that match the given specification.  Options for adjusting the precision for
+        matching windows.
+
+        Params
+        ------
+        trial_type : str
+        spec : list of tuples
+        
+        Returns
+        -------
+        ix : list of ints
+        """
+        ix = []
+        i = 0
+
+        if precision is None:
+            for spec,_ in self.windowsByPart[trial_type]:
+                if spec in specs:
+                    ix.append(i)
+                i += 1
+        else:
+            for spec,_ in self.windowsByPart[trial_type]:
+                specDiffs = np.abs( np.array(specs)-np.array(spec)[None,:] )
+                ix_ = (specDiffs<=precision).all(1)
+                if ix_.any():
+                    ix.append(i)
+                i += 1
+        return ix
 # end VRTrial
 
 
