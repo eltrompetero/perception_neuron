@@ -8,6 +8,69 @@ from load import *
 from utils import *
 from filter import *
 
+
+def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
+    """
+    Calculate average coherence over all given trials for given window specs.
+
+    Parameters
+    ----------
+    spec_list : list
+        List of twoples (invisible_fraction,window_duration).
+    trial_type : str
+        Trial type.
+    trials : list of VRTrial instances
+    mx_freq : int,10
+        Maximum frequency over which to average coherence
+
+    Returns
+    -------
+    cohmat : ndarray
+        Average coherence statistic over all trials.
+    cohmaterr : ndarray
+        Std of coherence statistic.
+    """
+    from scipy.signal import coherence
+
+    cohmat = np.zeros((len(spec_list),4,len(trials)))
+
+    for itrial,trial in enumerate(trials):
+	counter = 0 
+	for invisibleDur,windowDur in spec_list:
+	    t,subjectv = trial.subject_by_window_spec([(invisibleDur,windowDur)],
+						      trial_type,
+						      .11
+						     )[0][1:]
+	    t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
+							trial_type,
+							.11
+						       )[0][1:]
+
+	    if len(templatev)>0:
+		# Calculate coherence for each dimension.
+		for dimIx in xrange(3):
+		    f,cxy = coherence(subjectv[:,dimIx],templatev[:,dimIx],
+					fs=60,nperseg=120)
+		    cohmat[counter,dimIx,itrial] += cxy[f<mx_freq].mean()
+		# Coherence for velocity magnitude.
+		f,cxy = coherence(np.linalg.norm(subjectv,axis=1),
+				  np.linalg.norm(templatev,axis=1),
+				  fs=60,nperseg=120)
+		cohmat[counter,3,itrial] += cxy[f<mx_freq].mean()
+            elif disp:
+		print "No data for window spec (%1.1f,%1.1f) for trial %d."%(invisibleDur,
+									     windowDur,
+									     itrial)
+	    counter += 1
+    ntrialmat = (cohmat!=0).sum(2)  # number of trials available for each window spec
+                              # used for normalization
+    cohmat[cohmat==0] = np.nan
+    cohmaterr = np.nanstd(cohmat,axis=2)
+    cohmat = np.nansum(cohmat,axis=2)
+    cohmat /= ntrialmat
+    cohmaterr /= np.sqrt(ntrialmat)
+    return cohmat,cohmaterr
+
 def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz. Returned data is put into standard
