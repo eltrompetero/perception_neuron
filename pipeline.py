@@ -7,7 +7,33 @@ import os
 from load import *
 from utils import *
 from filter import *
+from numpy import pi
 
+def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],fs=np.arange(1,31)*.1):
+    """
+    Find the optimal uniform time shift.
+    
+    Parameters
+    ----------
+    dphase : ndarray
+    dphase_bds : tuple,(-pi/10,pi/10)
+        Integration domain.
+    
+    Returns
+    -------
+    fopt : float
+        Optimal frequency for uniform temporal shift.
+    """
+    avgDensity = np.zeros(len(fs))
+    # fig,ax = plt.subplots()
+    # cc = colorcycle(len(fs))
+    for i in xrange(len(fs)):
+        shifteddphase = subtract_freq_phase(i,fs,dphase)
+    #     ax.plot( [((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
+    #                              for s in shifteddphase] ,c=cc.next(),lw=2)
+        avgDensity[i] = np.mean([((s>dphase_bds[0])&(s<dphase_bds[1])).mean()
+                                 for s in np.delete(shifteddphase,i,axis=0)])
+    return fs[np.argmax(avgDensity)]
 
 def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
     """
