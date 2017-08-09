@@ -77,6 +77,34 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def phase_and_dphase(x,y):
+    """
+    Calculate complex phase per frequency per time and dphase for two signals
+    using a continuous wavelet transform with the complex Gaussian.
+
+    Parameters
+    ----------
+    x : ndarray
+    y : ndarray
+
+    Returns
+    -------
+    phasex : ndarray
+    phasey : ndarray
+    dphase : ndarray
+    """
+    import pywt
+
+    xcwtmat,freq = pywt.cwt(x,np.arange(1,100),'cgau1',1/60,precision=10)
+    ycwtmat,freq = pywt.cwt(y,np.arange(1,100),'cgau1',1/60,precision=10)
+
+    phasex = np.arctan2( xcwtmat.imag,xcwtmat.real )
+    phasey = np.arctan2( ycwtmat.imag,ycwtmat.real )
+
+    dphase = mod_angle(phasex-phasey)
+
+    return phasex,phasey,dphase
+
 def select_freqs(freqs,precision=1):
     """
     Only return a subset of the frequencies (unique by number of decimal points) and the 
