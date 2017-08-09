@@ -123,7 +123,7 @@ def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],
         return freqs[np.argmax(avgDensity)],avgDensity
     return freqs[np.argmax(avgDensity)]
 
-def phase_and_dphase(x,y):
+def phase_and_dphase(x,y,wavelet='cgau1'):
     """
     Calculate complex phase per frequency per time and dphase for two signals
     using a continuous wavelet transform with the complex Gaussian.
@@ -142,8 +142,8 @@ def phase_and_dphase(x,y):
     """
     import pywt
 
-    xcwtmat,freqs = pywt.cwt(x,np.arange(1,100),'cgau1',1/60,precision=10)
-    ycwtmat,freqs = pywt.cwt(y,np.arange(1,100),'cgau1',1/60,precision=10)
+    xcwtmat,freqs = pywt.cwt(x,np.arange(1,100),wavelet,1/60,precision=10)
+    ycwtmat,freqs = pywt.cwt(y,np.arange(1,100),wavelet,1/60,precision=10)
 
     phasex = np.arctan2( xcwtmat.imag,xcwtmat.real )
     phasey = np.arctan2( ycwtmat.imag,ycwtmat.real )
