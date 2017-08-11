@@ -123,7 +123,7 @@ def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],
         return freqs[np.argmax(avgDensity)],avgDensity
     return freqs[np.argmax(avgDensity)]
 
-def phase_and_dphase(x,y,wavelet='cgau1'):
+def phase_and_dphase(x,y,wavelet='cgau1',sample_period=1/60,precision=10):
     """
     Calculate complex phase per frequency per time and dphase for two signals
     using a continuous wavelet transform with the complex Gaussian.
@@ -132,6 +132,11 @@ def phase_and_dphase(x,y,wavelet='cgau1'):
     ----------
     x : ndarray
     y : ndarray
+    wavelet : str,'cgau1'
+        cgau1 or complex Gaussian gives fine temporal precision but poor frequency localization
+        whereas the higher derivatives of the complex gaussian like 'cgau8' give low temporal
+        precision and high frequency precision.
+    sample_period : float,1/60
 
     Returns
     -------
@@ -142,8 +147,8 @@ def phase_and_dphase(x,y,wavelet='cgau1'):
     """
     import pywt
 
-    xcwtmat,freqs = pywt.cwt(x,np.arange(1,100),wavelet,1/60,precision=10)
-    ycwtmat,freqs = pywt.cwt(y,np.arange(1,100),wavelet,1/60,precision=10)
+    xcwtmat,freqs = pywt.cwt(x,np.arange(1,100),wavelet,sample_period,precision=precision)
+    ycwtmat,freqs = pywt.cwt(y,np.arange(1,100),wavelet,sample_period,precision=precision)
 
     phasex = np.arctan2( xcwtmat.imag,xcwtmat.real )
     phasey = np.arctan2( ycwtmat.imag,ycwtmat.real )
