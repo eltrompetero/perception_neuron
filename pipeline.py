@@ -20,7 +20,7 @@ def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
     spec_list : list
         List of twoples (invisible_fraction,window_duration).
     trial_type : str
-        Trial type.
+        Trial type. 'hand' or 'avatar'
     trials : list of VRTrial instances
     mx_freq : int,10
         Maximum frequency over which to average coherence
@@ -28,17 +28,20 @@ def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
     Returns
     -------
     cohmat : ndarray
-        Average coherence statistic over all trials.
+        Average coherence statistic over all trials. First three cols correspond to xyz dimensions
+        and last col is norm.
     cohmaterr : ndarray
-        Std of coherence statistic.
+        Standard error of the mean of coherence statistic.
     """
     from scipy.signal import coherence
-
+    
+    # First three cols correspond to xyz dimensions and last col is norm.
     cohmat = np.zeros((len(spec_list),4,len(trials)))
 
     for itrial,trial in enumerate(trials):
 	counter = 0 
 	for invisibleDur,windowDur in spec_list:
+            # Get subject and template velocities.
 	    t,subjectv = trial.subject_by_window_spec([(invisibleDur,windowDur)],
 						      trial_type,
 						      .11
@@ -64,13 +67,14 @@ def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
 									     windowDur,
 									     itrial)
 	    counter += 1
+
     ntrialmat = (cohmat!=0).sum(2)  # number of trials available for each window spec
-                              # used for normalization
+                                    # used for normalization
     cohmat[cohmat==0] = np.nan
     cohmaterr = np.nanstd(cohmat,axis=2)
     cohmat = np.nansum(cohmat,axis=2)
-    cohmat /= ntrialmat
-    cohmaterr /= np.sqrt(ntrialmat)
+    cohmat /= ntrialmat  # averaged over number of data points
+    cohmaterr /= np.sqrt(ntrialmat)  # standard error of the mean
     return cohmat,cohmaterr
 
 def extract_motionbuilder_model2(trial_type,visible_start,modelhand):

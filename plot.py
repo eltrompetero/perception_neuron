@@ -25,6 +25,32 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
+def shade_windows(vis,ax,t=None,fill_kwargs={'color':'k','alpha':.2}):
+    """
+    Given axes, shade in the places where the avatar is invisible.
+
+    Parameters
+    ----------
+    vis : ndarray
+    ax : AxesSubplot
+    t : ndarray,None
+    fill_kwargs : dict,{}
+    
+    Returns
+    -------
+    None
+    """
+    if t is None:
+        t = np.arange(len(vix))
+
+    startix = np.where(np.diff(vis)==1)[0]
+    endix = np.where(np.diff(vis)==-1)[0]
+    ylim = ax.get_ylim()
+
+    for t0,t1 in zip(startix,endix):
+        ax.fill_between([t[t0],t[t1]],*ylim,**fill_kwargs)
+    ax.set(ylim=ylim)
+
 def time_occlusion_trial(mbT,mbV,anT,anV,startEnd,visible,invisible,
                          fig=None,ax=None,
                          ylabel='Velocity (m/s)',

@@ -1233,7 +1233,7 @@ class VRTrial(object):
         try:
             data = pickle.load(open('%s/trial_dictionaries.p'%self.dr,'rb'))
         except Exception:
-            self.pickle_trial_dicts()
+            self.pickle_trial_dicts(1)
             
         data = pickle.load(open('%s/trial_dictionaries.p'%self.dr,'rb'))
         self.templateTrial = data['templateTrial']
@@ -1356,16 +1356,16 @@ class VRTrial(object):
             return selection + self.template_by_invisible_dur(windowSpec,trialType+'0')
         return selection
 
-    def visibility_by_window_spec(self,windowSpec,trialType):
-        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
+    def visibility_by_window_spec(self,windowSpec,trial_type,precision=None):
+        ix = self._fetch_windowspec_indices(windowSpec,trial_type,precision=precision)
         
         selection = []
         for i in ix:
-            selection.append(( self.windowsByPart[trialType][i][0],
-                               self.timeSplitTrials[trialType][i],
-                               self.templateSplitTrials[trialType+'visibility'][i] ))
-        if trialType.isalpha():
-            return selection + self.visibility_by_window_spec(windowSpec,trialType+'0',
+            selection.append(( self.windowsByPart[trial_type][i][0],
+                               self.timeSplitTrials[trial_type][i],
+                               self.templateSplitTrials[trial_type+'visibility'][i] ))
+        if trial_type.isalpha():
+            return selection + self.visibility_by_window_spec(windowSpec,trial_type+'0',
                                                               precision=precision)
         return selection
 
@@ -1482,7 +1482,7 @@ class VRTrial(object):
             return dphase + self.dphase_by_window_spec(windowSpec,trialType+'0')
         return dphase
 
-    def pickle_trial_dicts(self):
+    def pickle_trial_dicts(self,disp=False):
         """
         Put data for analysis into easily accessible pickles. Right now, I have visibility and hand 
         velocities for AN port data and motionbuilder files.
@@ -1506,15 +1506,21 @@ class VRTrial(object):
             else:
                 visible,invisible = load_visibility(part[:-1]+'_visibility_0.txt',self.dr)
             startEnd = [visible[0],visible[-1]]
-
+            
+            # Extract template.
             mbT,mbV = extract_motionbuilder_model2(part,startEnd[0],self.modelhandedness[trialno])
             showIx = (mbT>startEnd[0]) & (mbT<startEnd[1])
             templateTrial[part+'T'],templateTrial[part+'V'] = mbT[showIx],mbV[showIx]
-
-            anT,anX,anV,anA = extract_AN_port(df,self.modelhandedness[trialno],
-                                              rotation_angle=self.rotation[trialno])
+            
+            # Extract subject from port file.
+            anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
+                                               rotation_angle=self.rotation[trialno] )
             showIx = (anT>startEnd[0]) & (anT<startEnd[1])
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
+
+            if disp:
+                print ("For trial %s, template ends at %1.1f and subject at"+
+                       "%1.1f.")%(part,templateTrial[part+'T'][-1],subjectTrial[part+'T'][-1])
 
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             # Since the AN trial starts after the mbTrial...the offset is positive.
@@ -1528,7 +1534,8 @@ class VRTrial(object):
                                                                              1/60,
                                                                              use_univariate=True)
             
-
+            
+            # Separate the different visible trials into separate arrays.
             # Times for when visible/invisible windows start.
             start = np.zeros((len(visible)+len(invisible)),dtype=object)
             start[::2] = visible
@@ -1550,13 +1557,17 @@ class VRTrial(object):
             for spec,startendt in windowsByPart[part]:
                 startendt = ((startendt[0]-startEnd[0]).total_seconds(),
                              (startendt[1]-startEnd[0]).total_seconds())
+
+                # Save time.
                 timeix = (subjectTrial[part+'T']<=startendt[1])&(subjectTrial[part+'T']>=startendt[0])
                 t = subjectTrial[part+'T'][timeix]
-                
                 timeSplitTrials[part].append(t)
+
+                # Save velocities.
                 subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
                 templateSplitTrials[part].append( templateTrial[part+'V'](t) )
-
+                
+                # Save visibility window.
                 timeix = (templateTrial[part+'T']<=startendt[1])&(templateTrial[part+'T']>=startendt[0])
                 t = templateTrial[part+'T'][timeix]
                 templateSplitTrials[part+'visibility'].append( visibility[timeix] )
