@@ -11,7 +11,10 @@ from filter import *
 from numpy import pi
 
 
-def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
+def coherence(spec_list,trial_type,trials,
+              mx_freq=10,
+              precision=.1,
+              disp=1):
     """
     Calculate average coherence over all given trials for given window specs.
 
@@ -24,6 +27,7 @@ def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
     trials : list of VRTrial instances
     mx_freq : int,10
         Maximum frequency over which to average coherence
+    precision : float,.1
 
     Returns
     -------
@@ -42,14 +46,16 @@ def coherence(spec_list,trial_type,trials,mx_freq=10,disp=1):
 	counter = 0 
 	for invisibleDur,windowDur in spec_list:
             # Get subject and template velocities.
-	    t,subjectv = trial.subject_by_window_spec([(invisibleDur,windowDur)],
+	    sspec,t,subjectv = trial.subject_by_window_spec([(invisibleDur,windowDur)],
 						      trial_type,
-						      .11
-						     )[0][1:]
-	    t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
+						      precision
+						     )[0]
+	    tspec,t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
 							trial_type,
-							.11
-						       )[0][1:]
+							precision
+						       )[0]
+            if disp:
+                print "Subject: %s, Template: %s"%(str(sspec),str(tspec))
 
 	    if len(templatev)>0:
 		# Calculate coherence for each dimension.
