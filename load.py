@@ -1266,6 +1266,7 @@ class VRTrial(object):
             List of trials that have given window duration. Each tuple in list is a tuple of the 
             ( (invisible,total window), time, extracted velocity data ).
         """
+        raise NotImplementedError("Needs to be fixed.")
         ix = []
         i=0
         for spec,_ in self.windowsByPart[part]:
@@ -1281,6 +1282,7 @@ class VRTrial(object):
         return selection
     
     def template_by_window_dur(self,windowDur,part):
+        raise NotImplementedError("Needs to be fixed.")
         ix = []
         i=0
         for spec,_ in self.windowsByPart[part]:
@@ -1296,6 +1298,7 @@ class VRTrial(object):
         return selection
     
     def subject_by_invisible_dur(self,windowDur,part):
+        raise NotImplementedError("Needs to be fixed.")
         ix = []
         i=0
         for spec,_ in self.windowsByPart[part]:
@@ -1310,36 +1313,42 @@ class VRTrial(object):
                                self.subjectSplitTrials[part][i] ))
         return selection
 
-    def subject_by_window_spec(self,windowSpec,trialType,precision=None):
+    def subject_by_window_spec(self,windowSpec,trial_type,precision=None):
         """Automatically search through left and right hand trials."""
-        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
-        
         selection = []
-        for i in ix:
-            selection.append(( self.windowsByPart[trialType][i][0],
-                               self.timeSplitTrials[trialType][i],
-                               self.subjectSplitTrials[trialType][i] ))
-        
-        if trialType.isalpha():
-            return selection + self.subject_by_window_spec(windowSpec,trialType+'0',
-                                                           precision=precision)
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.subjectSplitTrials[trial_type][ix[0]] ))
+            # Iterate also through hand0 or avatar0, which contains the other hand..
+            if trial_type.isalpha():
+                selection += self.subject_by_window_spec([windowSpec[specix]],
+                                                             trial_type+'0',
+                                                             precision=precision)
         return selection
 
-    def template_by_window_spec(self,windowSpec,trialType,precision=None):
+    def template_by_window_spec(self,windowSpec,trial_type,precision=None):
         """Automatically search through left and right hand trials."""
-        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
-        
         selection = []
-        for i in ix:
-            selection.append(( self.windowsByPart[trialType][i][0],
-                               self.timeSplitTrials[trialType][i],
-                               self.templateSplitTrials[trialType][i] ))
-        if trialType.isalpha():
-            return selection + self.template_by_window_spec(windowSpec,trialType+'0',
-                                                            precision=precision)
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.templateSplitTrials[trial_type][ix[0]] ))
+            # Iterate also through hand0 or avatar0, which contains the other hand..
+            if trial_type.isalpha():
+                selection += self.template_by_window_spec([windowSpec[specix]],
+                                                             trial_type+'0',
+                                                             precision=precision)
         return selection
 
     def template_by_invisible_dur(self,windowDur,part):
+        raise NotImplementedError("Needs to be fixed.")
         ix = []
         i=0
         for spec,_ in self.windowsByPart[part]:
@@ -1357,16 +1366,19 @@ class VRTrial(object):
         return selection
 
     def visibility_by_window_spec(self,windowSpec,trial_type,precision=None):
-        ix = self._fetch_windowspec_indices(windowSpec,trial_type,precision=precision)
-        
         selection = []
-        for i in ix:
-            selection.append(( self.windowsByPart[trial_type][i][0],
-                               self.timeSplitTrials[trial_type][i],
-                               self.templateSplitTrials[trial_type+'visibility'][i] ))
-        if trial_type.isalpha():
-            return selection + self.visibility_by_window_spec(windowSpec,trial_type+'0',
-                                                              precision=precision)
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.templateSplitTrials[trial_type+'visibility'][ix[0]] ))
+            # Iterate also through hand0 or avatar0, which contains the other hand..
+            if trial_type.isalpha():
+                selection += self.visibility_by_window_spec([windowSpec[specix]],
+                                                             trial_type+'0',
+                                                             precision=precision)
         return selection
 
     def phase_by_window_dur(self,source,windowDur,trialType):
@@ -1381,6 +1393,7 @@ class VRTrial(object):
         trialType (str)
             'avatar', 'avatar0', 'hand', 'hand0'
         """
+        raise NotImplementedError("Needs to be fixed.")
         ix = []
         i = 0
         for spec,_ in self.windowsByPart[trialType]:
@@ -1402,23 +1415,41 @@ class VRTrial(object):
                 print "Trial %d in trial type %s not found."%(i,trialType)
         return selection
 
-    def phase_by_window_spec(self,source,windowSpec,trialType):
-        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
+    def phase_by_window_spec(self,source,windowSpec,trial_type):
+        """
+        Parameters
+        ----------
+        source : str
+        windowSpec : list
+        trial_type : str
+        """
         selection = []
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.templateSplitTrials[trial_type][ix[0]] ))
+                try:
+                    if source=='subject' or source=='s':
+                        data = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trial_type,ix[0]),'rb'))
+                        phases,vs = data['phases'],data['vs']
+                    elif source=='template' or source=='t':
+                        data = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trial_type,ix[0]),'rb'))
+                        phases,vs = data['phases'],data['vs']
+                    
+                    phases = [np.vstack(p) for p in phases]
+                    selection.append(( self.windowsByPart[trial_type][ix[0]][0],phases ))
+                except IOError:
+                    print "Trial %d in trial type %s not found."%(ix[0],trial_type)
 
-        for i in ix:
-            try:
-                if source=='subject' or source=='s':
-                    data = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
-                    phases,vs = data['phases'],data['vs']
-                elif source=='template' or source=='t':
-                    data = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
-                    phases,vs = data['phases'],data['vs']
-                
-                phases = [np.vstack(p) for p in phases]
-                selection.append(( self.windowsByPart[trialType][i][0],phases ))
-            except IOError:
-                print "Trial %d in trial type %s not found."%(i,trialType)
+            # Iterate also through hand0 or avatar0, which contains the other hand.
+            if trial_type.isalpha():
+                selection += self.phase_by_window_spec(source,
+                                                        [windowSpec[specix]],
+                                                        trial_type+'0',
+                                                        precision=precision)
         return selection
 
     def filtv_by_window_spec(self,source,windowSpec,trialType,search_all=True):
@@ -1427,6 +1458,7 @@ class VRTrial(object):
         --------
         list of twoples (windowSpec, filtv) where filtv is a list of 3 arrays corresponding to each dimension
         """
+        raise NotImplementedError()
         ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
         selection = []
 
@@ -1452,6 +1484,7 @@ class VRTrial(object):
         """
         Difference in phase between subject and template motion.
         """
+        raise NotImplementedError
         from misc.angle import mod_angle
         
         subjectPhase = self.phase_by_window_dur('s',windowDur,trialType)
@@ -1478,8 +1511,6 @@ class VRTrial(object):
         for i in xrange(len(subjectPhase)):
             dphase.append(( subjectPhase[i][0], 
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
-        if trialType.isalpha():
-            return dphase + self.dphase_by_window_spec(windowSpec,trialType+'0')
         return dphase
 
     def pickle_trial_dicts(self,disp=False):
@@ -1655,20 +1686,28 @@ class VRTrial(object):
         ix : list of ints
         """
         ix = []
-        i = 0
+        trialWindows = np.array([w[0] for w in self.windowsByPart[trial_type]])
+        i = 0  # counter
 
         if precision is None:
-            for spec,_ in self.windowsByPart[trial_type]:
-                if spec in specs:
-                    ix.append(i)
-                i += 1
-        else:
-            for spec,_ in self.windowsByPart[trial_type]:
-                specDiffs = np.abs( np.array(specs)-np.array(spec)[None,:] )
+            for spec in specs:
+                if spec in trialWindows:
+                    ix.append( (spec[None,:]==trialWindows).all(1) )
+        elif type(precision) is float:
+            for spec in specs:
+                specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
                 ix_ = (specDiffs<=precision).all(1)
                 if ix_.any():
-                    ix.append(i)
-                i += 1
+                    ix.append(np.where(ix_)[0][0])
+        elif type(precision) is tuple:
+            for spec in specs:
+                specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
+                ix_ = (specDiffs[:,0]<=precision[0])&(specDiffs[:,1]<=precision[1])
+                if ix_.any():
+                    ix.append(np.where(ix_)[0][0])
+        else:
+            raise NotImplementedError("precision type not supported.")
+
         return ix
 # end VRTrial
 

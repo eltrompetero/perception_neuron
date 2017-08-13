@@ -14,6 +14,7 @@ from numpy import pi
 def coherence(spec_list,trial_type,trials,
               mx_freq=10,
               precision=.1,
+              firstix=0,
               disp=1):
     """
     Calculate average coherence over all given trials for given window specs.
@@ -49,11 +50,11 @@ def coherence(spec_list,trial_type,trials,
 	    sspec,t,subjectv = trial.subject_by_window_spec([(invisibleDur,windowDur)],
 						      trial_type,
 						      precision
-						     )[0]
+						     )[firstix]
 	    tspec,t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
 							trial_type,
 							precision
-						       )[0]
+						       )[firstix]
             if disp:
                 print "Subject: %s, Template: %s"%(str(sspec),str(tspec))
 
