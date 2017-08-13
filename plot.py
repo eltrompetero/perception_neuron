@@ -25,7 +25,9 @@ import load,utils
 # ------------------- #
 # Plotting functions. #
 # ------------------- #
-def shade_windows(vis,ax,t=None,fill_kwargs={'color':'k','alpha':.2}):
+def shade_windows(vis,ax,t=None,
+                  fill_kwargs={'color':'k','alpha':.2},
+                  set_label=True):
     """
     Given axes, shade in the places where the avatar is invisible.
 
@@ -35,6 +37,7 @@ def shade_windows(vis,ax,t=None,fill_kwargs={'color':'k','alpha':.2}):
     ax : AxesSubplot
     t : ndarray,None
     fill_kwargs : dict,{}
+    set_label : bool,True
     
     Returns
     -------
@@ -42,14 +45,22 @@ def shade_windows(vis,ax,t=None,fill_kwargs={'color':'k','alpha':.2}):
     """
     if t is None:
         t = np.arange(len(vix))
+    
+    # Where invisible and visible regions start.
+    startix = np.where(np.diff(vis)==-1)[0]
+    endix = np.where(np.diff(vis)==1)[0]
+    if endix[0]<startix[0]:
+        startix = np.concatenate([[0],startix])
+    if len(startix)>len(endix):
+        endix = np.concatenate([endix,[len(vis)-1]])
 
-    startix = np.where(np.diff(vis)==1)[0]
-    endix = np.where(np.diff(vis)==-1)[0]
     ylim = ax.get_ylim()
+    xlim = ax.get_xlim()
 
     for t0,t1 in zip(startix,endix):
-        ax.fill_between([t[t0],t[t1]],*ylim,**fill_kwargs)
-    ax.set(ylim=ylim)
+        h = ax.fill_between([t[t0],t[t1]],*ylim,**fill_kwargs)
+    h.set_label('Invisible')
+    ax.set(ylim=ylim,xlim=xlim)
 
 def time_occlusion_trial(mbT,mbV,anT,anV,startEnd,visible,invisible,
                          fig=None,ax=None,

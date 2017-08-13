@@ -1499,7 +1499,8 @@ class VRTrial(object):
         timeSplitTrials,subjectSplitTrials,templateSplitTrials = {},{},{}
 
         for trialno,part in enumerate(['avatar','avatar0','hand','hand0']):
-            print "Processing %s..."%part
+            if disp:
+                print "Processing %s..."%part
             # Select time interval during which the trial happened.
             if part.isalpha():
                 visible,invisible = load_visibility(part+'_visibility.txt',self.dr)
@@ -1517,10 +1518,12 @@ class VRTrial(object):
                                                rotation_angle=self.rotation[trialno] )
             showIx = (anT>startEnd[0]) & (anT<startEnd[1])
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
-
+            
             if disp:
-                print ("For trial %s, template ends at %1.1f and subject at"+
-                       "%1.1f.")%(part,templateTrial[part+'T'][-1],subjectTrial[part+'T'][-1])
+                print ("For trial %s, template ends at %s and subject at "+
+                        "%s.")%(part,
+                                str(templateTrial[part+'T'][-1])[11:],
+                                str(subjectTrial[part+'T'][-1])[11:])
 
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             # Since the AN trial starts after the mbTrial...the offset is positive.
@@ -1559,20 +1562,21 @@ class VRTrial(object):
                              (startendt[1]-startEnd[0]).total_seconds())
 
                 # Save time.
-                timeix = (subjectTrial[part+'T']<=startendt[1])&(subjectTrial[part+'T']>=startendt[0])
-                t = subjectTrial[part+'T'][timeix]
-                timeSplitTrials[part].append(t)
-
-                # Save velocities.
-                subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
-                templateSplitTrials[part].append( templateTrial[part+'V'](t) )
-                
-                # Save visibility window.
                 timeix = (templateTrial[part+'T']<=startendt[1])&(templateTrial[part+'T']>=startendt[0])
                 t = templateTrial[part+'T'][timeix]
+                timeSplitTrials[part].append(t)
+
+                # Save visibility window.
                 templateSplitTrials[part+'visibility'].append( visibility[timeix] )
+                
+                # Save velocities.
+                templateSplitTrials[part].append( templateTrial[part+'V'](t) )
+                # Subject sometimes has cutoff window so must reindex time.
+                timeix = (subjectTrial[part+'T']<=startendt[1])&(subjectTrial[part+'T']>=startendt[0])
+                t = subjectTrial[part+'T'][timeix]
+                subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
             
-            # Get the beginning fully visible window. Inser this into the beginning of the list.
+            # Get the beginning fully visible window. Insert this into the beginning of the list.
             windowsByPart[part].insert(0,((0,0),(0,invisibleStart[0])))
             timeix = (subjectTrial[part+'T']>=0)&(subjectTrial[part+'T']<=invisibleStart[0])
             t = subjectTrial[part+'T'][timeix]
