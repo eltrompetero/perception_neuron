@@ -243,20 +243,24 @@ def subtract_freq_phase(subtractIx,f,dphase):
 
 def shift_phase_by_time(f,phase,time_shift):
     """
-    Subtract lower frequency phase from higher frequencies in temporal domain.
+    Time shift is subtracted from given phase. A positive time shift pushes things forwards in time
+    and a negative shift pushes things backwards (or later).
 
     Params:
     -------
-    f (ndarray)
+    f : ndarray
         Frequencies of each row of phase.
-    phase (ndarray)
+    phase : ndarray
         In units of radians.
-    time_shift (ndarray)
+    time_shift : float
+
+    Returns
+    -------
+    phase : ndarray
+        Same shape as given phase.
     """
     phase = phase.copy()
-    phase /= f[:,None]*2*np.pi
-    phase = phase-time_shift
-    phase *= f[:,None]*2*np.pi
+    phase -= f[:,None]*2*pi*time_shift
     phase = mod_angle(phase)
     return phase
 
