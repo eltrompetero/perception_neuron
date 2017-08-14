@@ -1691,8 +1691,9 @@ class VRTrial(object):
 
         if precision is None:
             for spec in specs:
-                if spec in trialWindows:
-                    ix.append( (spec[None,:]==trialWindows).all(1) )
+                ix_ = (np.array(spec)[None,:]==trialWindows).all(1)
+                if ix_.any():
+                    ix.append( np.where(ix_)[0][0] )
         elif type(precision) is float:
             for spec in specs:
                 specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
