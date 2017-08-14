@@ -78,6 +78,50 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def max_coh_time_shift(subv,temv,
+                       dtgrid=np.linspace(0,1,100),
+                       mx_freq=10,
+                       disp=False):
+    """
+    Find the global time shift that maximizes the coherence between two signals.
+    
+    Parameters
+    ----------
+    subv : ndarray
+    temv : ndarray
+    dtgrid : ndarray,np.linspace(0,1,100)
+    bds : float or tuple,1
+        Bounds for counting phase difference that is within bounds.
+    disp : bool,False
+        
+    Returns
+    -------
+    """
+    from scipy.signal import coherence
+        
+    # Convert dtgrid to index shifts.
+    dtgrid = np.unique(np.around(dtgrid*60).astype(int))
+    
+    coh = np.zeros(len(dtgrid))
+    
+    for i,dt in enumerate(dtgrid):
+        if dt<0:
+            f,c = coherence(subv[-dt:],temv[:dt],fs=60,nperseg=120)
+        elif dt>0:
+            f,c = coherence(subv[:-dt],temv[dt:],fs=60,nperseg=120)
+        else:
+            f,c = coherence(subv,temv,fs=60,nperseg=120)
+        coh[i] = abs(c)[f<mx_freq].mean()
+        
+    shiftix = np.argmax(coh)
+    
+    if disp:
+        fig,ax = plt.subplots()
+        ax.plot(dtgrid/60,coh,'o')
+        ax.set(xlabel='dt',ylabel='coherence')
+        
+    return dtgrid[shiftix]/60
+
 def min_phase_time_shift(freq,subjectAngle,templateAngle,
                          bds=1,disp=False,dtgrid=np.linspace(0,1,100)):
     """
