@@ -15,6 +15,7 @@ def coherence(spec_list,trial_type,trials,
               mx_freq=10,
               precision=.1,
               firstix=0,
+              offset=None,
               disp=1):
     """
     Calculate average coherence over all given trials for given window specs.
@@ -29,6 +30,11 @@ def coherence(spec_list,trial_type,trials,
     mx_freq : int,10
         Maximum frequency over which to average coherence
     precision : float,.1
+    firstix : int
+    offset : int,None
+        Number of indices to offset the subject and template time series. If offset>0, we skip the
+        first offset elements from subject. If offset<0, -offset elements are removed from the
+        subject.
 
     Returns
     -------
@@ -55,6 +61,11 @@ def coherence(spec_list,trial_type,trials,
 							trial_type,
 							precision
 						       )[firstix]
+            if not offset is None:
+                if offset>0:
+                    t,subjectv,templatev = t[:-offset],subjectv[offset:],templatev[:-offset]
+                elif offset<0:
+                    t,subjectv,templatev = t[:offset],subjectv[:offset],templatev[-offset:]
             if disp:
                 print "Subject: %s, Template: %s"%(str(sspec),str(tspec))
 
