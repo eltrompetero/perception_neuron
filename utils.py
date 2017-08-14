@@ -78,6 +78,52 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def min_phase_time_shift(freq,subjectAngle,templateAngle,
+                         bds=1,disp=False,dtgrid=np.linspace(0,1,100)):
+    """
+    Find the global time shift that maximizes the phase density within the threshold.
+    
+    Parameters
+    ----------
+    freq : ndarray
+    subjectAngle : ndarray
+        Subject complex angle.
+    templateAngle : ndarray
+        Template complex angle.
+    dtgrid : ndarray,np.linspace(0,1,100)
+    bds : float or tuple,1
+        Bounds for counting phase difference that is within bounds. This is not properly implemented
+        yet.
+    disp : bool,False
+        
+    Returns
+    -------
+    """
+    zeroDensity = np.zeros_like(dtgrid)
+    zeroDensityNull = np.zeros_like(dtgrid)
+    
+    for i,dt in enumerate(dtgrid):
+        subPhaseAfterShift = shift_phase_by_time(freq,subjectAngle,dt)
+        dphase = mod_angle( templateAngle-subPhaseAfterShift )
+        zeroDensity[i] = (np.abs(dphase)<bds).sum()
+        
+        temPhaseAfterShift = shift_phase_by_time(freq,templateAngle,dt)
+        dphase = mod_angle( templateAngle-temPhaseAfterShift )
+        zeroDensityNull[i] = (np.abs(dphase)<bds).sum()
+    
+    shiftix = np.argmax(zeroDensity)
+#     if (zeroDensity[shiftix]>zeroDensityNull[:shiftix]).all():
+#         print "Null model does not reach minimum before solution."
+    
+    if disp:
+        fig,ax = plt.subplots()
+        ax.plot(dtgrid,zeroDensity,'o')
+        ax.plot(dtgrid,zeroDensityNull,'ro')
+        ax.set(xlabel='dt',ylabel='zero density')
+        ax.legend(('Subject vs template','Null'),fontsize='small',numpoints=1)
+        
+    return dtgrid[shiftix]
+
 def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],
                             freqs=np.arange(1,31)*.1,
                             weights=None,
