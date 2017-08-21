@@ -94,6 +94,7 @@ def max_coh_time_shift(subv,temv,
     bds : float or tuple,1
         Bounds for counting phase difference that is within bounds.
     disp : bool,False
+    ax : AxesSubplot,None
         
     Returns
     -------

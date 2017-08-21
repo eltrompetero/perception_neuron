@@ -58,7 +58,7 @@ def shade_windows(vis,ax,t=None,
     xlim = ax.get_xlim()
 
     for t0,t1 in zip(startix,endix):
-        h = ax.fill_between([t[t0],t[t1]],*ylim,**fill_kwargs)
+        h = ax.fill_between([t[t0],t[t1]],*ylim,lw=0,**fill_kwargs)
     h.set_label('Invisible')
     ax.set(ylim=ylim,xlim=xlim)
 

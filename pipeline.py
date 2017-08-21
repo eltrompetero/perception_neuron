@@ -11,11 +11,52 @@ from filter import *
 from numpy import pi
 
 
+def max_coherence(windowSpec,trials):
+    """
+    Shifted max coherence across all trials.
+    """
+    maxcoh = np.zeros((len(trials),4))
+    
+    for trialno,trial in enumerate(trials):
+        subjectVel = trial.subject_by_window_spec([windowSpec],'hand',(.05,.11))
+        templateVel = trial.template_by_window_spec([windowSpec],'hand',(.05,.11))
+        visWindow = trial.visibility_by_window_spec([windowSpec],'hand',(.05,.11))
+
+
+        # Load data.
+        if len(subjectVel[0][2])>0:
+            subt = subjectVel[0][1]
+            subv = subjectVel[0][2]
+            subt = subt[:len(subv)]
+
+            temt = templateVel[0][1]
+            temv = templateVel[0][2]
+
+            mnlen = min([len(subt),len(temt)])
+            temt,temv = temt[:mnlen],temv[:mnlen]
+            vist = visWindow[0][1]
+
+            # coherence as graphs are time shifted.
+            cohdtShifts = np.zeros(3)
+            for i in xrange(3):
+                cohdtShifts[i] = max_coh_time_shift(subv[:,i],temv[:,i],
+                                                 disp=False,dtgrid=np.linspace(-1,1,100))
+
+            firstix = 0
+            maxcoh[trialno],_ = coherence([subjectVel[0][0]],'hand',[trial],
+                                           firstix=firstix,
+                                           precision=(.05,.1),
+                                           offset=int(-cohdtShifts[1:].mean()*60))
+        else:
+            maxcoh[trialno] = np.nan
+    return maxcoh
+
 def coherence(spec_list,trial_type,trials,
               mx_freq=10,
               precision=.1,
               firstix=0,
               offset=None,
+              null=None,
               disp=1):
     """
     Calculate average coherence over all given trials for given window specs.
@@ -35,6 +76,7 @@ def coherence(spec_list,trial_type,trials,
         Number of indices to offset the subject and template time series. If offset>0, we skip the
         first offset elements from subject. If offset<0, -offset elements are removed from the
         subject.
+    null : tuple or list of tuples,None
 
     Returns
     -------
@@ -57,15 +99,29 @@ def coherence(spec_list,trial_type,trials,
 						      trial_type,
 						      precision
 						     )[firstix]
-	    tspec,t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
-							trial_type,
-							precision
-						       )[firstix]
+            if not null is None:
+                if type(null) is list:
+                    tspec,t,templatev = trial.template_by_window_spec([null[itrial]],
+                                                                        trial_type,
+                                                                        precision
+                                                                       )[firstix]
+                else:
+                    tspec,t,templatev = trial.template_by_window_spec([null],
+                                                                        trial_type,
+                                                                        precision
+                                                                       )[firstix]
+            else:
+                tspec,t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
+                                                                    trial_type,
+                                                                    precision
+                                                                   )[firstix]
+
             if not offset is None:
                 if offset>0:
-                    t,subjectv,templatev = t[:-offset],subjectv[offset:],templatev[:-offset]
+                    t,subjectv = t[-1200:][:-offset],subjectv[-1200:][offset:]
+                    templatev = templatev[-1200:][:-offset]
                 elif offset<0:
-                    t,subjectv,templatev = t[:offset],subjectv[:offset],templatev[-offset:]
+                    t,subjectv,templatev = t[-1200:][:offset],subjectv[-1200:][:offset],templatev[-1200:][-offset:]
             if disp:
                 print "Subject: %s, Template: %s"%(str(sspec),str(tspec))
 
