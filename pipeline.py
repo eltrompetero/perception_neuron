@@ -120,7 +120,139 @@ def coherence(spec_list,trial_type,trials,
     cohmaterr /= np.sqrt(ntrialmat)  # standard error of the mean
     return cohmat,cohmaterr
 
-def coherence_null(ignore_spec,trial_type,trials,
+def coherence_null_time_shift(spec,trial_type,trials,
+                              mx_freq=10,
+                              precision=.1,
+                              firstix=0,
+                              offset=None,
+                              disp=1):
+    """
+    Calculate coherence between trials and time shifted version of signal.
+
+    Parameters
+    ----------
+    spec_list : list
+        List of twoples (invisible_fraction,window_duration).
+    trial_type : str
+        Trial type. 'hand' or 'avatar'
+    trials : list of VRTrial instances
+    mx_freq : int,10
+        Maximum frequency over which to average coherence
+    precision : float,.1
+    firstix : int
+    offset : int,None
+        Number of indices to offset the subject and template time series. If offset>0, we skip the
+        first offset elements from subject. If offset<0, -offset elements are removed from the
+        subject.
+
+    Returns
+    -------
+    cohmat : ndarray
+        Average coherence statistic over all trials. First three cols correspond to xyz dimensions
+        and last col is norm.
+    cohmaterr : ndarray
+        Standard error of the mean of coherence statistic.
+    """
+    # First three cols correspond to xyz dimensions and last col is norm.
+    cohmat = []
+    cohmaterr = []
+
+    for itrial,trial in enumerate(trials):
+	counter = 0 
+        spec_list = [w[0] for w in trial.windowsByPart[trial_type] if not
+                     isclose(w[0],spec,precision)]
+        cohmat.append( np.zeros((len(spec_list),4)) )
+	for specix,spec in enumerate(spec_list):
+            cohOutput = _compare_coherence(trial,[spec,spec],[trial_type]*2,
+                                           [precision]*2,mx_freq,
+                                           firstix,disp,offset,template_only=True)
+           
+            if not cohOutput is None:
+                f,cxy = cohOutput
+                for dimIx,c in enumerate(cxy):
+                    cohmat[-1][specix,dimIx] += c
+	    counter += 1
+
+        ntrialmat = (cohmat[-1]!=0).sum(0)  # number of trials available for each window spec
+                                            # used for normalization
+        cohmat[-1][cohmat[-1]==0] = np.nan
+        cohmaterr.append( np.nanstd(cohmat[-1],axis=0) )
+        cohmat[-1] = np.nansum(cohmat[-1],axis=0)
+        cohmat[-1] /= ntrialmat  # averaged over number of data points
+        cohmaterr[-1] /= np.sqrt(ntrialmat)  # standard error of the mean
+    return cohmat,cohmaterr
+
+def coherence_null(spec,trial_type,trials,
+                   test_signal=None,
+                   mx_freq=10,
+                   precision=.1,
+                   firstix=0,
+                   offset=None,
+                   disp=1):
+    """
+    Calculate coherence between trials and an arbitrary signal.
+
+    Parameters
+    ----------
+    spec_list : list
+        List of twoples (invisible_fraction,window_duration).
+    trial_type : str
+        Trial type. 'hand' or 'avatar'
+    trials : list of VRTrial instances
+    mx_freq : int,10
+        Maximum frequency over which to average coherence
+    precision : float,.1
+    firstix : int
+    offset : int,None
+        Number of indices to offset the subject and template time series. If offset>0, we skip the
+        first offset elements from subject. If offset<0, -offset elements are removed from the
+        subject.
+
+    Returns
+    -------
+    cohmat : ndarray
+        Average coherence statistic over all trials. First three cols correspond to xyz dimensions
+        and last col is norm.
+    cohmaterr : ndarray
+        Standard error of the mean of coherence statistic.
+    """
+    # First three cols correspond to xyz dimensions and last col is norm.
+    cohmat = []
+    cohmaterr = []
+
+    for itrial,trial in enumerate(trials):
+	counter = 0 
+        spec_list = [w[0] for w in trial.windowsByPart[trial_type] if not
+                isclose(w[0],spec,precision)]
+        cohmat.append( np.zeros((len(spec_list),4)) )
+	for specix,spec in enumerate(spec_list):
+            if test_signal is None:
+                cohOutput = _compare_coherence(trial,[spec,spec],[trial_type]*2,
+                                               [precision]*2,mx_freq,
+                                               firstix,disp,offset)
+            else:
+                cohOutput = _compare_coherence_given_vel(trial,spec,trial_type,
+                                                         precision,
+                                                         mx_freq,
+                                                         test_signal,
+                                                         firstix,disp,offset)
+           
+            if not cohOutput is None:
+                f,cxy = cohOutput
+                for dimIx,c in enumerate(cxy):
+                    cohmat[-1][specix,dimIx] += c
+	    counter += 1
+
+        ntrialmat = (cohmat[-1]!=0).sum(0)  # number of trials available for each window spec
+                                        # used for normalization
+        cohmat[-1][cohmat[-1]==0] = np.nan
+        cohmaterr.append( np.nanstd(cohmat[-1],axis=0) )
+        cohmat[-1] = np.nansum(cohmat[-1],axis=0)
+        cohmat[-1] /= ntrialmat  # averaged over number of data points
+        cohmaterr[-1] /= np.sqrt(ntrialmat)  # standard error of the mean
+    return cohmat,cohmaterr
+
+def _coherence_null(ignore_spec,trial_type,trials,
                    mx_freq=10,
                    precision=.1,
                    firstix=0,
@@ -300,6 +432,11 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
                 t = t[-1200:][:offset]
                 subjectv = subjectv[-1200:][:offset],
                 templatev = templatev[-1200:][-offset:]
+        else:
+            t = t[-1200:]
+            subjectv = subjectv[-1200:]
+            templatev = templatev[-1200:]
+
         if disp:
             print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
                                                                      tspec[0],tspec[1])
@@ -312,20 +449,80 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
         for dimIx in xrange(3):
             f,cxy_ = coherence(subjectv[:,dimIx],templatev[:,dimIx],
                                 fs=60,nperseg=120)
-
-            cxy[dimIx] = cxy_[f<mx_freq].mean()
+            cxy[dimIx] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
 
         # Coherence for velocity magnitude.
         f,cxy_ = coherence(np.linalg.norm(subjectv,axis=1),
                            np.linalg.norm(templatev,axis=1),
                            fs=60,nperseg=120)
-        cxy[3] = cxy_[f<mx_freq].mean()
+        cxy[3] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
         return f,cxy
     except Exception,err:
         if disp:
             print "No data for window spec (%1.1f,%1.1f)."%(windows[0][0],
                                                             windows[0][1])
         return
+
+def _compare_coherence_given_vel(trial,window,trial_type,precision,mx_freq,
+                                 test_signal,
+                                 firstix=0,disp=True,offset=None):
+    """
+    Compare coherence for the given windows specified for the subject and for the template.
+
+    Parameters
+    ----------
+    trial : VRTrial
+    windows
+    trial_types
+    precisions
+    """
+    from scipy.signal import coherence
+    assert len(test_signal)>=1200
+    try:
+        subjectv = test_signal
+        tspec,t,templatev = trial.template_by_window_spec([window],
+                                                            trial_type,
+                                                            precision
+                                                           )[firstix]
+        if not offset is None:
+            if offset>0:
+                t,subjectv = t[-1200:][:-offset],subjectv[-1200:][offset:]
+                templatev = templatev[-1200:][:-offset]
+            elif offset<0:
+                t = t[-1200:][:offset]
+                subjectv = subjectv[-1200:][:offset],
+                templatev = templatev[-1200:][-offset:]
+        else:
+            t = t[-1200:]
+            subjectv = subjectv[-1200:]
+            templatev = templatev[-1200:]
+
+        if disp:
+            print "Template: (%1.1f,%1.1f)"%(tspec[0],tspec[1])
+        
+        if len(subjectv)==0:
+            return
+        
+        # Calculate coherence for each dimension.
+        cxy = np.zeros(4)
+        for dimIx in xrange(3):
+            f,cxy_ = coherence(subjectv[:,dimIx],templatev[:,dimIx],
+                               fs=60,nperseg=120)
+            cxy[dimIx] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
+
+        # Coherence for velocity magnitude.
+        f,cxy_ = coherence(np.linalg.norm(subjectv,axis=1),
+                           np.linalg.norm(templatev,axis=1),
+                           fs=60,nperseg=120)
+        cxy[3] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
+        return f,cxy
+    except Exception,err:
+        print err
+        if disp:
+            print "No data for window spec (%1.1f,%1.1f)."%(window[0],
+                                                            window[1])
+        return
+
 
 def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
     """
