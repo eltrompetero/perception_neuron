@@ -57,6 +57,7 @@ def coherence(spec_list,trial_type,trials,
               firstix=0,
               offset=None,
               null=None,
+              null_trial_type=None,
               disp=1):
     """
     Calculate average coherence over all given trials for given window specs.
@@ -95,51 +96,52 @@ def coherence(spec_list,trial_type,trials,
 	counter = 0 
 	for invisibleDur,windowDur in spec_list:
             # Get subject and template velocities.
-	    sspec,t,subjectv = trial.subject_by_window_spec([(invisibleDur,windowDur)],
-						      trial_type,
-						      precision
-						     )[firstix]
-            if not null is None:
-                if type(null) is list:
-                    tspec,t,templatev = trial.template_by_window_spec([null[itrial]],
-                                                                        trial_type,
+            try:
+                sspec,t,subjectv = trial.subject_by_window_spec([(invisibleDur,windowDur)],
+                                                                trial_type,
+                                                                precision
+                                                               )[firstix]
+                if not null is None:
+                    if null_trial_type is None:
+                        null_trial_type = trial_type
+                    tspec,t,templatev = trial.template_by_window_spec([null],
+                                                                        null_trial_type,
                                                                         precision
                                                                        )[firstix]
                 else:
-                    tspec,t,templatev = trial.template_by_window_spec([null],
+                    tspec,t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
                                                                         trial_type,
                                                                         precision
                                                                        )[firstix]
-            else:
-                tspec,t,templatev = trial.template_by_window_spec([(invisibleDur,windowDur)],
-                                                                    trial_type,
-                                                                    precision
-                                                                   )[firstix]
 
-            if not offset is None:
-                if offset>0:
-                    t,subjectv = t[-1200:][:-offset],subjectv[-1200:][offset:]
-                    templatev = templatev[-1200:][:-offset]
-                elif offset<0:
-                    t,subjectv,templatev = t[-1200:][:offset],subjectv[-1200:][:offset],templatev[-1200:][-offset:]
-            if disp:
-                print "Subject: %s, Template: %s"%(str(sspec),str(tspec))
+                if not offset is None:
+                    if offset>0:
+                        t,subjectv = t[-1200:][:-offset],subjectv[-1200:][offset:]
+                        templatev = templatev[-1200:][:-offset]
+                    elif offset<0:
+                        t = t[-1200:][:offset]
+                        subjectv = subjectv[-1200:][:offset],
+                        templatev = templatev[-1200:][-offset:]
+                if disp:
+                    print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
+                                                                             tspec[0],tspec[1])
 
-	    if len(templatev)>0:
-		# Calculate coherence for each dimension.
-		for dimIx in xrange(3):
-		    f,cxy = coherence(subjectv[:,dimIx],templatev[:,dimIx],
-					fs=60,nperseg=120)
-		    cohmat[counter,dimIx,itrial] += cxy[f<mx_freq].mean()
-		# Coherence for velocity magnitude.
-		f,cxy = coherence(np.linalg.norm(subjectv,axis=1),
-				  np.linalg.norm(templatev,axis=1),
-				  fs=60,nperseg=120)
-		cohmat[counter,3,itrial] += cxy[f<mx_freq].mean()
-            elif disp:
-		print "No data for window spec (%1.1f,%1.1f) for trial %d."%(invisibleDur,
-									     windowDur,
-									     itrial)
+                if len(subjectv)>0:
+                    # Calculate coherence for each dimension.
+                    for dimIx in xrange(3):
+                        f,cxy = coherence(subjectv[:,dimIx],templatev[:,dimIx],
+                                            fs=60,nperseg=120)
+                        cohmat[counter,dimIx,itrial] += cxy[f<mx_freq].mean()
+                    # Coherence for velocity magnitude.
+                    f,cxy = coherence(np.linalg.norm(subjectv,axis=1),
+                                      np.linalg.norm(templatev,axis=1),
+                                      fs=60,nperseg=120)
+                    cohmat[counter,3,itrial] += cxy[f<mx_freq].mean()
+            except Exception:
+                if disp:
+                    print "No data for window spec (%1.1f,%1.1f) for trial %d."%(invisibleDur,
+                                                                                 windowDur,
+                                                                                 itrial)
 	    counter += 1
 
     ntrialmat = (cohmat!=0).sum(2)  # number of trials available for each window spec
