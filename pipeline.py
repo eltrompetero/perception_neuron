@@ -56,8 +56,6 @@ def coherence(spec_list,trial_type,trials,
               precision=.1,
               firstix=0,
               offset=None,
-              null=None,
-              null_trial_type=None,
               disp=1):
     """
     Calculate average coherence over all given trials for given window specs.
@@ -77,48 +75,30 @@ def coherence(spec_list,trial_type,trials,
         Number of indices to offset the subject and template time series. If offset>0, we skip the
         first offset elements from subject. If offset<0, -offset elements are removed from the
         subject.
-    null : tuple or list of tuples,None
+    disp : bool,True
 
     Returns
     -------
     cohmat : ndarray
-        Average coherence statistic over all trials. First three cols correspond to xyz dimensions
-        and last col is norm.
+        Coherence statistic for all trials and all given window specs for xyz and vel norm.
     cohmaterr : ndarray
-        Standard error of the mean of coherence statistic.
+        Standard error of the mean of coherence statistic across trials.
     """
+    # In last dim, first three cols correspond to xyz dimensions and last col is norm.
+    cohmat = np.zeros((len(trials),len(spec_list),4))
     
-    # First three cols correspond to xyz dimensions and last col is norm.
-    cohmat = np.zeros((len(spec_list),4,len(trials)))
-
     for itrial,trial in enumerate(trials):
-	counter = 0 
-	for spec in spec_list:
+	for specix,spec in enumerate(spec_list):
             # Get subject and template velocities.
-            if null is None:
-                cohOutput = _compare_coherence(trial,[spec]*2,[trial_type]*2,[precision]*2,mx_freq,
-                                               firstix,disp,offset)
-            else:
-                if null_trial_type is None:
-                    null_trial_type = trial_type
-                cohOutput = _compare_coherence(trial,[spec,null],[trial_type,null_trial_type],
-                                               [precision]*2,
-                                               mx_freq,firstix,disp,offset)
-            
+            cohOutput = _compare_coherence(trial,[spec]*2,[trial_type]*2,[precision]*2,mx_freq,
+                                           firstix=firstix,disp=disp,offset=offset)
+                        
             if not cohOutput is None:
-                f,cxy = cohOutput
-                for dimIx,c in enumerate(cxy):
-                    cohmat[counter,dimIx,itrial] += c
-	    counter += 1
-
-    ntrialmat = (cohmat!=0).sum(2)  # number of trials available for each window spec
-                                    # used for normalization
-    cohmat[cohmat==0] = np.nan
-    cohmaterr = np.nanstd(cohmat,axis=2)
-    cohmat = np.nansum(cohmat,axis=2)
-    cohmat /= ntrialmat  # averaged over number of data points
-    cohmaterr /= np.sqrt(ntrialmat)  # standard error of the mean
-    return cohmat,cohmaterr
+                f,cohmat[itrial,specix,:] = cohOutput
+            else:
+                cohmat[itrial,specix,:] = np.nan
+    
+    return cohmat,np.nanstd(cohmat,axis=0)/np.sqrt((np.isnan(cohmat[:,0,0])==0).sum())
 
 def coherence_null_visible(spec_list,trial_type,trials,
                           mx_freq=10,
@@ -139,7 +119,7 @@ def coherence_null_visible(spec_list,trial_type,trials,
     mx_freq : int,10
         Maximum frequency over which to average coherence
     precision : float,.1
-    firstix : int
+    firstix : int,0
     offset : int,None
         Number of indices to offset the subject and template time series. If offset>0, we skip the
         first offset elements from subject. If offset<0, -offset elements are removed from the
@@ -155,21 +135,19 @@ def coherence_null_visible(spec_list,trial_type,trials,
         Standard error of the mean of coherence statistic down the columns.
     """
     # First three cols correspond to xyz dimensions and last col is norm.
-    cohmat = np.zeros((len(trials),4))
-    cohmaterr = np.zeros((len(trials),4))
+    cohmat = np.zeros((len(trials),len(spec_list),4))
     
     for itrial,trial in enumerate(trials):
-	counter = 0 
 	for specix,spec in enumerate(spec_list):
             cohOutput = _compare_coherence_vis(trial,spec,trial_type,
                                                precision,mx_freq,
                                                firstix,disp,offset)
            
             if not cohOutput is None:
-                f,cohmat[itrial] = cohOutput
+                f,cohmat[itrial,specix,:] = cohOutput
             else:
-                cohmat[itrial] = np.nan
-    return cohmat,np.nanstd(cohmat,axis=0)/np.sqrt((np.isnan(cohmat[:,0])==0).sum())
+                cohmat[itrial,specix,:] = np.nan
+    return cohmat,np.nanstd(cohmat,axis=0)/np.sqrt((np.isnan(cohmat[:,0,0])==0).sum())
 
 def coherence_null_time_shift(spec_list,trial_type,trials,
                               mx_freq=10,
@@ -206,8 +184,7 @@ def coherence_null_time_shift(spec_list,trial_type,trials,
         Standard error of the mean of coherence statistic.
     """
     # First three cols correspond to xyz dimensions and last col is norm.
-    cohmat = np.zeros((len(trials),4))
-    cohmaterr = np.zeros((len(trials),4))
+    cohmat = np.zeros((len(trials),len(spec_list),4))
     
     for itrial,trial in enumerate(trials):
 	for specix,spec in enumerate(spec_list):
@@ -216,11 +193,11 @@ def coherence_null_time_shift(spec_list,trial_type,trials,
                                            firstix,disp,offset,template_only=True)
            
             if not cohOutput is None:
-                f,cohmat[itrial] = cohOutput
+                f,cohmat[itrial,specix,:] = cohOutput
             else:
-                cohmat[itrial] = np.nan
+                cohmat[itrial,specix,:] = np.nan
     
-    return cohmat,np.nanstd(cohmat,axis=0)/np.sqrt((np.isnan(cohmat[:,0])==0).sum())
+    return cohmat,np.nanstd(cohmat,axis=0)/np.sqrt((np.isnan(cohmat[:,0,0])==0).sum())
 
 def coherence_null(spec_list,trial_type,trials,test_signal,
                    mx_freq=10,
@@ -241,7 +218,7 @@ def coherence_null(spec_list,trial_type,trials,test_signal,
     mx_freq : int,10
         Maximum frequency over which to average coherence
     precision : float,.1
-    firstix : int
+    firstix : int,0
     offset : int,None
         Number of indices to offset the subject and template time series. If offset>0, we skip the
         first offset elements from subject. If offset<0, -offset elements are removed from the
@@ -257,8 +234,7 @@ def coherence_null(spec_list,trial_type,trials,test_signal,
         Standard error of the mean of coherence statistic.
     """
     # First three cols correspond to xyz dimensions and last col is norm.
-    cohmat = np.zeros((len(trials),4))
-    cohmaterr = np.zeros((len(trials),4))
+    cohmat = np.zeros((len(trials),len(spec_list),4))
 
     for itrial,trial in enumerate(trials):
 	for specix,spec in enumerate(spec_list):
@@ -268,11 +244,11 @@ def coherence_null(spec_list,trial_type,trials,test_signal,
                                                      firstix=firstix,disp=disp,offset=offset)
            
             if not cohOutput is None:
-                f,cohmat[itrial] = cohOutput
+                f,cohmat[itrial,specix,:] = cohOutput
             else:
-                cohmat[itrial] = np.nan
+                cohmat[itrial,specix,:] = np.nan
 
-    return cohmat,np.nanstd(cohmaterr,axis=0)/np.sqrt((np.isnan(cohmat[:,0])==0).sum())
+    return cohmat,np.nanstd(cohmat,axis=0)/np.sqrt((np.isnan(cohmat[:,0,0])==0).sum())
 
 def _coherence_null(ignore_spec,trial_type,trials,
                    mx_freq=10,
@@ -439,13 +415,13 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
                                                           )[firstix]
         else:
             sspec,t,subjectv = trial.subject_by_window_spec([windows[0]],
-                                                              trial_types[0],
-                                                              precisions[0]
-                                                             )[firstix]
+                                                             trial_types[0],
+                                                             precisions[0]
+                                                            )[firstix]
         tspec,t,templatev = trial.template_by_window_spec([windows[1]],
-                                                            trial_types[1],
-                                                            precisions[1]
-                                                           )[firstix]
+                                                           trial_types[1],
+                                                           precisions[1]
+                                                          )[firstix]
         if not offset is None:
             if offset>0:
                 t,subjectv = t[-1200:][:-offset],subjectv[-1200:][offset:]
@@ -458,6 +434,7 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
             t = t[-1200:]
             subjectv = subjectv[-1200:]
             templatev = templatev[-1200:]
+        assert (len(subjectv)==1200) and (len(templatev)==1200)
 
         if disp:
             print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
@@ -468,15 +445,17 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
         
         # Calculate coherence for each dimension.
         cxy = np.zeros(4)
+        noverlap,nperseg = 30,90
+        nfft = nperseg*2
         for dimIx in xrange(3):
             f,cxy_ = coherence(subjectv[:,dimIx],templatev[:,dimIx],
-                                fs=60,nperseg=120)
+                               fs=60,nperseg=nperseg,noverlap=noverlap,nfft=nfft)
             cxy[dimIx] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
-
+        
         # Coherence for velocity magnitude.
         f,cxy_ = coherence(np.linalg.norm(subjectv,axis=1),
                            np.linalg.norm(templatev,axis=1),
-                           fs=60,nperseg=120)
+                           fs=60,nperseg=nperseg,noverlap=noverlap,nfft=nfft)
         cxy[3] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
         return f,cxy
     except Exception,err:
@@ -523,6 +502,7 @@ def _compare_coherence_vis(trial,window,trial_type,precision,mx_freq,
             t = t[-1200:]
             visibility = visibility[-1200:]
             templatev = templatev[-1200:]
+        assert (len(visibility)==1200) and (len(templatev)==1200)
 
         if disp:
             print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
@@ -581,6 +561,7 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
             t = t[-1200:]
             subjectv = subjectv[-1200:]
             templatev = templatev[-1200:]
+        assert (len(subjectv)==1200) and (len(templatev)==1200)
 
         if disp:
             print "Template: (%1.1f,%1.1f)"%(tspec[0],tspec[1])
