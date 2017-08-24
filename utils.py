@@ -78,21 +78,40 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
-def cwt_coherence(x,y,nskip,scale=np.arange(10,100),**kwargs):
-    # Use the wavelet transform to measure coherence.
+def cwt_coherence(x,y,nskip,scale=np.arange(10,100),mx_freq=10,**kwargs):
+    """
+    Use the wavelet transform to measure coherence.
+
+    Parameters
+    ----------
+    x : ndarray
+    y : ndarray
+    nskip : int
+    scale : list
+    mx_freq : float,10
+    **kwargs
+
+    Returns
+    -------
+    avgCoherence : array
+        Averaged over all frequencies <mx_freq Hz.
+    """
+    import pywt
+    assert len(x)==len(y)
     xcwt,f = pywt.cwt(x,scale,'cgau1',sampling_period=1/60,**kwargs)
     ycwt,f = pywt.cwt(y,scale,'cgau1',sampling_period=1/60,**kwargs)
     
     # Get indices of points with some overlap.
-    selectix = np.arange(nskip,len(subv),nskip,dtype=int)
+    selectix = np.arange(nskip,len(x),nskip,dtype=int)
 
     Psub = ( np.abs(xcwt[:,selectix])**2 ).mean(-1)
     Pav = ( np.abs(ycwt[:,selectix])**2 ).mean(-1)
-    Pcross = ( np.abs(xcwt[:,selectix]*ycwt[:,selectix].conjugate()) ).mean(-1)
-
+    Pcross = ( xcwt[:,selectix]*ycwt[:,selectix].conjugate() ).mean(-1)
+    
     coh = np.abs(Pcross)**2/Psub/Pav
 
-    return -np.trapz(coh[f<10],x=f[f<10])/(f[f<10].max()-f[f<10].min())
+    return -(np.trapz(coh[f<mx_freq],x=f[f<mx_freq]) / 
+             (f[f<mx_freq].max()-f[f<mx_freq].min()) )
 
 def max_coh_time_shift(subv,temv,
                        dtgrid=np.linspace(0,1,100),
