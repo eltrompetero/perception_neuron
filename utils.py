@@ -23,7 +23,7 @@ import multiprocess as mp
 from scipy.optimize import minimize
 from scipy.signal import spectrogram,savgol_filter,fftconvolve
 from misc.angle import *
-
+import pywt
 
 # ================== # 
 # Class definitions.
@@ -78,6 +78,27 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def tf_coherence(x,y,S):
+    """
+    Parameters
+    ----------
+    x : ndarray
+    y : ndarray
+    S : ndarray
+        Smoothing filter for 2d convolution.
+    """
+    from scipy.signal import convolve2d
+
+    xcwt,f = pywt.cwt(x,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
+    ycwt,f = pywt.cwt(y,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
+
+    smoothx = convolve2d(np.abs(xcwt)**2,S,mode='same')
+    smoothy = convolve2d(np.abs(ycwt)**2,S,mode='same')
+    smoothxy = convolve2d(xcwt*ycwt.conjugate(),S,mode='same')
+
+    smoothcoh = smoothxy/np.sqrt(smoothx*smoothy)
+    return f,smoothcoh
+
 def coherence_before_vis(subcwt,avcwt,f,vis,dt,min_freq=0,max_freq=10):
     """
     Coherence using the wavelet transform for dt seconds around the visibility turning back on.
