@@ -56,6 +56,7 @@ def coherence(spec_list,trial_type,trials,
               precision=.1,
               firstix=0,
               offset=None,
+              cwt=False,
               disp=1):
     """
     Calculate average coherence over all given trials for given window specs.
@@ -91,7 +92,7 @@ def coherence(spec_list,trial_type,trials,
 	for specix,spec in enumerate(spec_list):
             # Get subject and template velocities.
             cohOutput = _compare_coherence(trial,[spec]*2,[trial_type]*2,[precision]*2,mx_freq,
-                                           firstix=firstix,disp=disp,offset=offset)
+                                           firstix=firstix,disp=disp,offset=offset,cwt=cwt)
                         
             if not cohOutput is None:
                 f,cohmat[itrial,specix,:] = cohOutput
@@ -395,16 +396,26 @@ def isclose(spec1,spec2,precision):
 
 def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
                        firstix=0,disp=True,offset=None,
-                       template_only=False):
+                       template_only=False,cwt=False):
     """
     Compare coherence for the given windows specified for the subject and for the template.
 
     Parameters
     ----------
     trial : VRTrial
-    windows
-    trial_types
-    precisions
+    windows : list of tuples
+    trial_types : list of strings
+    precisions : list of precision
+    mx_freq : float
+    firstix : int,0
+    disp : bool,True
+    offset : int,None
+    template_only : bool,False
+    cwt : bool,False
+        If True, compute coherence using continuous wavelet transform.
+
+    Returns
+    -------
     """
     from scipy.signal import coherence
     try:
@@ -444,18 +455,27 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
             return
         
         # Calculate coherence for each dimension.
-        cxy = np.zeros(4)
+        cxy = np.zeros(4)  # averaged coherence
         noverlap,nperseg = 30,90
         nfft = nperseg*2
         for dimIx in xrange(3):
-            f,cxy_ = coherence(subjectv[:,dimIx],templatev[:,dimIx],
-                               fs=60,nperseg=nperseg,noverlap=noverlap,nfft=nfft)
+            if cwt:
+                f,cxy_ = cwt_coherence(subjectv[:,dimIx],templatev[:,dimIx],noverlap)
+                cxy_ *= -1
+            else:
+                f,cxy_ = coherence(subjectv[:,dimIx],templatev[:,dimIx],
+                                   fs=60,nperseg=nperseg,noverlap=noverlap,nfft=nfft)
+
             cxy[dimIx] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
         
         # Coherence for velocity magnitude.
-        f,cxy_ = coherence(np.linalg.norm(subjectv,axis=1),
-                           np.linalg.norm(templatev,axis=1),
-                           fs=60,nperseg=nperseg,noverlap=noverlap,nfft=nfft)
+        if cwt:
+            f,cxy_ = cwt_coherence(subjectv[:,dimIx],templatev[:,dimIx],noverlap)
+            cxy_ *= -1
+        else:
+            f,cxy_ = coherence(np.linalg.norm(subjectv,axis=1),
+                               np.linalg.norm(templatev,axis=1),
+                               fs=60,nperseg=nperseg,noverlap=noverlap,nfft=nfft)
         cxy[3] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
         return f,cxy
     except Exception,err:

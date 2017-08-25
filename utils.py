@@ -78,6 +78,52 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def coherence_before_vis(subcwt,avcwt,f,vis,dt,min_freq=0,max_freq=10):
+    """
+    Coherence using the wavelet transform for dt seconds around the visibility turning back on.
+    
+    Parameters
+    ----------
+    subcwt
+    avcwt
+    f : ndarray
+        Frequencies.
+    vis
+    dt : float
+        temporal distance from the start of a new visibility section. Positive value is for
+        before visibility starts.
+    min_freq : float,0
+    max_freq : float,10
+
+    Returns
+    -------
+    Average coherence between (min_freq,max_freq).
+    """
+    # Get indices of points near the end of the invisibility window.
+    dtprev = int(dt*60)
+    visStartIx = np.where(np.diff(vis)==1)[0]-dtprev
+    visStartIx = visStartIx[(visStartIx>=0)&(visStartIx<len(vis))]
+
+    Psub = ( np.abs(subcwt[:,visStartIx])**2 ).mean(-1)
+    Pav = ( np.abs(avcwt[:,visStartIx])**2 ).mean(-1)
+    Pcross = ( subcwt[:,visStartIx]*avcwt[:,visStartIx].conjugate() ).mean(-1)
+    
+    
+    coh = np.abs(Pcross)**2/Psub/Pav
+    freqix = (f>=min_freq)&(f<=max_freq)
+
+    # Errors.
+    #print ( Psub/( np.abs(subcwt[:,visStartIx])**2 ).std(-1) )[freqix]
+    #print ( Pav/( np.abs(avcwt[:,visStartIx])**2 ).std(-1) )[freqix]
+    #print ( np.abs(Pcross)**2/(np.abs( subcwt[:,visStartIx]*avcwt[:,visStartIx].conjugate()
+    #    )**2).std(-1) )[freqix]
+
+
+    avgC = np.trapz(coh[freqix],x=f[freqix])/(f[freqix].max()-f[freqix].min())
+    if avgC<0:
+        return -avgC
+    return avgC
+
 def cwt_coherence(x,y,nskip,scale=np.arange(10,100),mx_freq=10,**kwargs):
     """
     Use the wavelet transform to measure coherence.
@@ -93,8 +139,8 @@ def cwt_coherence(x,y,nskip,scale=np.arange(10,100),mx_freq=10,**kwargs):
 
     Returns
     -------
-    avgCoherence : array
-        Averaged over all frequencies <mx_freq Hz.
+    f : ndarray
+    coherence : ndarray
     """
     import pywt
     assert len(x)==len(y)
@@ -107,11 +153,9 @@ def cwt_coherence(x,y,nskip,scale=np.arange(10,100),mx_freq=10,**kwargs):
     Psub = ( np.abs(xcwt[:,selectix])**2 ).mean(-1)
     Pav = ( np.abs(ycwt[:,selectix])**2 ).mean(-1)
     Pcross = ( xcwt[:,selectix]*ycwt[:,selectix].conjugate() ).mean(-1)
-    
     coh = np.abs(Pcross)**2/Psub/Pav
 
-    return -(np.trapz(coh[f<mx_freq],x=f[f<mx_freq]) / 
-             (f[f<mx_freq].max()-f[f<mx_freq].min()) )
+    return f,coh
 
 def max_coh_time_shift(subv,temv,
                        dtgrid=np.linspace(0,1,100),
