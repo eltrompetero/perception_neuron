@@ -78,6 +78,53 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def phase_coherence(x,y):
+    """
+    Parameters
+    ----------
+    x : ndarray
+    y : ndarray
+    S : ndarray
+        Smoothing filter for 2d convolution.
+
+    Returns
+    -------
+    Phase coherence
+    """
+    xcwt,f = pywt.cwt(x,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
+    ycwt,f = pywt.cwt(y,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
+
+    smoothx = np.abs(xcwt)
+    smoothy = np.abs(ycwt)
+    smoothxy = xcwt*ycwt.conjugate()
+
+    smoothcoh = smoothxy.mean(1) / ( smoothx*smoothy ).mean(1)
+    return f,smoothcoh
+
+def tf_phase_coherence(x,y,S):
+    """
+    Parameters
+    ----------
+    x : ndarray
+    y : ndarray
+    S : ndarray
+        Smoothing filter for 2d convolution.
+
+    Returns
+    -------
+    """
+    from scipy.signal import convolve2d
+
+    xcwt,f = pywt.cwt(x,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
+    ycwt,f = pywt.cwt(y,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
+
+    smoothx = convolve2d(np.abs(xcwt),S,mode='same')
+    smoothy = convolve2d(np.abs(ycwt),S,mode='same')
+    smoothxy = convolve2d(xcwt*ycwt.conjugate(),S,mode='same')
+    
+    smoothcoh = smoothxy.mean(1) / ( smoothx*smoothy ).mean(1)
+    return f,smoothcoh
+
 def tf_coherence(x,y,S):
     """
     Parameters
