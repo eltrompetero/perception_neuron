@@ -1578,7 +1578,8 @@ class VRTrial(object):
             start = np.cumsum(start)
             invisibleStart = start[::2]
             visibleStart = start[1::2] 
-
+            
+            # When target is invisible, set visibility to 0.
             visibility = np.ones_like(templateTrial[part+'T'])
             for i,j in zip(invisibleStart,visibleStart):
                 visibility[(templateTrial[part+'T']>=i) & (templateTrial[part+'T']<j)] = 0

@@ -46,8 +46,9 @@ def shade_windows(vis,ax,t=None,
     if t is None:
         t = np.arange(len(vix))
     
-    # Where invisible and visible regions start.
+    # Where invisible regions start.
     startix = np.where(np.diff(vis)==-1)[0]
+    # and where they end
     endix = np.where(np.diff(vis)==1)[0]
     if endix[0]<startix[0]:
         startix = np.concatenate([[0],startix])

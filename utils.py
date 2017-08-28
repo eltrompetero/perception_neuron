@@ -146,6 +146,32 @@ def tf_coherence(x,y,S):
     smoothcoh = smoothxy/np.sqrt(smoothx*smoothy)
     return f,smoothcoh
 
+def corrcoef_before_vis(subv,avv,vis,dt):
+    """
+    Coherence using the wavelet transform for dt seconds around the visibility turning back on.
+    
+    Parameters
+    ----------
+    subv : ndarray
+        Subject velocity.
+    avv : ndarray
+        Avatar velocity.
+    vis : ndarray
+    dt : float
+        Time to look back behind or after visibility turns on. Positive values correspond to looking
+        after the window.
+
+    Returns
+    -------
+    """
+    # Get indices of points near the end of the invisibility window.
+    dtprev = int(dt*60)
+    visStartIx = np.where(np.diff(vis)==1)[0]+dtprev
+    # Apply bounds.
+    visStartIx = visStartIx[(visStartIx>=0)&(visStartIx<len(vis))]
+    
+    return np.corrcoef(subv[visStartIx],avv[visStartIx])[0,1]
+
 def coherence_before_vis(subcwt,avcwt,f,vis,dt,min_freq=0,max_freq=10):
     """
     Coherence using the wavelet transform for dt seconds around the visibility turning back on.
