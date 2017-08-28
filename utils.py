@@ -118,11 +118,11 @@ def tf_phase_coherence(x,y,S):
     xcwt,f = pywt.cwt(x,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
     ycwt,f = pywt.cwt(y,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
 
-    smoothx = convolve2d(np.abs(xcwt),S,mode='same')
-    smoothy = convolve2d(np.abs(ycwt),S,mode='same')
+    smoothx = convolve2d(np.abs(xcwt)**2,S,mode='same')
+    smoothy = convolve2d(np.abs(ycwt)**2,S,mode='same')
     smoothxy = convolve2d(xcwt*ycwt.conjugate(),S,mode='same')
     
-    smoothcoh = smoothxy.mean(1) / ( smoothx*smoothy ).mean(1)
+    smoothcoh = smoothxy.mean(1) / np.sqrt(( smoothx*smoothy ).mean(1))
     return f,smoothcoh
 
 def tf_coherence(x,y,S):
@@ -176,7 +176,6 @@ def coherence_before_vis(subcwt,avcwt,f,vis,dt,min_freq=0,max_freq=10):
     Pav = ( np.abs(avcwt[:,visStartIx])**2 ).mean(-1)
     Pcross = ( subcwt[:,visStartIx]*avcwt[:,visStartIx].conjugate() ).mean(-1)
     
-    
     coh = np.abs(Pcross)**2/Psub/Pav
     freqix = (f>=min_freq)&(f<=max_freq)
 
@@ -186,13 +185,12 @@ def coherence_before_vis(subcwt,avcwt,f,vis,dt,min_freq=0,max_freq=10):
     #print ( np.abs(Pcross)**2/(np.abs( subcwt[:,visStartIx]*avcwt[:,visStartIx].conjugate()
     #    )**2).std(-1) )[freqix]
 
-
-    avgC = np.trapz(coh[freqix],x=f[freqix])/(f[freqix].max()-f[freqix].min())
+    avgC = np.trapz(coh[freqix],x=f[freqix]) / (f[freqix].max()-f[freqix].min())
     if avgC<0:
         return -avgC
     return avgC
 
-def cwt_coherence(x,y,nskip,scale=np.arange(10,100),mx_freq=10,**kwargs):
+def cwt_coherence(x,y,nskip,scale=np.logspace(0,2,100),**kwargs):
     """
     Use the wavelet transform to measure coherence.
 
@@ -202,7 +200,6 @@ def cwt_coherence(x,y,nskip,scale=np.arange(10,100),mx_freq=10,**kwargs):
     y : ndarray
     nskip : int
     scale : list
-    mx_freq : float,10
     **kwargs
 
     Returns

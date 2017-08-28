@@ -1193,7 +1193,7 @@ def window_specs(person,dr):
 # Class definitions. #
 # ------------------ #
 class VRTrial(object):
-    def __init__(self,person,modelhandedness,rotation,dr):
+    def __init__(self,person,modelhandedness,rotation,dr,fname='trial_dictionaries.p'):
         """
         Params:
         -------
@@ -1231,11 +1231,11 @@ class VRTrial(object):
         self.dr = dr
         
         try:
-            data = pickle.load(open('%s/trial_dictionaries.p'%self.dr,'rb'))
+            data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
         except Exception:
             self.pickle_trial_dicts(1)
             
-        data = pickle.load(open('%s/trial_dictionaries.p'%self.dr,'rb'))
+        data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
         self.templateTrial = data['templateTrial']
         self.subjectTrial = data['subjectTrial']
         self.timeSplitTrials = data['timeSplitTrials']

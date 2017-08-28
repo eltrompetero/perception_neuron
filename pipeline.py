@@ -693,7 +693,6 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     from datetime import datetime
 
     anT = np.array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
-    # anT = vectorize(datetime.utcfromtimestamp)(df['Timestamp'].values.astype(int)*1e-9)
     
     # Extract only necessary body part from the dataframe.
     df = load_calc('',cols='XVA',zd=False,df=df.iloc[:,1:])
