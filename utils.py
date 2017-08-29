@@ -146,41 +146,51 @@ def tf_coherence(x,y,S):
     smoothcoh = smoothxy/np.sqrt(smoothx*smoothy)
     return f,smoothcoh
 
-def window_mutual_info(avv,vis,dt0,dt1):
+def window_mutual_info(vel,vis,dt0,dt1,vel1=None,select_vis_start=True):
     """
     Mutual information between visible and invisible portions of window. Right now, this only looks
     for information in the sign of the average.
     
     Parameters
     ----------
-    avv : ndarray
+    vel : ndarray
         Avatar velocity.
     vis : ndarray
     dt0 : float
         Time to look back behind visibility turns on. 
     dt1 : float
         Time to look back after visibility turns on. 
+    vel1 : ndarray,None
+    select_vis_start : bool,True
     
     Returns
     -------
+    mi 
     """
-    from entropy import mi,joint_p_mat
+    from entropy import MI,joint_p_mat
 
     dt0,dt1 = int(dt0*60),int(dt1*60)
-    visStartIx = np.where(np.diff(vis)==1)[0]
+    if select_vis_start:
+        visStartIx = np.where(np.diff(vis)==1)[0]
+    else:
+        visStartIx = np.where(np.diff(vis)==-1)[0]
     dt0ix = visStartIx-dt0
     dt1ix = visStartIx+dt1
     
+    assert ( (dt0ix<visStartIx) & (visStartIx<dt1ix) ).all()
+    
     # Keep indices within bounds of array.
-    keepix = (dt0ix>=0) & (dt1ix<len(avv))
+    keepix = (dt0ix>=0) & (dt1ix<len(vel))
     dt0ix,dt1ix = dt0ix[keepix],dt1ix[keepix]
     visStartIx = visStartIx[keepix]
     
     v = np.zeros((len(dt0ix),2))
+    if vel1 is None:
+        vel1 = vel
     for i,(t0,t1,t2) in enumerate(zip(dt0ix,visStartIx,dt1ix)):
-        v[i] = np.sign(avv[t0:t1].mean()),np.sign(avv[t1:t2].mean())
-
-    return mi( joint_p_mat(v,[0],[1]) )
+        v[i] = np.sign(vel[t0:t1].mean()),np.sign(vel1[t1:t2].mean())
+    
+    return MI( joint_p_mat(v,[0],[1]) )
 
 def mean_window_v(avv,vis,dt0,dt1):
     """
