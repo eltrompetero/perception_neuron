@@ -146,6 +146,42 @@ def tf_coherence(x,y,S):
     smoothcoh = smoothxy/np.sqrt(smoothx*smoothy)
     return f,smoothcoh
 
+def window_mutual_info(avv,vis,dt0,dt1):
+    """
+    Mutual information between visible and invisible portions of window. Right now, this only looks
+    for information in the sign of the average.
+    
+    Parameters
+    ----------
+    avv : ndarray
+        Avatar velocity.
+    vis : ndarray
+    dt0 : float
+        Time to look back behind visibility turns on. 
+    dt1 : float
+        Time to look back after visibility turns on. 
+    
+    Returns
+    -------
+    """
+    from entropy import mi,joint_p_mat
+
+    dt0,dt1 = int(dt0*60),int(dt1*60)
+    visStartIx = np.where(np.diff(vis)==1)[0]
+    dt0ix = visStartIx-dt0
+    dt1ix = visStartIx+dt1
+    
+    # Keep indices within bounds of array.
+    keepix = (dt0ix>=0) & (dt1ix<len(avv))
+    dt0ix,dt1ix = dt0ix[keepix],dt1ix[keepix]
+    visStartIx = visStartIx[keepix]
+    
+    v = np.zeros((len(dt0ix),2))
+    for i,(t0,t1,t2) in enumerate(zip(dt0ix,visStartIx,dt1ix)):
+        v[i] = np.sign(avv[t0:t1].mean()),np.sign(avv[t1:t2].mean())
+
+    return mi( joint_p_mat(v,[0],[1]) )
+
 def mean_window_v(avv,vis,dt0,dt1):
     """
     Return velocity trajectory averaged across windows for a single trial.
