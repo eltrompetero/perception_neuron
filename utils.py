@@ -146,6 +146,40 @@ def tf_coherence(x,y,S):
     smoothcoh = smoothxy/np.sqrt(smoothx*smoothy)
     return f,smoothcoh
 
+def mean_window_v(avv,vis,dt0,dt1):
+    """
+    Return velocity trajectory averaged across windows for a single trial.
+    
+    Parameters
+    ----------
+    avv : ndarray
+        Avatar velocity.
+    vis : ndarray
+    dt0 : float
+        Time to look back behind visibility turns on. 
+    dt1 : float
+        Time to look back after visibility turns on. 
+    
+    Returns
+    -------
+    vMean : ndarray
+    vStd : ndarray
+    """
+    dt0,dt1 = int(dt0*60),int(dt1*60)
+    visStartIx = np.where(np.diff(vis)==1)[0]
+    dt0ix = visStartIx-dt0
+    dt1ix = visStartIx+dt1
+    
+    # Keep indices within bounds of array.
+    keepix = (dt0ix>=0) & (dt1ix<len(avv))
+    dt0ix,dt1ix = dt0ix[keepix],dt1ix[keepix]
+
+    v = np.zeros((len(dt0ix),(dt1ix-dt0ix).min()))
+    for i,(t0,t1) in enumerate(zip(dt0ix,dt1ix)):
+        v[i] = avv[t0:t0+v.shape[1]]
+    
+    return v.mean(0),v.std(0)
+
 def corrcoef_before_vis(subv,avv,vis,dt):
     """
     Coherence using the wavelet transform for dt seconds around the visibility turning back on.
