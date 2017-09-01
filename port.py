@@ -42,35 +42,36 @@ def _format_port_output(s):
 
 def record_AN_port(fname):
     """
-    Start recording data from Axis Neuron port at some predetermined time and saves it to file name.
-    
-    Params:
+    Start recording data from Axis Neuron port when presence of start.txt is detected and stop when
+    end.txt is detected in C:/Users/Eddie/Dropbox/Sync_trials/Data.
+
+    Parameters
+    ----------
+    fname : str
+
+    Returns
     -------
-    fname (str)
+    None
     """
+    f = open(fname,'w')
+
+    # Check that recording has started as given by presence of lock file.
     while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/start.txt'):
         pause.seconds(1)
-
-    data = []  # Port output.
-    portOut = [datetime.now()]*2
-    startTime = datetime.now()
-    max_wait_time = 1000
-    while ( (not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/end.txt')) and
-            (datetime.now()-startTime).total_seconds()<max_wait_time ):
-        portOut = read_port()
-        data.append(portOut)
     
+    # Write header line.
     headers = list(calc_file_headers())
     headers[-1] = ''.join(headers[-1].split())  # Remove space in last column header.
-    with open(fname,'w') as f:
-        f.write('Start time: %s\n'%data[0][0].isoformat())
-        f.write('End time: %s\n\n'%data[-1][0].isoformat())
-        f.write('Timestamp '+' '.join(headers)+'\n')
-        for d in data:
-            t = d[0].isoformat()
-            #if '\r' in d[1] or '\n' in d[1]:
-            #    raise Exception
-            f.write('%s %s\n'%(t,d[1].rstrip()))
+    f.write('Timestamp '+' '.join(headers)+'\n')
+    
+    # Capture port output.
+    while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/end.txt'):
+        portOut = read_port()
+        t = portOut[0].isoformat()
+        f.write('%s %s\n'%(t,portOut[1].rstrip()))
+        f.flush()
+    
+    f.close()
 
 def _fix_problem_dates(f,fname):
     """
