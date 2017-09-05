@@ -5,7 +5,7 @@
 from __future__ import division
 import numpy as np
 from datetime import datetime,timedelta
-import os,time,pause,socket,shutil
+import os,time,socket,shutil
 import pandas as pd
 from load import calc_file_headers
 
@@ -19,11 +19,24 @@ def read_port():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         sock.connect((host,port))
-        data=sock.recvfrom(32768)
+        # In worst case scenario, all 947 fields will be 9 bytes with 1 space in between and a \n
+        # character.
+        t,data = datetime.now(),sock.recv(9470*2)
         sock.close()
-        return data[0]
-    data = incoming(HOST, PORT)
-    return datetime.now(),data
+        return t,data
+    
+    data = ''
+    while data=='':
+        t,data = incoming(HOST, PORT)
+    
+    # Clean up data that is returned from port to be a single line.
+    lastn = len(data)-data[::-1].index('\n')-1
+    try:
+        plastn = len(data)-4-data[:lastn-2][::-1].index('\n')
+    except ValueError:
+        plastn = 0
+
+    return t,data[plastn:lastn]
 
 def format_port_output(s):
     s=s.split(' ')[1:11]
@@ -48,16 +61,12 @@ def record_AN_port(fname):
     Parameters
     ----------
     fname : str
-
-    Returns
-    -------
-    None
     """
     f = open(fname,'w')
 
     # Check that recording has started as given by presence of lock file.
     while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/start.txt'):
-        pause.seconds(1)
+        time.sleep(1)
     
     # Write header line.
     headers = list(calc_file_headers())
@@ -68,7 +77,7 @@ def record_AN_port(fname):
     while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/end.txt'):
         portOut = read_port()
         t = portOut[0].isoformat()
-        f.write('%s %s\n'%(t,portOut[1].rstrip()))
+        f.write('%s %s\n'%(t,portOut[1].strip()))
         f.flush()
     
     f.close()
