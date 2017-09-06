@@ -159,3 +159,94 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_
         df['Timestamp'] = dt
     return df
 
+
+# ---------------------------------------------------- #
+# Functions for real time reading from port broadcast. #
+# ---------------------------------------------------- #
+def read_an_port_file(fopen,partsIx):
+    """
+    Read from AN port broadcast file and extract the information from specified fields.
+
+    Parameters
+    ----------
+    fopen : file to read from
+    partsIx : list of column indices to return
+
+    Returns
+    -------
+    """
+    subT = np.array(())
+    subV = np.zeros((0,3))
+
+    # Taking anything that has been added to the file from current read position.
+    fopen.seek(0,1)
+    ln = fopen.read() 
+    # Take last line. 
+    ln = ln.split('\n')[:-1]
+    
+    print "Accessing file..."
+    for el in ln:
+        # Some values seem to be cutoff because microseconds is precisely 0.
+        el = el.split()
+        if len(el[0])!=26:
+            el[0] += '.000000'
+        
+        # Read in data.
+        subT = np.append(subT,datetime.strptime(el[0], '%Y-%m-%dT%H:%M:%S.%f'))
+        subV = np.append(subV,[[float(f) for f in [el[ix] for ix in partsIx]]],axis=0)
+    return subT,subV
+
+def fetch_vel_history(fopen,partsIx,dt=3):
+    """
+    Return the velocity history interpolated at a constant frame rate since the last query as specified by
+    current read position in file.
+
+    Parameters
+    ----------
+    fopen : file
+        File where output from AN port broadcast is.
+    partsIx : list of ints
+        Indices of columns for which to extract data.
+    dt : float,3
+        Number of seconds to go into the past.
+    """
+    # Extract data from file.
+    subT,subV = read_an_port_file(fopen,partsIx)
+    now = datetime.now()
+    t = np.array([i.total_seconds() for i in now-subT])
+
+    # Only keep time points within dt of last measurement.
+    timeix = t<(t[-1]+dt)
+    t = t[timeix]
+    subV = subV[timeix]
+
+    # MultiUnivariateSpline needs t that has been ordered from lowest to highest.
+    interpV = MultiUnivariateSpline(t[::-1],subV[::-1])
+    t = np.arange(t[-1],t[0],1/60)[::-1]
+    return interpV(t),t
+
+def left_hand_col_indices():
+    from load import calc_file_headers,calc_file_body_parts
+    # Get the columns with the data that we're interested in.
+    columns = calc_file_headers()
+    skeleton = calc_file_body_parts()
+    nameIx = 0
+    for i,s in enumerate(skeleton):
+        if not 'contact' in s:
+            for j,c in enumerate(columns):
+                columns[j] = c.replace(str(nameIx+1).zfill(2),s)
+            nameIx += 1
+    return [columns.index(p)+1 for p in ['LeftHand-V-x','LeftHand-V-y','LeftHand-V-z']]
+
+def right_hand_col_indices():
+    from load import calc_file_headers,calc_file_body_parts
+    # Get the columns with the data that we're interested in.
+    columns = calc_file_headers()
+    skeleton = calc_file_body_parts()
+    nameIx = 0
+    for i,s in enumerate(skeleton):
+        if not 'contact' in s:
+            for j,c in enumerate(columns):
+                columns[j] = c.replace(str(nameIx+1).zfill(2),s)
+            nameIx += 1
+    return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
