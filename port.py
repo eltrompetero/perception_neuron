@@ -331,14 +331,20 @@ def fetch_matching_avatar_vel(avatar,part,t,disp=False):
 # Classes #
 # ======= #
 class HandSyncExperiment(object):
-    def __init__(self,outfile):
+    def __init__(self,outfile,duration,trial_type):
         """
         Parameters
         ----------
         outfile : str
-            Output file where to write current coherence value.
+            Output file where to write current coherence value. This will be placed in DATADR.
+        duration : float
+            Seconds into past to analyze.
+        trial_type : str
+            'avatar','avatar0','hand','hand0'
         """
         self.outfile = outfile
+        self.duration = duration
+        self.trialType = trial_type
     
     def start(self):
         """
@@ -365,37 +371,36 @@ class HandSyncExperiment(object):
         fopen = open('%s/%s'%(DATADR,'an_port.txt'),'r')
         fopen.seek(0,2)  # Head to end of file
 
-        # Demo only: wait for data to be written to end..
-        time.sleep(4)
+
+        # Run experiment.
+        # For retrieving the subject's velocities.
+        subVBroadcast = ANBroadcast(self.duration,
+                                    '%s/%s'%(DATADR,'an_port.txt'),
+                                    right_hand_col_indices())
+        # Wait for data to be written to end of file..
+        time.sleep(self.duration+1)
 
         # Get data from subject and also from avatar.
         with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
-            v,t,tdate = fetch_vel_history(fopen,right_hand_col_indices(),
-                                          return_datetime=True)
-            avv = fetch_matching_avatar_vel(avatar,'hand',tdate,
+            subVBroadcast.update()
+            print len(subVBroadcast.v),len(subVBroadcast.tdate)
+            assert len(subVBroadcast.tdate)>1
+            v = subVBroadcast.v
+            avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
                                             disp=True)
 
             while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
                 f,cxy = coherence(avv[:,2],v[:,2],fs=60,nperseg=90,nfft=180)
-                end = datetime.now()
-                
                 avgcoh = np.trapz(cxy[f<=10],x=f[f<=10])/(f[f<=10].max()-f[0])
                 fout.write('%f\n'%avgcoh)
                 
-                time.sleep(.15)
+                time.sleep(.25)
                 
-                vnew,tnew,tdatenew = fetch_vel_history(fopen,right_hand_col_indices(),
-                                               t0=tdate[-1]+timedelta(0,1/60),return_datetime=True)
-                v = np.append(v,vnew,axis=0)
-                tdate = np.append(tdate,tdatenew)
-                tix = tdate[(tdate-datetime.now()).total_seconds()>-3]
-                v = v[tix]
-                tdate = tdate[tix]
-                print len(v),len(tdate)
-
-                avv = fetch_matching_avatar_vel(avatar,'hand',tdate,
+                subVBroadcast.update()
+                v = subVBroadcast.v
+                avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
                                                 disp=True)
-
+# end HandSyncExperiment
 
 class ANBroadcast(object):
     def __init__(self,duration,broadcast_file,parts_ix):
@@ -440,11 +445,13 @@ class ANBroadcast(object):
             print "Nothing new to read."
             return
         
+        # Update arrays with new data. 
         self.v = np.append(self.v,vnew,axis=0)
         self.tdate = np.append(self.tdate,tdatenew)
         now = datetime.now()
         self.t = np.array([(t-now).total_seconds() for t in self.tdate])
         
+        # Only keep data points that are within self.duration of now.
         tix = self.t>-self.duration
         self.v = self.v[tix]
         self.t = self.t[tix]
@@ -485,3 +492,4 @@ class ANBroadcast(object):
         self.t = t
         # sync datetimes with linearly spaced seconds.
         self.tdate = np.array([self.tdate[0]+timedelta(0,i/60) for i in xrange(len(t))])
+# end ANBroadcast
