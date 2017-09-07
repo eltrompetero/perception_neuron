@@ -348,11 +348,16 @@ class HandSyncExperiment(object):
         self.trialType = trial_type
         self.partsIx = parts_ix
     
-    def start(self):
+    def start(self,update_delay=.25):
         """
         Start experiment. Will calculate coherence and output.
         
         NOTE: need to add error checking
+
+        Parameters
+        ----------
+        update_delay : float
+            Number of seconds to wait between updating arrays.
         """
         from load import subject_settings_v3,VRTrial
         from scipy.signal import coherence
@@ -391,7 +396,7 @@ class HandSyncExperiment(object):
                 avgcoh = np.trapz(cxy[f<=10],x=f[f<=10])/(f[f<=10].max()-f[0])
                 fout.write('%f\n'%avgcoh)
                 
-                time.sleep(.25)
+                time.sleep(update_delay)
                 
                 subVBroadcast.update()
                 v = subVBroadcast.v
