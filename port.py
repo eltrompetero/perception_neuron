@@ -331,7 +331,7 @@ def fetch_matching_avatar_vel(avatar,part,t,disp=False):
 # Classes #
 # ======= #
 class HandSyncExperiment(object):
-    def __init__(self,outfile,duration,trial_type):
+    def __init__(self,outfile,duration,trial_type,parts_ix):
         """
         Parameters
         ----------
@@ -341,10 +341,12 @@ class HandSyncExperiment(object):
             Seconds into past to analyze.
         trial_type : str
             'avatar','avatar0','hand','hand0'
+        parts_ix : str
         """
         self.outfile = outfile
         self.duration = duration
         self.trialType = trial_type
+        self.partsIx = parts_ix
     
     def start(self):
         """
@@ -366,25 +368,20 @@ class HandSyncExperiment(object):
         fopen = open('%s/%s'%(DATADR,'start.txt'),'w')
         fopen.write(datetime.now().isoformat())
         fopen.close()
-        
-        # Open AN broadcast data file.
-        fopen = open('%s/%s'%(DATADR,'an_port.txt'),'r')
-        fopen.seek(0,2)  # Head to end of file
 
 
         # Run experiment.
         # For retrieving the subject's velocities.
         subVBroadcast = ANBroadcast(self.duration,
                                     '%s/%s'%(DATADR,'an_port.txt'),
-                                    right_hand_col_indices())
+                                    self.partsIx)
         # Wait for data to be written to end of file..
         time.sleep(self.duration+1)
 
         # Get data from subject and also from avatar.
         with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
             subVBroadcast.update()
-            print len(subVBroadcast.v),len(subVBroadcast.tdate)
-            assert len(subVBroadcast.tdate)>1
+            assert len(subVBroadcast.tdate)>100
             v = subVBroadcast.v
             avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
                                             disp=True)
