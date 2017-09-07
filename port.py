@@ -160,6 +160,7 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_
     return df
 
 
+
 # ---------------------------------------------------- #
 # Functions for real time reading from port broadcast. #
 # ---------------------------------------------------- #
@@ -169,11 +170,16 @@ def read_an_port_file(fopen,partsIx):
 
     Parameters
     ----------
-    fopen : file to read from
+    fopen : file
+        Read from this file at current place in file.
     partsIx : list of column indices to return
 
     Returns
     -------
+    subT : ndarray
+        subject time
+    subV : ndarray
+        subject velocity
     """
     subT = np.array(())
     subV = np.zeros((0,3))
@@ -196,10 +202,11 @@ def read_an_port_file(fopen,partsIx):
         subV = np.append(subV,[[float(f) for f in [el[ix] for ix in partsIx]]],axis=0)
     return subT,subV
 
-def fetch_vel_history(fopen,partsIx,dt=3):
+def fetch_vel_history(fopen,partsIx,dt=3,return_datetime=False):
     """
     Return the velocity history interpolated at a constant frame rate since the last query as specified by
-    current read position in file.
+    current read position in file. Be careful because this could mean parsing entire file if the
+    read position is at beginning. Calls read_an_port_file().
 
     Parameters
     ----------
@@ -209,7 +216,19 @@ def fetch_vel_history(fopen,partsIx,dt=3):
         Indices of columns for which to extract data.
     dt : float,3
         Number of seconds to go into the past.
+
+    Returns
+    -------
+    v : ndarray
+        Array of dimensions (n_time,3).
+    t : ndarray
+        Time in seconds relative to when function was called.
+    tdate : ndarray
+        Time as datetime.
     """
+    from datetime import timedelta
+    from utils import MultiUnivariateSpline
+
     # Extract data from file.
     subT,subV = read_an_port_file(fopen,partsIx)
     now = datetime.now()
@@ -223,6 +242,9 @@ def fetch_vel_history(fopen,partsIx,dt=3):
     # MultiUnivariateSpline needs t that has been ordered from lowest to highest.
     interpV = MultiUnivariateSpline(t[::-1],subV[::-1])
     t = np.arange(t[-1],t[0],1/60)[::-1]
+    if return_datetime:
+        tasdate = np.array([now+timedelta(0,i) for i in t])
+        return interpV(t),t,tasdate
     return interpV(t),t
 
 def left_hand_col_indices():
@@ -250,3 +272,32 @@ def right_hand_col_indices():
                 columns[j] = c.replace(str(nameIx+1).zfill(2),s)
             nameIx += 1
     return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
+
+def fetch_matching_avatar_vel(avatar,part,t):
+    """
+    Get the stretch of avatar velocities that aligns with the velocity data of the subject. Assumes
+    that the start time for the avatar is given in ~/Dropbox/Sync_trials/Data/start.txt
+
+    Parameters
+    ----------
+    avatar : dict
+        This would be the templateTrial loaded in VRTrial.
+    part : str
+        Choose from 'avatar','avatar0','hand','hand0'.
+    t : array of datetime objects
+        Stretch of time to return data from.
+
+    Returns
+    -------
+    v : ndarray
+        Avatar's velocity that matches given time stamps.
+    """
+    with open(os.path.expanduser('~')+'/Dropbox/Sync_trials/Data/start.txt','r') as f:
+        startt = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
+
+    # Transform dt to time in seconds.
+    t = np.array([i.total_seconds() for i in t-startt])
+    
+    # Return part of avatar's trajectory that agrees with the stipulated time bounds.
+    return avatar[part+'V'](t)
+
