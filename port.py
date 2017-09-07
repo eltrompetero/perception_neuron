@@ -11,6 +11,7 @@ from load import calc_file_headers
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
 PORT = 7003  # Calculation data.
+DATADR = os.path.expanduser('~')+'/Dropbox/Sync_trials/Data'
 
 # Functions for reading from broadcasting port.
 def read_port():
@@ -56,7 +57,7 @@ def _format_port_output(s):
 def record_AN_port(fname):
     """
     Start recording data from Axis Neuron port when presence of start.txt is detected and stop when
-    end.txt is detected in C:/Users/Eddie/Dropbox/Sync_trials/Data.
+    end.txt is detected in DATADR.
 
     Parameters
     ----------
@@ -200,9 +201,10 @@ def read_an_port_file(fopen,partsIx):
         # Read in data.
         subT = np.append(subT,datetime.strptime(el[0], '%Y-%m-%dT%H:%M:%S.%f'))
         subV = np.append(subV,[[float(f) for f in [el[ix] for ix in partsIx]]],axis=0)
+    assert len(subT)==len(subV)
     return subT,subV
 
-def fetch_vel_history(fopen,partsIx,dt=3,return_datetime=False):
+def fetch_vel_history(fopen,partsIx,dt=3,return_datetime=False,t0=None):
     """
     Return the velocity history interpolated at a constant frame rate since the last query as specified by
     current read position in file. Be careful because this could mean parsing entire file if the
@@ -216,6 +218,12 @@ def fetch_vel_history(fopen,partsIx,dt=3,return_datetime=False):
         Indices of columns for which to extract data.
     dt : float,3
         Number of seconds to go into the past.
+    t0 : datetime,None
+        Time at which to start (should be before now). This is useful for aligning data with the
+        right time spacing when reading from the file multiple times. The difference between this
+        and the recording start time will be added to tdate.
+    return_datetime : bool
+        Return tdate.
 
     Returns
     -------
@@ -232,20 +240,34 @@ def fetch_vel_history(fopen,partsIx,dt=3,return_datetime=False):
     # Extract data from file.
     subT,subV = read_an_port_file(fopen,partsIx)
     now = datetime.now()
-    t = np.array([i.total_seconds() for i in now-subT])
+    t = np.array([i.total_seconds() for i in subT-now])
 
     # Only keep time points within dt of last measurement.
-    timeix = t<(t[-1]+dt)
+    timeix = t>(t[-1]-dt)
     t = t[timeix]
     subV = subV[timeix]
 
     # MultiUnivariateSpline needs t that has been ordered from lowest to highest.
-    interpV = MultiUnivariateSpline(t[::-1],subV[::-1])
-    t = np.arange(t[-1],t[0],1/60)[::-1]
+    splineV = MultiUnivariateSpline(t,subV)
+    if not t0 is None:
+        if t0<subT[0]:
+            # If we exceed bounds, we will have to fill in the blanks after interpolation.
+            interpIx = np.array([t0<i for i in subT])
+            print "must interpolate %d points"%interpIx.sum()
+        t = np.arange((t0-now).total_seconds(),t[-1],1/60)
+        dt = (t0-subT[0]).total_seconds()
+    else:
+        t = np.arange(t[0],t[-1],1/60)
+        dt = 0
+        interpIx = np.zeros_like(subT)==1
+
+    splineV = splineV(t)
+    if interpIx.any():
+        splineV[interpIx] = np.nan
     if return_datetime:
-        tasdate = np.array([now+timedelta(0,i) for i in t])
-        return interpV(t),t,tasdate
-    return interpV(t),t
+        tasdate = np.array([now+timedelta(0,i+dt) for i in t])
+        return splineV,t,tasdate
+    return splineV,t
 
 def left_hand_col_indices():
     from load import calc_file_headers,calc_file_body_parts
@@ -273,7 +295,7 @@ def right_hand_col_indices():
             nameIx += 1
     return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
 
-def fetch_matching_avatar_vel(avatar,part,t):
+def fetch_matching_avatar_vel(avatar,part,t,disp=False):
     """
     Get the stretch of avatar velocities that aligns with the velocity data of the subject. Assumes
     that the start time for the avatar is given in ~/Dropbox/Sync_trials/Data/start.txt
@@ -292,12 +314,174 @@ def fetch_matching_avatar_vel(avatar,part,t):
     v : ndarray
         Avatar's velocity that matches given time stamps.
     """
-    with open(os.path.expanduser('~')+'/Dropbox/Sync_trials/Data/start.txt','r') as f:
+    with open('%s/%s'%(DATADR,'start.txt'),'r') as f:
         startt = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
-
+    
     # Transform dt to time in seconds.
     t = np.array([i.total_seconds() for i in t-startt])
-    
+    if disp:
+        print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
+
     # Return part of avatar's trajectory that agrees with the stipulated time bounds.
     return avatar[part+'V'](t)
 
+
+
+# ======= #
+# Classes #
+# ======= #
+class HandSyncExperiment(object):
+    def __init__(self,outfile):
+        """
+        Parameters
+        ----------
+        outfile : str
+            Output file where to write current coherence value.
+        """
+        self.outfile = outfile
+    
+    def start(self):
+        """
+        Start experiment. Will calculate coherence and output.
+        
+        NOTE: need to add error checking
+        """
+        from load import subject_settings_v3,VRTrial
+        from scipy.signal import coherence
+
+        # Load avatar trajectory. This has a bunch of overhead because it shouldn't necessary to also load
+        # a trial from a subject.
+        subject_settings = subject_settings_v3
+        person,modelhandedness,rotation,dr = subject_settings(0)
+        trial = VRTrial(person,modelhandedness,rotation,dr)
+        avatar = trial.templateTrial
+
+        # Demo only: need a start time.
+        fopen = open('%s/%s'%(DATADR,'start.txt'),'w')
+        fopen.write(datetime.now().isoformat())
+        fopen.close()
+        
+        # Open AN broadcast data file.
+        fopen = open('%s/%s'%(DATADR,'an_port.txt'),'r')
+        fopen.seek(0,2)  # Head to end of file
+
+        # Demo only: wait for data to be written to end..
+        time.sleep(4)
+
+        # Get data from subject and also from avatar.
+        with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
+            v,t,tdate = fetch_vel_history(fopen,right_hand_col_indices(),
+                                          return_datetime=True)
+            avv = fetch_matching_avatar_vel(avatar,'hand',tdate,
+                                            disp=True)
+
+            while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
+                f,cxy = coherence(avv[:,2],v[:,2],fs=60,nperseg=90,nfft=180)
+                end = datetime.now()
+                
+                avgcoh = np.trapz(cxy[f<=10],x=f[f<=10])/(f[f<=10].max()-f[0])
+                fout.write('%f\n'%avgcoh)
+                
+                time.sleep(.15)
+                
+                vnew,tnew,tdatenew = fetch_vel_history(fopen,right_hand_col_indices(),
+                                               t0=tdate[-1]+timedelta(0,1/60),return_datetime=True)
+                v = np.append(v,vnew,axis=0)
+                tdate = np.append(tdate,tdatenew)
+                tix = tdate[(tdate-datetime.now()).total_seconds()>-3]
+                v = v[tix]
+                tdate = tdate[tix]
+                print len(v),len(tdate)
+
+                avv = fetch_matching_avatar_vel(avatar,'hand',tdate,
+                                                disp=True)
+
+
+class ANBroadcast(object):
+    def __init__(self,duration,broadcast_file,parts_ix):
+        """
+        Class for keeping track of history of velocity.
+        
+        Parameters
+        ----------
+        duration : float
+            Number of seconds to keep track in the past.
+        broadcast_file : str
+            Where data from AN port is broadcast.
+        parts_ix : list of ints
+            Indices of corresponding column headers in broadcast file.
+        """
+        self.duration = duration
+        
+        # Open file and go to the end.
+        self.fin = open(broadcast_file)
+        self.fin.seek(0,2)
+        
+        self.partsIx = parts_ix
+
+        self.refresh()
+    
+    def refresh(self):
+        """Clear stored arrays."""
+        self.v = np.zeros((0,3))
+        self.t = np.array(())
+        self.tdate = np.array(())
+
+    def update(self):
+        """
+        Update record of velocities by reading latest velocities and throwing out old velocities.
+        
+        Must interpolate missing points in between readings. Best way to do this cheaply is to use a
+        Kalman filter to add a new point instead of refitting a global spline every time we get a
+        new set of points.
+        """
+        vnew,tdatenew = self.fetch_new_vel()
+        if len(vnew)==0:
+            print "Nothing new to read."
+            return
+        
+        self.v = np.append(self.v,vnew,axis=0)
+        self.tdate = np.append(self.tdate,tdatenew)
+        now = datetime.now()
+        self.t = np.array([(t-now).total_seconds() for t in self.tdate])
+        
+        tix = self.t>-self.duration
+        self.v = self.v[tix]
+        self.t = self.t[tix]
+        self.tdate = self.tdate[tix]
+        
+        self.interpolate()
+    
+    def fetch_new_vel(self):
+        """
+        Return the velocity history interpolated at a constant frame rate since the last query as specified by
+        current read position in file. Be careful because this could mean parsing entire file if the
+        read position is at beginning. Calls read_an_port_file().
+
+        Returns
+        -------
+        v : ndarray
+            Array of dimensions (n_time,3).
+        tdate : ndarray
+            Time as datetime.
+        """
+        from datetime import timedelta
+        from utils import MultiUnivariateSpline
+
+        # Extract data from file.
+        subT,subV = read_an_port_file(self.fin,self.partsIx)
+        return subV,subT
+    
+    def interpolate(self):
+        """
+        Interpolate velocity trajectory on record and replace self.t and self.v with linearly spaced
+        interpolation.
+        """
+        from utils import MultiUnivariateSpline
+
+        splineV = MultiUnivariateSpline(self.t,self.v)
+        t = np.arange(self.t[0],self.t[-1],1/60)
+        self.v = splineV(t)
+        self.t = t
+        # sync datetimes with linearly spaced seconds.
+        self.tdate = np.array([self.tdate[0]+timedelta(0,i/60) for i in xrange(len(t))])
