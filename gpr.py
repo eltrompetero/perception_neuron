@@ -101,8 +101,7 @@ class GPR(object):
     '''
     Class performs the gpr and writes the new visibility fraction/time to outputFile
     '''
-    def __init__(self,coherenceEvaluator,
-                 initialTime,initialVisibilityFraction,outputFile,
+    def __init__(self,
                  GPRKernel = 1.0 * RBF(length_scale=1.0, length_scale_bounds=(1e-1, 10.0)),
                  TMIN=0.5,TMAX=2,TSTEP=0.1,
                  FMIN=0.1,FMAX=0.9,FSTEP=0.1):
@@ -115,101 +114,62 @@ class GPR(object):
         self.FMIN = FMIN
         self.FMAX = FMAX
         self.FSTEP = FSTEP
-        self.outputFile = outputFile
-        self.coherenceEvaluator = coherenceEvaluator
         
         self.kernel = GPRKernel
         
-        self.times = np.empty(1)
-        self.times[0] = initialTime
-        self.fractions = np.empty(1)
-        self.fractions[0] = initialVisibilityFraction
-        self.coherences = np.empty(0)
+        self.durations = np.zeros(0)
+        self.fractions = np.zeros(0)
+        self.coherences = np.zeros(0)
         
-        self.meshPoints = self.make_mesh(self.TMIN,self.TMAX,self.TSTEP,
-                                         self.FMIN,self.FMAX,self.FSTEP)
+        self.meshPoints = np.meshgrid(np.arange(self.TMIN,self.TMAX+self.TSTEP,self.TSTEP),
+                                      np.arange(self.FMIN,self.FMAX+self.FSTEP,self.FSTEP))
+        self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
         self.gp = gaussian_process.GaussianProcessRegressor(kernel=self.kernel)
         self.coherence_pred = 0
-        self.variance_pred = 0
-        
-    def make_mesh(self,min_time,max_time,time_step,min_frac,max_frac,frac_step):
-        '''Generates mesh points for multi-dimensional GPR'''
-        time_range = np.linspace(min_time,max_time,time_step)
-        frac_range = np.linspace(min_frac,max_frac,frac_step)
-        
-        t_length = len(time_range)
-        f_length = len(frac_range)
-        
-        mesh_points = np.ndarray((t_length*f_length,2))
-
-        for i in range(t_length):
-            for j in range(f_length):
-                mesh_points[(i+1) + j][0] = time_range[i]
-                mesh_points[(i+1) + j][1] = frac_range[j]
-        
-        return mesh_points
-    
-    def getDataPoints(self):
-        '''Converts N input time,fraction pairs into an Nx2 matrix '''
-        data_points = np.ndarray((len(self.times),2))
-        for i in range(len(self.times)):
-            data_points[i][0] = self.times[i]
-            data_points[i][1] = self.fractions[i]
-            
-        return data_points
-    
+        self.std_pred = 0
+   
     def predict(self):
         '''
         Calls the GPR
         '''
-        dataPoints = self.getDataPoints()
-            
-        self.gp.fit(dataPoints,self.coherences)
-        
-        self.coherence_pred, self.variance_pred = self.gp.predict(self.meshPoints)
+        self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.coherences )
+        self.coherence_pred, self.std_pred = self.gp.predict(self.meshPoints,return_std=True)
         
     def max_uncertainty(self):
         '''
-        Returns next_time,next_fraction as the point where the variance of the GPR is max
-        '''
+        Returns next_duration,next_fraction as the point where the variance of the GPR is max
         # Currently finds maximum uncertainty,and then returns a point with
         # that uncertainty as the update value. But really this should be a
         # point which would minimize the total uncertainty.
-        
-        next_time = 0
-        next_fraction = 0
-        maxIndex = 0
-        max_var = max(self.variance_pred)
-        
-        for i in range(len(self.variance_pred[0])):
-            if self.variance_pred[i] == max_var:
-                maxIndex = i
-                break
-        
-        next_time = self.meshPoints[maxIndex][0]
+
+        Returns
+        -------
+        next_window_duration : float
+        next_vis_fraction : float
+        '''
+        maxIndex = np.argmax(self.std_pred)
+
+        next_duration = self.meshPoints[maxIndex][0]
         next_fraction = self.meshPoints[maxIndex][1]
         
-        return (next_time,next_fraction)
+        return next_duration,next_fraction
         
-    def update(self):
+    def update(self,new_coherence,window_dur,vis_fraction):
         '''
-        This is called to write a new time/fraction pair to outputFile
-        Output: next_time,next_fraction
+        This is called to add new data point to prediction.
+
+        Parameters
+        ----------
+        new_coherence : float
+        window_dur : float
+        vis_fraction : float
         '''
-        new_coherence = self.coherenceEvaluator.getAverageCoherence()
-        self.coherenceEvaluator.resetCoherences()
         self.coherences = np.append(self.coherences,new_coherence)
+        self.fractions = np.append(self.fractions,vis_fraction)
+        self.durations = np.append(self.durations,window_dur)
         
         self.predict()
         
-        (next_time,next_fraction) = self.max_uncertainty()
-        next_fraction = self.max_uncertainty()
-        self.nextQueryOutput = open(self.outputFile,'w')
-        self.nextQueryOutput.write(str(next_time) + ',' + str(next_fraction))
-        self.nextQueryOutput.write(str(next_fraction))
-        self.nextQueryOutput.close()
-        
-        self.times = np.append(self.times,next_time)
-        self.fractions = np.append(self.fractions,next_fraction)
-        
+        return self.max_uncertainty()
+#end GPR

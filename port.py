@@ -361,6 +361,7 @@ class HandSyncExperiment(object):
         """
         from load import subject_settings_v3,VRTrial
         from gpr import CoherenceEvaluator,GPR
+        import cPickle as pickle
 
         # Load avatar trajectory. This has a bunch of overhead because it shouldn't necessary to also load
         # a trial from a subject.
@@ -378,6 +379,8 @@ class HandSyncExperiment(object):
         # Run experiment.
         # Performance evaluation.
         ceval = CoherenceEvaluator(.035,10,60,90)
+        gprmodel = GPR()
+        nextDuration,nextFraction = np.random.uniform(.5,2),np.random.uniform(.1,.9)
         
         # For retrieving the subject's velocities.
         subVBroadcast = ANBroadcast(self.duration,
@@ -404,6 +407,22 @@ class HandSyncExperiment(object):
                 v = subVBroadcast.v
                 avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
                                                 disp=True)
+
+                if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
+                    os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
+                    # Run GPR.
+                    print "Running GPR on this trial..."
+                    avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdateHistory)
+                    avgcoh = ceval.evaluateCoherence( avv[:,2],subVBroadcast.vHistory[:,2] )
+                    nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
+
+                    # Refresh history.
+                    subVBroadcast.refresh()
+                    # No output til more data has been collected.
+                    print "Collecting data..."
+                    time.sleep(self.duration+1)
+        print "Saving GPR."
+        pickle.dump({'gprmodel':gprmodel},open('%s/%s'%(DATADR,'temp.p'),'wb'),-1)
 # end HandSyncExperiment
 
 
@@ -420,6 +439,26 @@ class ANBroadcast(object):
             Where data from AN port is broadcast.
         parts_ix : list of ints
             Indices of corresponding column headers in broadcast file.
+
+        Subfields
+        ---------
+        v : ndarray
+            Of duration of self.duration. Of dimension (n_time,3).
+        t : ndarray
+            Of duration of self.duration.
+        vHistory : ndarray
+            All history since last refresh.
+        tHistory : ndarray
+            All history since last refresh.
+        tdateHistory : ndarray
+            All history since last refresh.
+
+        Methods
+        -------
+        refresh()
+        update()
+        fetch_new_vel()
+        _interpolate()
         """
         self.duration = duration
         
@@ -432,10 +471,13 @@ class ANBroadcast(object):
         self.refresh()
     
     def refresh(self):
-        """Clear stored arrays."""
+        """Clear stored arrays including history."""
         self.v = np.zeros((0,3))
         self.t = np.array(())
         self.tdate = np.array(())
+        self.vHistory = np.zeros((0,3))
+        self.tHistory = np.array(())
+        self.tdateHistory = np.array(())
 
     def update(self):
         """
@@ -451,18 +493,18 @@ class ANBroadcast(object):
             return
         
         # Update arrays with new data. 
-        self.v = np.append(self.v,vnew,axis=0)
-        self.tdate = np.append(self.tdate,tdatenew)
+        self.vHistory = np.append(self.vHistory,vnew,axis=0)
+        self.tdateHistory = np.append(self.tdateHistory,tdatenew)
         now = datetime.now()
-        self.t = np.array([(t-now).total_seconds() for t in self.tdate])
+        self.tHistory = np.array([(t-now).total_seconds() for t in self.tdateHistory])
         
         # Only keep data points that are within self.duration of now.
-        tix = self.t>-self.duration
-        self.v = self.v[tix]
-        self.t = self.t[tix]
-        self.tdate = self.tdate[tix]
+        tix = self.tHistory>-self.duration
+        self.v = self.vHistory[tix]
+        self.t = self.tHistory[tix]
+        self.tdate = self.tdateHistory[tix]
         
-        self.interpolate()
+        self._interpolate()
     
     def fetch_new_vel(self):
         """
@@ -484,7 +526,7 @@ class ANBroadcast(object):
         subT,subV = read_an_port_file(self.fin,self.partsIx)
         return subV,subT
     
-    def interpolate(self):
+    def _interpolate(self):
         """
         Interpolate velocity trajectory on record and replace self.t and self.v with linearly spaced
         interpolation.
