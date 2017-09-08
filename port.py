@@ -348,7 +348,9 @@ class HandSyncExperiment(object):
         self.trialType = trial_type
         self.partsIx = parts_ix
     
-    def start(self,update_delay=.25):
+    def start(self,update_delay=.25,
+              min_window_duration=.5,max_window_duration=2,
+              min_vis_fraction=.1,max_vis_fraction=.9):
         """
         Start experiment. Will calculate coherence and output.
         
@@ -357,7 +359,7 @@ class HandSyncExperiment(object):
         Parameters
         ----------
         update_delay : float
-            Number of seconds to wait between updating arrays.
+            Number of seconds to wait between updating arrays when calculating realtime coherence.
         """
         from load import subject_settings_v3,VRTrial
         from gpr import CoherenceEvaluator,GPR
@@ -377,10 +379,11 @@ class HandSyncExperiment(object):
 
 
         # Run experiment.
-        # Performance evaluation.
-        ceval = CoherenceEvaluator(.035,10,60,90)
+        # Setup routines for calculating coherence.
+        ceval = CoherenceEvaluator(10)
         gprmodel = GPR()
-        nextDuration,nextFraction = np.random.uniform(.5,2),np.random.uniform(.1,.9)
+        nextDuration = np.random.uniform(min_window_duration,max_window_duration)
+        nextFraction = np.random.uniform(min_vis_fraction,max_vis_fraction)
         
         # For retrieving the subject's velocities.
         subVBroadcast = ANBroadcast(self.duration,
@@ -392,11 +395,14 @@ class HandSyncExperiment(object):
         # Get data from subject and also from avatar.
         with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
             subVBroadcast.update()
-            assert len(subVBroadcast.tdate)>100
+            while len(subVBroadcast.tdateHistory)<(self.duration*60):
+                print "Waiting to collect more data..."
+                time.sleep(1)
+                subVBroadcast.update()
             v = subVBroadcast.v
             avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
                                             disp=True)
-
+            
             while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
                 avgcoh = ceval.evaluateCoherence(avv[:,2],v[:,2])
                 fout.write('%f\n'%avgcoh)

@@ -10,20 +10,21 @@ class CoherenceEvaluator(object):
     update() evaluates the average coherence over the given time.
     These assume V_person and V_avatar are pre-aligned and have the same length.
     '''
-    def __init__(self,performanceThreshold,maxfreq,
-                 SAMPLE_FREQ,WINDOW_LENGTH):
+    def __init__(self,maxfreq,SAMPLE_FREQ=60,WINDOW_LENGTH=90):
         '''
-        Window length in seconds.
-        performanceThreshold, a number between 0 and 1, specifies the least that a
-        person's average coherence should be for a performance grade of 1 (good).
-
         Parameters
         ----------
-        performanceThreshold : float
         maxfreq : float
             Max frequency up to which to average coherence.
-        SAMPLE_FREQ : float
-        WINDOW_LENGTH : int
+        SAMPLE_FREQ : float,60
+            Sampling frequency
+        WINDOW_LENGTH : int,90
+            Number ofdata points to use in window for coherence calculation.
+
+        Subfields
+        ---------
+        coherence
+        coherences
         '''
         self.maxfreq = maxfreq
         self.SAMPLE_FREQ = SAMPLE_FREQ
