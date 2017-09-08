@@ -382,8 +382,9 @@ class HandSyncExperiment(object):
         # Setup routines for calculating coherence.
         ceval = CoherenceEvaluator(10)
         gprmodel = GPR()
-        nextDuration = np.random.uniform(min_window_duration,max_window_duration)
-        nextFraction = np.random.uniform(min_vis_fraction,max_vis_fraction)
+        nextDuration = np.around(np.random.uniform(min_window_duration,max_window_duration),1)
+        nextFraction = np.around(np.random.uniform(min_vis_fraction,max_vis_fraction),1)
+        open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction)).close()
         
         # For retrieving the subject's velocities.
         subVBroadcast = ANBroadcast(self.duration,
@@ -421,6 +422,8 @@ class HandSyncExperiment(object):
                     avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdateHistory)
                     avgcoh = ceval.evaluateCoherence( avv[:,2],subVBroadcast.vHistory[:,2] )
                     nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
+                    open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
+                                                                                nextFraction)).close()
 
                     # Refresh history.
                     subVBroadcast.refresh()

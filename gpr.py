@@ -30,8 +30,6 @@ class CoherenceEvaluator(object):
         self.SAMPLE_FREQ = SAMPLE_FREQ
         self.WINDOW_LENGTH = WINDOW_LENGTH
         
-        self.performanceThreshold = performanceThreshold
-        
         self.v = None
         self.v_av = None
         
@@ -74,6 +72,7 @@ class CoherenceEvaluator(object):
         # Evaluate Average Coherence by the Trapezoid rule.
         freqIx = (self.f>0)&(self.f<self.maxfreq)
         avg_coherence = np.trapz(self.C[freqIx],x=self.f[freqIx]) / (self.f[freqIx].max()-self.f[freqIx].min())
+        assert 0<=avg_coherence<=1,str(len(v1))+' '+str(len(v2))
         return avg_coherence
     
     def evaluatePerformance(self):
