@@ -360,7 +360,7 @@ class HandSyncExperiment(object):
             Number of seconds to wait between updating arrays.
         """
         from load import subject_settings_v3,VRTrial
-        from scipy.signal import coherence
+        from gpr import CoherenceEvaluator,GPR
 
         # Load avatar trajectory. This has a bunch of overhead because it shouldn't necessary to also load
         # a trial from a subject.
@@ -376,6 +376,9 @@ class HandSyncExperiment(object):
 
 
         # Run experiment.
+        # Performance evaluation.
+        ceval = CoherenceEvaluator(.035,10,60,90)
+        
         # For retrieving the subject's velocities.
         subVBroadcast = ANBroadcast(self.duration,
                                     '%s/%s'%(DATADR,'an_port.txt'),
@@ -392,8 +395,7 @@ class HandSyncExperiment(object):
                                             disp=True)
 
             while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
-                f,cxy = coherence(avv[:,2],v[:,2],fs=60,nperseg=90,nfft=180)
-                avgcoh = np.trapz(cxy[f<=10],x=f[f<=10])/(f[f<=10].max()-f[0])
+                avgcoh = ceval.evaluateCoherence(avv[:,2],v[:,2])
                 fout.write('%f\n'%avgcoh)
                 
                 time.sleep(update_delay)
@@ -403,6 +405,7 @@ class HandSyncExperiment(object):
                 avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
                                                 disp=True)
 # end HandSyncExperiment
+
 
 class ANBroadcast(object):
     def __init__(self,duration,broadcast_file,parts_ix):

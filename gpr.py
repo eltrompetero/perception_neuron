@@ -4,36 +4,35 @@ from scipy.signal import coherence
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import RBF
 
+
 class CoherenceEvaluator(object):
     '''
-    update_fullVector and update_singlePoint are the primary methods, both of which
-    evaluate the average coherence over the given time.
+    update() evaluates the average coherence over the given time.
     These assume V_person and V_avatar are pre-aligned and have the same length.
-    update_singlePoint appends a new data point to the vectors, and discards the
-    first element after they have a certain length. Time, V_person, and V_avatar
-    always have a fixed length.
     '''
-    
-    def __init__(self,outputFile,performanceThreshold,DATA_LENGTH,
+    def __init__(self,performanceThreshold,maxfreq,
                  SAMPLE_FREQ,WINDOW_LENGTH):
         '''
         Window length in seconds.
         performanceThreshold, a number between 0 and 1, specifies the least that a
         person's average coherence should be for a performance grade of 1 (good).
-        Data Length specifies how long the data vectors should be. Update_singlePoint
-        removes one data point at each step if len(T) >= DATA_LENGTH
+
+        Parameters
+        ----------
+        performanceThreshold : float
+        maxfreq : float
+            Max frequency up to which to average coherence.
+        SAMPLE_FREQ : float
+        WINDOW_LENGTH : int
         '''
-        
+        self.maxfreq = maxfreq
         self.SAMPLE_FREQ = SAMPLE_FREQ
         self.WINDOW_LENGTH = WINDOW_LENGTH
-        self.DATA_LENGTH = DATA_LENGTH
         
-        self.outputFile = outputFile
         self.performanceThreshold = performanceThreshold
         
-        self.T = np.empty(0)
-        self.v = np.empty(0)
-        self.v_av = np.empty(0)
+        self.v = None
+        self.v_av = None
         
         self.coherence = 0
         self.coherences = np.empty(0)
@@ -61,33 +60,30 @@ class CoherenceEvaluator(object):
     def resetPerformance(self):
         self.performanceValues = np.empty(0)
         
-    def evaluateCoherence(self):
+    def evaluateCoherence(self,v1,v2):
         '''
         Returns average coherence between current v and v_av data vectors.
         '''
-        
         # Scipy.signal's coherence implementation. Not yet Eddie-coherence.
-        self.f,self.C = coherence(self.v_av,
-                                  self.v,
+        self.f,self.C = coherence(v1,v2,
                                   fs=self.SAMPLE_FREQ,
                                   nperseg=self.WINDOW_LENGTH,
                                   nfft=2 * self.WINDOW_LENGTH)
         
         # Evaluate Average Coherence by the Trapezoid rule.
-        avg_coherence = 0
-        delta_f = self.f[1] - self.f[0]
-        for i in range(len(self.C)-1):
-            avg_coherence += (self.C[i] + 0.5 * (self.C[i+1] - self.C[i])) * delta_f
-        avg_coherence = avg_coherence / float(self.f[-1])
-        
+        freqIx = (self.f>0)&(self.f<self.maxfreq)
+        avg_coherence = np.trapz(self.C[freqIx],x=self.f[freqIx]) / (self.f[freqIx].max()-self.f[freqIx].min())
         return avg_coherence
     
     def evaluatePerformance(self):
         '''
         Evaluates average coherence against threshold value, and writes binary
         value to target output file.
+
+        Returns
+        -------
+        performance
         '''
-        
         performance = 0
         avg_coherence = self.evaluateCoherence()
         
@@ -96,53 +92,9 @@ class CoherenceEvaluator(object):
         
         self.coherences = np.append(self.coherences,avg_coherence)
         self.performanceValues = np.append(self.performanceValues,performance)
-        
-        evaluation = open(self.outputFile,'w')
-        evaluation.write(str(performance))
-        evaluation.close()
-    
-    def update_fullVector(self,time,V_person,V_avatar):
-        '''
-        Pass time, V_person, V_avatar as aligned vectors (np.ndarrays).
-        '''
-        # Do I need time if buffering / smoothing are handled a layer above?
-        
-        self.T = time
-        self.v = V_person
-        self.v_av = V_avatar
-        
-        # Assert lengths are the same.
-        # Assert types are all np.ndarray.
-        length = len(self.T)
-        for e in (self.T, self.v, self.v_av):
-            assert len(e) == length, "Data not properly aligned."
-            assert type(e) == np.ndarray, "Data must be passed as np.ndarray."
-        
-        self.evaluatePerformance()
-        
-    def update_singlePoint(self,time,V_person,V_avatar):
-        '''
-        Pass time, V_person, V_avatar from a single measurement as individual floats.
-        Adds new data point to stored vectors, subtracts the first element.
-        Alignment should be handled before passing the new data point.
-        '''
-        # Do I need time if buffering / smoothing are handled a layer above?
-        
-        self.T = np.append(self.T,time)
-        self.v = np.append(self.v,V_person)
-        self.v_av = np.append(self.v_av,V_avatar)
-        
-        length = len(self.T)
-        for e in (self.T, self.v, self.v_av):
-            assert len(e) == length, "Data not properly aligned."
-        
-        if length > self.DATA_LENGTH:
-            # Remove first element of each vector
-            self.T = self.T[1:]
-            self.v = self.v[1:]
-            self.v_av = self.v_av[1:]
-        
-        self.evaluatePerformance()
+        return performance
+# end CoherenceEvaluator
+
 
 
 class GPR(object):
