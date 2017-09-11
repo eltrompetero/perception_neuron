@@ -421,6 +421,7 @@ class HandSyncExperiment(object):
                             print "run_gpr.txt successfully deleted."
                         except OSError:
                             print "run_gpr.txt unsuccessfully deleted."
+                            time.sleep(0.1)
 
                     # Run GPR.
                     print "Running GPR on this trial..."
