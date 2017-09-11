@@ -62,7 +62,19 @@ class CoherenceEvaluator(object):
     def evaluateCoherence(self,v1,v2):
         '''
         Returns average coherence between current v and v_av data vectors.
+
+        Parameters
+        ----------
+        v1 : ndarray
+            Vector.
+        v2 : ndarray
+            Vector.
+
+        Returns
+        -------
+        avg_coh : float
         '''
+        assert len(v1)==len(v2)
         # Scipy.signal's coherence implementation. Not yet Eddie-coherence.
         self.f,self.C = coherence(v1,v2,
                                   fs=self.SAMPLE_FREQ,

@@ -314,6 +314,7 @@ def fetch_matching_avatar_vel(avatar,part,t,disp=False):
     v : ndarray
         Avatar's velocity that matches given time stamps.
     """
+    # Get the time at which the trial started.
     with open('%s/%s'%(DATADR,'start.txt'),'r') as f:
         startt = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
     
@@ -384,7 +385,7 @@ class HandSyncExperiment(object):
         gprmodel = GPR()
         nextDuration = np.around(np.random.uniform(min_window_duration,max_window_duration),1)
         nextFraction = np.around(np.random.uniform(min_vis_fraction,max_vis_fraction),1)
-        open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction)).close()
+        open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction))
         
         # For retrieving the subject's velocities.
         subVBroadcast = ANBroadcast(self.duration,
@@ -423,7 +424,7 @@ class HandSyncExperiment(object):
                     avgcoh = ceval.evaluateCoherence( avv[:,2],subVBroadcast.vHistory[:,2] )
                     nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
                     open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
-                                                                                nextFraction)).close()
+                                                                                nextFraction))
 
                     # Refresh history.
                     subVBroadcast.refresh()
@@ -512,7 +513,7 @@ class ANBroadcast(object):
         self.v = self.vHistory[tix]
         self.t = self.tHistory[tix]
         self.tdate = self.tdateHistory[tix]
-        
+        assert len(self.v)==len(self.t)==len(self.tdate) 
         self._interpolate()
     
     def fetch_new_vel(self):
