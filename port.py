@@ -190,6 +190,7 @@ def read_an_port_file(fopen,partsIx):
     ln = fopen.read() 
     # Take last line. 
     ln = ln.split('\n')[:-1]
+    assert len(ln)>2, "Insufficient data has been appended to pull out an entire single broadcast."
     
     print "Accessing file..."
     for el in ln:
@@ -201,7 +202,6 @@ def read_an_port_file(fopen,partsIx):
         # Read in data.
         subT = np.append(subT,datetime.strptime(el[0], '%Y-%m-%dT%H:%M:%S.%f'))
         subV = np.append(subV,[[float(f) for f in [el[ix] for ix in partsIx]]],axis=0)
-    assert len(subT)==len(subV)
     return subT,subV
 
 def fetch_vel_history(fopen,partsIx,dt=3,return_datetime=False,t0=None):
@@ -349,7 +349,7 @@ class HandSyncExperiment(object):
         self.trialType = trial_type
         self.partsIx = parts_ix
     
-    def start(self,update_delay=.25,
+    def start(self,update_delay=.3,
               min_window_duration=.5,max_window_duration=2,
               min_vis_fraction=.1,max_vis_fraction=.9):
         """
@@ -411,13 +411,17 @@ class HandSyncExperiment(object):
                 
                 time.sleep(update_delay)
                 
-                subVBroadcast.update()
-                v = subVBroadcast.v
-                avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
-                                                disp=True)
-
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
-                    os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
+                    # Sometimes deletion conflicts with writing.
+                    notDeleted = True
+                    while notDeleted:
+                        try:
+                            os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
+                            notDeleted = False
+                            print "run_gpr.txt successfully deleted."
+                        except OSError:
+                            print "run_gpr.txt unsuccessfully deleted."
+
                     # Run GPR.
                     print "Running GPR on this trial..."
                     avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdateHistory)
@@ -431,6 +435,13 @@ class HandSyncExperiment(object):
                     # No output til more data has been collected.
                     print "Collecting data..."
                     time.sleep(self.duration+1)
+                
+                subVBroadcast.update()
+                v = subVBroadcast.v
+                avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
+                                                disp=True)
+
+
         print "Saving GPR."
         pickle.dump({'gprmodel':gprmodel},open('%s/%s'%(DATADR,'temp.p'),'wb'),-1)
 # end HandSyncExperiment
