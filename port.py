@@ -196,12 +196,13 @@ def read_an_port_file(fopen,partsIx):
     for el in ln:
         # Some values seem to be cutoff because microseconds is precisely 0.
         el = el.split()
-        if len(el[0])!=26:
-            el[0] += '.000000'
-        
-        # Read in data.
-        subT = np.append(subT,datetime.strptime(el[0], '%Y-%m-%dT%H:%M:%S.%f'))
-        subV = np.append(subV,[[float(f) for f in [el[ix] for ix in partsIx]]],axis=0)
+        if el[0]!='Timestamp':
+            if len(el[0])!=26 :
+                el[0] += '.000000'
+            
+            # Read in data.
+            subT = np.append(subT,datetime.strptime(el[0], '%Y-%m-%dT%H:%M:%S.%f'))
+            subV = np.append(subV,[[float(f) for f in [el[ix] for ix in partsIx]]],axis=0)
     return subT,subV
 
 def fetch_vel_history(fopen,partsIx,dt=3,return_datetime=False,t0=None):
@@ -343,37 +344,44 @@ class HandSyncExperiment(object):
         trial_type : str
             'avatar','avatar0','hand','hand0'
         parts_ix : str
+            Indices of the columns in an_port file to extract and analyze.
         """
         self.outfile = outfile
         self.duration = duration
         self.trialType = trial_type
         self.partsIx = parts_ix
     
-    def start(self,update_delay=.3,
+    def start(self,avatar,
+              update_delay=.3,
+              initial_window_duration=1.0,initial_vis_fraction=0.5,
               min_window_duration=.5,max_window_duration=2,
               min_vis_fraction=.1,max_vis_fraction=.9):
         """
-        Start experiment. Will calculate coherence and output.
-        
-        NOTE: need to add error checking
+        Run realtime analysis for experiment. Starts when start.txt becomes available to read in
+        avatar start time. Reads an_port.txt to get the latest velocity data and keep track of
+        subject's performance relative to the avatar. When run_gpr.txt is written, GPR prediction
+        for the coherence as a function of window duration and visible fraction is performed and the
+        next coordinate is written to next_setting.txt.
 
         Parameters
         ----------
-        update_delay : float
+        avatar : dict
+            Dictionary of avatar interpolation splines.
+        update_delay : float,.3
             Number of seconds to wait between updating arrays when calculating realtime coherence.
+        initial_window_duration : float,1.0
+        min_window_duration : float,.5
+        max_window_duration : float,2
+        min_vis_fraction : float,.1
+        max_vis_fraction : float,.9
         """
         from load import subject_settings_v3,VRTrial
         from gpr import CoherenceEvaluator,GPR
         import cPickle as pickle
-
-        # Load avatar trajectory. This has a bunch of overhead because it shouldn't necessary to also load
-        # a trial from a subject.
-        subject_settings = subject_settings_v3
-        person,modelhandedness,rotation,dr = subject_settings(0)
-        trial = VRTrial(person,modelhandedness,rotation,dr)
-        avatar = trial.templateTrial
-
-        # Demo only: need a start time.
+        
+        # Read start time.
+        while not os.path.isfile('%s/%s'%(DATADR,'start.txt')):
+            time.sleep(.5)
         fopen = open('%s/%s'%(DATADR,'start.txt'),'w')
         fopen.write(datetime.now().isoformat())
         fopen.close()
@@ -383,8 +391,10 @@ class HandSyncExperiment(object):
         # Setup routines for calculating coherence.
         ceval = CoherenceEvaluator(10)
         gprmodel = GPR()
-        nextDuration = np.around(np.random.uniform(min_window_duration,max_window_duration),1)
-        nextFraction = np.around(np.random.uniform(min_vis_fraction,max_vis_fraction),1)
+        nextDuration = np.around(initial_window_duration,1)
+        nextFraction = np.around(initial_vis_fraction,1)
+        assert min_window_duration<=nextDuration<=max_window_duration
+        assert min_vis_fraction<=nextFraction<=max_vis_fraction
         open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction))
         
         # For retrieving the subject's velocities.
