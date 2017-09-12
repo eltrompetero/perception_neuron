@@ -84,7 +84,7 @@ class CoherenceEvaluator(object):
         # Evaluate Average Coherence by the Trapezoid rule.
         freqIx = (self.f>0)&(self.f<self.maxfreq)
         avg_coherence = np.trapz(self.C[freqIx],x=self.f[freqIx]) / (self.f[freqIx].max()-self.f[freqIx].min())
-        assert 0<=avg_coherence<=1,str(len(v1))+' '+str(len(v2))
+        
         return avg_coherence
     
     def evaluatePerformance(self):
@@ -133,8 +133,10 @@ class GPR(object):
         self.fractions = np.zeros(0)
         self.coherences = np.zeros(0)
         
+        # Create two grids for t and f.
         self.meshPoints = np.meshgrid(np.arange(self.TMIN,self.TMAX+self.TSTEP,self.TSTEP),
                                       np.arange(self.FMIN,self.FMAX+self.FSTEP,self.FSTEP))
+        # Flatten t and f grids and stack them into an Nx2 array.
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
         self.gp = gaussian_process.GaussianProcessRegressor(kernel=self.kernel)
