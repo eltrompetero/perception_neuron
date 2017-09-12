@@ -590,6 +590,20 @@ class ANBroadcast(object):
         self._interpolate()
 
         self.lock.release()
+
+    def loop_update(self,event,dt):
+        """
+        Loop update til event is set.
+
+        Parameters
+        ----------
+        event : threading.Event
+        dt : float
+            Number of seconds to wait between updates.
+        """
+        while not event.is_set():
+            self.update()
+            time.sleep(dt)
     
     def fetch_new_vel(self):
         """
