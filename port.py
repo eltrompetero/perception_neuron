@@ -334,7 +334,7 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,disp=False):
 # Classes #
 # ======= #
 class HandSyncExperiment(object):
-    def __init__(self,outfile,duration,trial_type,parts_ix):
+    def __init__(self,outfile,duration,trial_type):
         """
         Parameters
         ----------
@@ -350,9 +350,34 @@ class HandSyncExperiment(object):
         self.outfile = outfile
         self.duration = duration
         self.trialType = trial_type
-        self.partsIx = parts_ix
+        self.partsIx = None
+
+    def load_avatar(self):
+        """
+        Returns
+        -------
+        avatar : dict
+            Dictionary of avatar interpolation splines.
+        """
+        from load import subject_settings_v3 as subject_settings
+        from load import VRTrial
+        handedness = open('%s/%s'%(DATADR,'left_or_right.txt')).readline()
+
+        if handedness=='left':
+            person,modelhandedness,rotation,dr = subject_settings(0)
+            self.partsIx = left_hand_col_indices()
+        elif handedness=='right':
+            person,modelhandedness,rotation,dr = subject_settings(2)
+            self.partsIx = right_hand_col_indices()
+        else:
+            raise Exception
+
+        trial = VRTrial(person,modelhandedness,rotation,dr)
+        avatar = trial.templateTrial
+
+        return avatar
     
-    def start(self,avatar,
+    def start(self,
               update_delay=.3,
               initial_window_duration=1.0,initial_vis_fraction=0.5,
               min_window_duration=.5,max_window_duration=2,
@@ -366,8 +391,6 @@ class HandSyncExperiment(object):
 
         Parameters
         ----------
-        avatar : dict
-            Dictionary of avatar interpolation splines.
         update_delay : float,.3
             Number of seconds to wait between updating arrays when calculating realtime coherence.
         initial_window_duration : float,1.0
@@ -390,20 +413,21 @@ class HandSyncExperiment(object):
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
         open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction))
         
-        # For retrieving the subject's velocities.
-        subVBroadcast = ANBroadcast(self.duration,
-                                    '%s/%s'%(DATADR,'an_port.txt'),
-                                    self.partsIx)
-        # Wait for data to be written to end of port broadcast file.
-        time.sleep(self.duration+1)
-
         # Get the time at which the trial started.
         while not os.path.isfile('%s/%s'%(DATADR,'start_time.txt')):
             time.sleep(.5)
         time.sleep(.5)
         with open('%s/%s'%(DATADR,'start_time.txt'),'r') as f:
             t0 = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
+        
+        avatar = self.load_avatar()
 
+        # For retrieving the subject's velocities.
+        subVBroadcast = ANBroadcast(self.duration,
+                                    '%s/%s'%(DATADR,'an_port.txt'),
+                                    self.partsIx)
+        # Wait for data to be written to end of port broadcast file.
+        time.sleep(self.duration+1)
         # Wait til fully visible trial has finished and read data while waiting so that we can erase
         # it before starting the next trial.
         time.sleep(self.duration+1)
