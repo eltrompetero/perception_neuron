@@ -376,7 +376,24 @@ class HandSyncExperiment(object):
         avatar = trial.templateTrial
 
         return avatar
-    
+
+    def read_start_time(self):
+        """
+        Get the time at which the trial started.
+        """
+        while not os.path.isfile('%s/%s'%(DATADR,'start_time.txt')):
+            time.sleep(.5)
+        time.sleep(.5)
+        with open('%s/%s'%(DATADR,'start_time.txt'),'r') as f:
+            t0 = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
+        return t0
+   
+    def wait_for_start_gpr(self):
+        while not os.path.isfile('%s/%s'%(DATADR,'start_gpr.txt')):
+            self.subVBroadcast.update()
+            time.sleep(.5)
+        self.subVBroadcast.refresh()
+
     def start(self,
               update_delay=.3,
               initial_window_duration=1.0,initial_vis_fraction=0.5,
@@ -413,38 +430,28 @@ class HandSyncExperiment(object):
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
         open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction))
         
-        # Get the time at which the trial started.
-        while not os.path.isfile('%s/%s'%(DATADR,'start_time.txt')):
-            time.sleep(.5)
-        time.sleep(.5)
-        with open('%s/%s'%(DATADR,'start_time.txt'),'r') as f:
-            t0 = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
-        
+        t0 = self.read_start_time()
         avatar = self.load_avatar()
 
         # For retrieving the subject's velocities.
-        subVBroadcast = ANBroadcast(self.duration,
-                                    '%s/%s'%(DATADR,'an_port.txt'),
-                                    self.partsIx)
-        # Wait for data to be written to end of port broadcast file.
-        time.sleep(self.duration+1)
+        self.subVBroadcast = ANBroadcast(self.duration,
+                                         '%s/%s'%(DATADR,'an_port.txt'),
+                                         self.partsIx)
+
         # Wait til fully visible trial has finished and read data while waiting so that we can erase
         # it before starting the next trial.
         time.sleep(self.duration+1)
-        while not os.path.isfile('%s/%s'%(DATADR,'start_gpr.txt')):
-            subVBroadcast.update()
-            time.sleep(.5)
-        subVBroadcast.refresh()
+        self.wait_for_start_gpr()
 
         # Run real time GPR analysis loop.
         with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
-            subVBroadcast.update()
-            while len(subVBroadcast.tdateHistory)<(self.duration*60):
+            self.subVBroadcast.update()
+            while len(self.subVBroadcast.tdateHistory)<(self.duration*60):
                 print "Waiting to collect more data..."
                 time.sleep(1)
-                subVBroadcast.update()
-            v = subVBroadcast.v
-            avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,t0,
+                self.subVBroadcast.update()
+            v = self.subVBroadcast.v
+            avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.tdate,t0,
                                             disp=True)
             
             while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
@@ -468,21 +475,21 @@ class HandSyncExperiment(object):
                     # Run GPR.
                     print "Running GPR on this trial..."
                     avv = fetch_matching_avatar_vel(avatar,self.trialType,
-                                                    subVBroadcast.tdateHistory,t0)
-                    avgcoh = ceval.evaluateCoherence( avv[:,2],subVBroadcast.vHistory[:,2] )
+                                                    self.subVBroadcast.tdateHistory,t0)
+                    avgcoh = ceval.evaluateCoherence( avv[:,2],self.subVBroadcast.vHistory[:,2] )
                     nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
                     open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                                 nextFraction))
 
                     # Refresh history.
-                    subVBroadcast.refresh()
+                    self.subVBroadcast.refresh()
                     # No output til more data has been collected.
                     print "Collecting data..."
                     time.sleep(self.duration+1)
                 
-                subVBroadcast.update()
-                v = subVBroadcast.v
-                avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,t0,
+                self.subVBroadcast.update()
+                v = self.subVBroadcast.v
+                avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.tdate,t0,
                                                 disp=True)
 
             with open('%s/%s'%(DATADR,'end_port_read.txt'),'w') as f:
