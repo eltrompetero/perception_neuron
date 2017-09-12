@@ -8,6 +8,7 @@ from datetime import datetime,timedelta
 import os,time,socket,shutil
 import pandas as pd
 from load import calc_file_headers
+import threading
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
 PORT = 7003  # Calculation data.
@@ -526,6 +527,7 @@ class ANBroadcast(object):
             All history since last refresh.
         tdateHistory : ndarray
             All history since last refresh.
+        lock : threading.Lock
 
         Methods
         -------
@@ -535,6 +537,7 @@ class ANBroadcast(object):
         _interpolate()
         """
         self.duration = duration
+        self.lock = threading.Lock()
         
         # Open file and go to the end.
         self.fin = open(broadcast_file)
@@ -546,12 +549,16 @@ class ANBroadcast(object):
     
     def refresh(self):
         """Clear stored arrays including history."""
+        self.lock.acquire()
+
         self.v = np.zeros((0,3))
         self.t = np.array(())
         self.tdate = np.array(())
         self.vHistory = np.zeros((0,3))
         self.tHistory = np.array(())
         self.tdateHistory = np.array(())
+
+        self.lock.release()
 
     def update(self):
         """
@@ -566,6 +573,8 @@ class ANBroadcast(object):
             print "Nothing new to read."
             return
         
+        self.lock.acquire()
+
         # Update arrays with new data. 
         self.vHistory = np.append(self.vHistory,vnew,axis=0)
         self.tdateHistory = np.append(self.tdateHistory,tdatenew)
@@ -579,6 +588,8 @@ class ANBroadcast(object):
         self.tdate = self.tdateHistory[tix]
         assert len(self.v)==len(self.t)==len(self.tdate) 
         self._interpolate()
+
+        self.lock.release()
     
     def fetch_new_vel(self):
         """
