@@ -341,7 +341,7 @@ class HandSyncExperiment(object):
         outfile : str
             Output file where to write current coherence value. This will be placed in DATADR.
         duration : float
-            Seconds into past to analyze.
+            Seconds into past to analyze for real time coherence measure.
         trial_type : str
             'avatar','avatar0','hand','hand0'
         parts_ix : str
