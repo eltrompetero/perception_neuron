@@ -54,19 +54,22 @@ def _format_port_output(s):
     return f
 # end port section
 
-def record_AN_port(fname):
+def record_AN_port(fname,savedr='C:/Users/Eddie/Dropbox/Sync_trials/Data'):
     """
     Start recording data from Axis Neuron port when presence of start.txt is detected and stop when
-    end.txt is detected in DATADR.
+    end_port_read.txt is detected in DATADR.
+
+    Must be run on Windows running the UE4 setup.
 
     Parameters
     ----------
     fname : str
+    savedr : str,'C:/Users/Eddie/Dropbox/Sync_trials/Data/'
     """
     f = open(fname,'w')
 
     # Check that recording has started as given by presence of lock file.
-    while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/start.txt'):
+    while not os.path.isfile('%s/%s'%(savedr,'start.txt')):
         time.sleep(1)
     
     # Write header line.
@@ -75,7 +78,7 @@ def record_AN_port(fname):
     f.write('Timestamp '+' '.join(headers)+'\n')
     
     # Capture port output.
-    while not os.path.isfile('C:/Users/Eddie/Dropbox/Sync_trials/Data/end.txt'):
+    while not os.path.isfile('%s/%s'%(savedr,'end_port_read.txt')):
         portOut = read_port()
         t = portOut[0].isoformat()
         f.write('%s %s\n'%(t,portOut[1].strip()))
@@ -296,7 +299,7 @@ def right_hand_col_indices():
             nameIx += 1
     return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
 
-def fetch_matching_avatar_vel(avatar,part,t,disp=False):
+def fetch_matching_avatar_vel(avatar,part,t,t0,disp=False):
     """
     Get the stretch of avatar velocities that aligns with the velocity data of the subject. Assumes
     that the start time for the avatar is given in ~/Dropbox/Sync_trials/Data/start.txt
@@ -309,18 +312,16 @@ def fetch_matching_avatar_vel(avatar,part,t,disp=False):
         Choose from 'avatar','avatar0','hand','hand0'.
     t : array of datetime objects
         Stretch of time to return data from.
+    t0 : datetime
 
     Returns
     -------
     v : ndarray
         Avatar's velocity that matches given time stamps.
     """
-    # Get the time at which the trial started.
-    with open('%s/%s'%(DATADR,'start.txt'),'r') as f:
-        startt = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
-    
+        
     # Transform dt to time in seconds.
-    t = np.array([i.total_seconds() for i in t-startt])
+    t = np.array([i.total_seconds() for i in t-t0])
     if disp:
         print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
 
@@ -379,18 +380,10 @@ class HandSyncExperiment(object):
         from gpr import CoherenceEvaluator,GPR
         import cPickle as pickle
         
-        # Read start time.
-        while not os.path.isfile('%s/%s'%(DATADR,'start.txt')):
-            time.sleep(.5)
-        fopen = open('%s/%s'%(DATADR,'start.txt'),'w')
-        fopen.write(datetime.now().isoformat())
-        fopen.close()
-
-
-        # Run experiment.
         # Setup routines for calculating coherence.
         ceval = CoherenceEvaluator(10)
-        gprmodel = GPR()
+        gprmodel = GPR(TMIN=min_window_duration,TMAX=max_window_duration,
+                       FMIN=min_vis_fraction,FMAX=max_vis_fraction)
         nextDuration = np.around(initial_window_duration,1)
         nextFraction = np.around(initial_vis_fraction,1)
         assert min_window_duration<=nextDuration<=max_window_duration
@@ -401,10 +394,25 @@ class HandSyncExperiment(object):
         subVBroadcast = ANBroadcast(self.duration,
                                     '%s/%s'%(DATADR,'an_port.txt'),
                                     self.partsIx)
-        # Wait for data to be written to end of file..
+        # Wait for data to be written to end of port broadcast file.
         time.sleep(self.duration+1)
 
-        # Get data from subject and also from avatar.
+        # Get the time at which the trial started.
+        while not os.path.isfile('%s/%s'%(DATADR,'start_time.txt')):
+            time.sleep(.5)
+        time.sleep(.5)
+        with open('%s/%s'%(DATADR,'start_time.txt'),'r') as f:
+            t0 = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
+
+        # Wait til fully visible trial has finished and read data while waiting so that we can erase
+        # it before starting the next trial.
+        time.sleep(self.duration+1)
+        while not os.path.isfile('%s/%s'%(DATADR,'start_gpr.txt')):
+            subVBroadcast.update()
+            time.sleep(.5)
+        subVBroadcast.refresh()
+
+        # Run real time GPR analysis loop.
         with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
             subVBroadcast.update()
             while len(subVBroadcast.tdateHistory)<(self.duration*60):
@@ -412,7 +420,7 @@ class HandSyncExperiment(object):
                 time.sleep(1)
                 subVBroadcast.update()
             v = subVBroadcast.v
-            avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
+            avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,t0,
                                             disp=True)
             
             while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
@@ -435,7 +443,8 @@ class HandSyncExperiment(object):
 
                     # Run GPR.
                     print "Running GPR on this trial..."
-                    avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdateHistory)
+                    avv = fetch_matching_avatar_vel(avatar,self.trialType,
+                                                    subVBroadcast.tdateHistory,t0)
                     avgcoh = ceval.evaluateCoherence( avv[:,2],subVBroadcast.vHistory[:,2] )
                     nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
                     open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
@@ -449,9 +458,11 @@ class HandSyncExperiment(object):
                 
                 subVBroadcast.update()
                 v = subVBroadcast.v
-                avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,
+                avv = fetch_matching_avatar_vel(avatar,self.trialType,subVBroadcast.tdate,t0,
                                                 disp=True)
 
+            with open('%s/%s'%(DATADR,'end_port_read.txt'),'w') as f:
+                f.write('')
 
         print "Saving GPR."
         pickle.dump({'gprmodel':gprmodel},open('%s/%s'%(DATADR,'temp.p'),'wb'),-1)
