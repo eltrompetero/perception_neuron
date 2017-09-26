@@ -336,7 +336,7 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,disp=False):
 # Classes #
 # ======= #
 class HandSyncExperiment(object):
-    def __init__(self,outfile,duration,trial_type):
+    def __init__(self,outfile,duration,trial_type,broadcast_port=5001):
         """
         Parameters
         ----------
@@ -348,11 +348,13 @@ class HandSyncExperiment(object):
             'avatar','avatar0','hand','hand0'
         parts_ix : str
             Indices of the columns in an_port file to extract and analyze.
+        broadcast_port : int,5001
         """
         self.outfile = outfile
         self.duration = duration
         self.trialType = trial_type
         self.partsIx = None
+        self.broadcastPort = broadcast_port
 
     def load_avatar(self):
         """
@@ -379,22 +381,34 @@ class HandSyncExperiment(object):
 
         return avatar
 
-    def read_start_time(self):
+    def wait_for_start_time(self):
         """
         Get the time at which the trial started.
+
+        Returns
+        -------
+        t0 : datetime
+            The time at which the trial was started.
         """
         while not os.path.isfile('%s/%s'%(DATADR,'start_time.txt')):
             time.sleep(.5)
+        # Give some time for the initial time to be written by UE4.
         time.sleep(.5)
         with open('%s/%s'%(DATADR,'start_time.txt'),'r') as f:
             t0 = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
         return t0
    
     def wait_for_start_gpr(self):
+        """
+        Once start_gpr.txt has been written, erase self.subVBroadcast's memory of the history of
+        velocity.
+        """
         while not os.path.isfile('%s/%s'%(DATADR,'start_gpr.txt')):
             self.subVBroadcast.update()
             time.sleep(.5)
         self.subVBroadcast.refresh()
+
+
 
     def start(self,
               update_delay=.3,
@@ -402,11 +416,17 @@ class HandSyncExperiment(object):
               min_window_duration=.5,max_window_duration=2,
               min_vis_fraction=.1,max_vis_fraction=.9):
         """
-        Run realtime analysis for experiment. Starts when start.txt becomes available to read in
-        avatar start time. Reads an_port.txt to get the latest velocity data and keep track of
-        subject's performance relative to the avatar. When run_gpr.txt is written, GPR prediction
-        for the coherence as a function of window duration and visible fraction is performed and the
-        next coordinate is written to next_setting.txt.
+        Run realtime analysis for experiment.
+        
+        Code waits til when start.txt becomes available to read in avatar start time.
+        
+        One thread is initialized to read an_port.txt to get the latest velocity data and keep track
+        of subject's performance relative to the avatar. When run_gpr.txt is written, this module
+        runs GPR prediction for the coherence as a function of window duration and visible fraction
+        is performed
+        
+        Another thread is initialized to broadcast the current GPR coordinate to port 5001 (default
+        setting).
 
         Parameters
         ----------
@@ -430,9 +450,13 @@ class HandSyncExperiment(object):
         nextFraction = np.around(initial_vis_fraction,1)
         assert min_window_duration<=nextDuration<=max_window_duration
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
-        open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction))
         
-        t0 = self.read_start_time()
+        # Open port for communication with UE4 engine. This
+
+
+       
+        # Wait til start_time.txt has been written to start experiment..
+        t0 = self.wait_for_start_time()
         avatar = self.load_avatar()
 
         # For retrieving the subject's velocities.
@@ -700,3 +724,55 @@ class ANBroadcast(object):
         # sync datetimes with linearly spaced seconds.
         self.tdate = np.array([self.tdate[0]+timedelta(0,i/60) for i in xrange(len(t))])
 # end ANBroadcast
+
+
+
+class DataBroadcaster(object):
+    def __init__(self,port,host='127.0.0.1'):
+        """
+        Class for safely broadcasting mutable data.
+
+        Parameters
+        ----------
+        port : int
+        host : str,'127.0.0.1'
+        """
+        self.port = port
+        self.host = host
+        self.lock = threading.Lock()
+        self._payload = ''
+
+    def update_str(self,snew):
+        """
+        Update string of data that is being transmitted.
+        
+        Parameters
+        ----------
+        snew : str
+        """
+        self.lock.acquire()
+        self._payload = snew
+        self.lock.release()
+
+    def broadcast(self,event,pause=1):
+        """
+        Loop broadcast payload to port with pause in between broadcasts. Payload is protected so
+        that it can be updated safely from another function.
+
+        Parameters
+        ----------
+        event : threading.Event
+        pause : float,1
+            Number of seconds to wait before looping.
+        """
+        while not event.is_set():
+            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            sock.connect((self.host,self.port))
+
+            self.lock.acquire()
+            sock.send(self._payload)
+            self.lock.release()
+
+            sock.close()
+            time.sleep(pause)
+#end DataBroadcaster
