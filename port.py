@@ -8,6 +8,7 @@ from datetime import datetime,timedelta
 import os,time,socket,shutil
 import pandas as pd
 from load import calc_file_headers
+import threading
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
 PORT = 7003  # Calculation data.
@@ -193,7 +194,8 @@ def read_an_port_file(fopen,partsIx):
     ln = fopen.read() 
     # Take last line. 
     ln = ln.split('\n')[:-1]
-    assert len(ln)>2, "Insufficient data has been appended to pull out an entire single broadcast."
+    if len(ln)<2:
+        return subT,subV
     
     print "Accessing file..."
     for el in ln:
@@ -442,24 +444,29 @@ class HandSyncExperiment(object):
         # it before starting the next trial.
         time.sleep(self.duration+1)
         self.wait_for_start_gpr()
+        
+        event = threading.Event()
 
         # Run real time GPR analysis loop.
         with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
-            self.subVBroadcast.update()
-            while len(self.subVBroadcast.tdateHistory)<(self.duration*60):
-                print "Waiting to collect more data..."
-                time.sleep(1)
-                self.subVBroadcast.update()
-            v = self.subVBroadcast.v
-            avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.tdate,t0,
-                                            disp=True)
+            # Start thread for looping update subVBroadcast.
+            t = threading.Thread(target=self.subVBroadcast.loop_update,args=(event,update_delay))
+            t.setDaemon(True)
+            t.start()
+            
+            while self.subVBroadcast.len_history()<(self.duration*60):
+                print "Waiting to collect more data...(%d)"%self.subVBroadcast.len_history()
+                time.sleep(1.5)
             
             while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
-                avgcoh = ceval.evaluateCoherence(avv[:,2],v[:,2])
-                fout.write('%f\n'%avgcoh)
-                
-                time.sleep(update_delay)
-                
+                v = self.subVBroadcast.copy_v()
+                avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.copy_tdate(),
+                                                t0,
+                                                disp=True)
+                if len(v)>90:
+                    avgcoh = ceval.evaluateCoherence(avv[:,2],v[:,2])
+                    fout.write('%f\n'%avgcoh)
+                print "loop"     
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
                     # Sometimes deletion conflicts with writing.
                     notDeleted = True
@@ -470,27 +477,36 @@ class HandSyncExperiment(object):
                             print "run_gpr.txt successfully deleted."
                         except OSError:
                             print "run_gpr.txt unsuccessfully deleted."
-                            time.sleep(0.1)
+                            time.sleep(.1)
 
                     # Run GPR.
                     print "Running GPR on this trial..."
                     avv = fetch_matching_avatar_vel(avatar,self.trialType,
-                                                    self.subVBroadcast.tdateHistory,t0)
-                    avgcoh = ceval.evaluateCoherence( avv[:,2],self.subVBroadcast.vHistory[:,2] )
+                                                    self.subVBroadcast.copy_tdateHistory(),t0)
+                    avgcoh = ceval.evaluateCoherence( avv[:,2],self.subVBroadcast.copy_vHistory()[:,2] )
                     nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
                     open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                                 nextFraction))
 
                     # Refresh history.
+                    event.set()
                     self.subVBroadcast.refresh()
+                    event.clear()
+
                     # No output til more data has been collected.
                     print "Collecting data..."
                     time.sleep(self.duration+1)
-                
-                self.subVBroadcast.update()
-                v = self.subVBroadcast.v
-                avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.tdate,t0,
-                                                disp=True)
+                    
+                    # Start loop update again.
+                    t = threading.Thread(target=self.subVBroadcast.loop_update,args=(event,update_delay))
+                    t.start()
+
+                time.sleep(update_delay) 
+            
+            # Always end thread.
+            print "ending thread"
+            event.set()
+            t.join()
 
             with open('%s/%s'%(DATADR,'end_port_read.txt'),'w') as f:
                 f.write('')
@@ -526,6 +542,7 @@ class ANBroadcast(object):
             All history since last refresh.
         tdateHistory : ndarray
             All history since last refresh.
+        lock : threading.Lock
 
         Methods
         -------
@@ -535,6 +552,7 @@ class ANBroadcast(object):
         _interpolate()
         """
         self.duration = duration
+        self.lock = threading.Lock()
         
         # Open file and go to the end.
         self.fin = open(broadcast_file)
@@ -543,15 +561,61 @@ class ANBroadcast(object):
         self.partsIx = parts_ix
 
         self.refresh()
-    
+
+    # ========================= # 
+    # Safe data access methods. #
+    # ========================= # 
+    def len_history(self):
+        self.lock.acquire()
+        n = len(self.tdateHistory)
+        self.lock.release()
+        return n
+
+    def copy_v(self):
+        self.lock.acquire()
+        v = self.v.copy()
+        self.lock.release()
+        return v
+
+    def copy_tdate(self):
+        self.lock.acquire()
+        tdate = self.tdate.copy()
+        self.lock.release()
+        return tdate
+
+    def copy_v(self):
+        self.lock.acquire()
+        v = self.v.copy()
+        self.lock.release()
+        return v
+
+    def copy_vHistory(self):
+        self.lock.acquire()
+        vHistory = self.vHistory.copy()
+        self.lock.release()
+        return vHistory
+
+    def copy_tdateHistory(self):
+        self.lock.acquire()
+        tdateHistory = self.tdateHistory.copy()
+        self.lock.release()
+        return tdateHistory
+
+    # =============== #
+    # Update methods. #
+    # =============== #
     def refresh(self):
         """Clear stored arrays including history."""
+        self.lock.acquire()
+
         self.v = np.zeros((0,3))
         self.t = np.array(())
         self.tdate = np.array(())
         self.vHistory = np.zeros((0,3))
         self.tHistory = np.array(())
         self.tdateHistory = np.array(())
+
+        self.lock.release()
 
     def update(self):
         """
@@ -566,6 +630,8 @@ class ANBroadcast(object):
             print "Nothing new to read."
             return
         
+        self.lock.acquire()
+
         # Update arrays with new data. 
         self.vHistory = np.append(self.vHistory,vnew,axis=0)
         self.tdateHistory = np.append(self.tdateHistory,tdatenew)
@@ -578,7 +644,27 @@ class ANBroadcast(object):
         self.t = self.tHistory[tix]
         self.tdate = self.tdateHistory[tix]
         assert len(self.v)==len(self.t)==len(self.tdate) 
-        self._interpolate()
+        
+        # Must have enough points to interpolate.
+        if len(self.v)>10:
+            self._interpolate()
+
+        self.lock.release()
+
+    def loop_update(self,event,dt):
+        """
+        Loop update til event is set.
+
+        Parameters
+        ----------
+        event : threading.Event
+        dt : float
+            Number of seconds to wait between updates. Must be greater than 0.3.
+        """
+        assert dt>=.3,"Update loop too fast for acquiring outside of function."
+        while not event.is_set():
+            self.update()
+            time.sleep(dt)
     
     def fetch_new_vel(self):
         """
