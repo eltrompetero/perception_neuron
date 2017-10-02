@@ -169,7 +169,7 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_
 # ---------------------------------------------------- #
 # Functions for real time reading from port broadcast. #
 # ---------------------------------------------------- #
-def read_an_port_file(fopen,partsIx):
+def read_an_port_file(fopen,partsIx,verbose=False):
     """
     Read from AN port broadcast file and extract the information from specified fields.
 
@@ -190,6 +190,7 @@ def read_an_port_file(fopen,partsIx):
     subV = np.zeros((0,3))
 
     # Taking anything that has been added to the file from current read position.
+    # The first time the file is opened, the read position is at the beginning of the file.
     fopen.seek(0,1)
     ln = fopen.read() 
     # Take last line. 
@@ -197,7 +198,8 @@ def read_an_port_file(fopen,partsIx):
     if len(ln)<2:
         return subT,subV
     
-    print "Accessing file..."
+    if verbose:
+        print "Accessing file..."
     for el in ln:
         # Some values seem to be cutoff because microseconds is precisely 0.
         el = el.split()
@@ -301,7 +303,7 @@ def right_hand_col_indices():
             nameIx += 1
     return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
 
-def fetch_matching_avatar_vel(avatar,part,t,t0,disp=False):
+def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
     """
     Get the stretch of avatar velocities that aligns with the velocity data of the subject. Assumes
     that the start time for the avatar is given in ~/Dropbox/Sync_trials/Data/start.txt
@@ -321,10 +323,9 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,disp=False):
     v : ndarray
         Avatar's velocity that matches given time stamps.
     """
-        
     # Transform dt to time in seconds.
     t = np.array([i.total_seconds() for i in t-t0])
-    if disp:
+    if verbose:
         print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
 
     # Return part of avatar's trajectory that agrees with the stipulated time bounds.
@@ -336,12 +337,10 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,disp=False):
 # Classes #
 # ======= #
 class HandSyncExperiment(object):
-    def __init__(self,outfile,duration,trial_type,broadcast_port=5001):
+    def __init__(self,duration,trial_type,broadcast_port=5001):
         """
         Parameters
         ----------
-        outfile : str
-            Output file where to write current coherence value. This will be placed in DATADR.
         duration : float
             Seconds into past to analyze for real time coherence measure.
         trial_type : str
@@ -350,7 +349,6 @@ class HandSyncExperiment(object):
             Indices of the columns in an_port file to extract and analyze.
         broadcast_port : int,5001
         """
-        self.outfile = outfile
         self.duration = duration
         self.trialType = trial_type
         self.partsIx = None
@@ -365,7 +363,7 @@ class HandSyncExperiment(object):
         """
         from load import subject_settings_v3 as subject_settings
         from load import VRTrial
-        handedness = open('%s/%s'%(DATADR,'left_or_right.txt')).readline()
+        handedness = open('%s/%s'%(DATADR,'left_or_right.txt')).readline().rstrip()
 
         if handedness=='left':
             person,modelhandedness,rotation,dr = subject_settings(0)
@@ -374,6 +372,7 @@ class HandSyncExperiment(object):
             person,modelhandedness,rotation,dr = subject_settings(2)
             self.partsIx = right_hand_col_indices()
         else:
+            print handedness
             raise Exception
 
         trial = VRTrial(person,modelhandedness,rotation,dr)
@@ -408,8 +407,6 @@ class HandSyncExperiment(object):
             time.sleep(.5)
         self.subVBroadcast.refresh()
 
-
-
     def start(self,
               update_delay=.3,
               initial_window_duration=1.0,initial_vis_fraction=0.5,
@@ -420,14 +417,19 @@ class HandSyncExperiment(object):
         
         Code waits til when start.txt becomes available to read in avatar start time.
         
-        One thread is initialized to read an_port.txt to get the latest velocity data and keep track
-        of subject's performance relative to the avatar. When run_gpr.txt is written, this module
-        runs GPR prediction for the coherence as a function of window duration and visible fraction
-        is performed
+        The threads that are running:
+        0. readThread: read an_port.txt to get the latest velocity data
+        1. updateBroadcastThread: assess subject's performance relative to the avatar and
+            update coherence value
+        2. broadcastThread: broadcast subject's performance to port 5001
         
-        Another thread is initialized to broadcast the current GPR coordinate to port 5001 (default
-        setting).
+        Thread communication happens through members that are updated using thread locks.
+        
+        In while loop, run GPR prediction step and write the next window duration and visible
+        fraction to file. Waiting for run_gpr.txt and writing to next_setting.txt.
 
+        When end.txt is written, experiment ends.
+        
         Parameters
         ----------
         update_delay : float,.3
@@ -443,7 +445,7 @@ class HandSyncExperiment(object):
         import cPickle as pickle
         
         # Setup routines for calculating coherence.
-        ceval = CoherenceEvaluator(10)
+        coheval = CoherenceEvaluator(10)  # arg is max freq to consider
         gprmodel = GPR(TMIN=min_window_duration,TMAX=max_window_duration,
                        FMIN=min_vis_fraction,FMAX=max_vis_fraction)
         nextDuration = np.around(initial_window_duration,1)
@@ -451,96 +453,118 @@ class HandSyncExperiment(object):
         assert min_window_duration<=nextDuration<=max_window_duration
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
         
-        # Open port for communication with UE4 engine. This
+        # Open port for communication with UE4 engine. This will send the current coherence value to
+        # UE4.
+        self.broadcast = DataBroadcaster(self.broadcastPort)
+        self.broadcast.update_payload('0.0')
+        broadcastThread = threading.Thread(target=self.broadcast.broadcast,kwargs={'verbose':False})
 
-
-       
         # Wait til start_time.txt has been written to start experiment..
         t0 = self.wait_for_start_time()
         avatar = self.load_avatar()
 
-        # For retrieving the subject's velocities.
-        self.subVBroadcast = ANBroadcast(self.duration,
+        # Initialize thread reading the subject's velocities.
+        self.subVBroadcast = ANReader(self.duration,
                                          '%s/%s'%(DATADR,'an_port.txt'),
                                          self.partsIx)
+        readThread = threading.Thread(target=self.subVBroadcast.loop_update,args=(update_delay,))
+
+        # Set up thread for updating value of streaming braodcast of coherence.
+        def update_broadcaster(stopEvent):
+            try:
+                while not stopEvent.is_set():
+                    v = self.subVBroadcast.copy_v()
+                    avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.copy_tdate(),t0)
+                    if len(v)>=160:
+                        avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
+                        self.broadcast.update_payload('%1.1f'%avgcoh)
+                    else: print "Not enough data"
+                    time.sleep(0.2)
+            except Exception,err:
+                print err.parameter
+            finally:
+                print "updateBroadcastThread stopped"
+        self.updateBroadcastEvent = threading.Event()
+        updateBroadcastThread = threading.Thread(target=update_broadcaster,args=(self.updateBroadcastEvent,))
 
         # Wait til fully visible trial has finished and read data while waiting so that we can erase
         # it before starting the next trial.
         time.sleep(self.duration+1)
         self.wait_for_start_gpr()
         
-        event = threading.Event()
+        print "Starting threads."
+        readThread.start()
+        while self.subVBroadcast.len_history()<(self.duration*60):
+            print "Waiting to collect more data...(%d)"%self.subVBroadcast.len_history()
+            time.sleep(1.5)
+        broadcastThread.start()
+        if self.broadcast.connectionInterrupted:
+            raise Exception
+        updateBroadcastThread.start()
 
-        # Run real time GPR analysis loop.
-        with open('%s/%s'%(DATADR,self.outfile),'w') as fout:
-            # Start thread for looping update subVBroadcast.
-            t = threading.Thread(target=self.subVBroadcast.loop_update,args=(event,update_delay))
-            t.setDaemon(True)
-            t.start()
+        # Run GPR for the next windows setting.
+        print "Running GPR loop."
+        while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
+            if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
+                # Sometimes deletion conflicts with writing.
+                notDeleted = True
+                while notDeleted:
+                    try:
+                        os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
+                        notDeleted = False
+                        print "run_gpr.txt successfully deleted."
+                    except OSError:
+                        print "run_gpr.txt unsuccessfully deleted."
+                        time.sleep(.1)
+
+                # Run GPR.
+                print "Running GPR on this trial..."
+                avv = fetch_matching_avatar_vel(avatar,self.trialType,
+                                                self.subVBroadcast.copy_tdateHistory(),t0)
+                avgcoh = coheval.evaluateCoherence( avv[:,2],self.subVBroadcast.copy_vHistory()[:,2] )
+                nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
+                open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
+                                                                            nextFraction))
+
+                # Stop thread and refresh history.
+                self.subVBroadcast.stopEvent.set()
+                readThread.join()
+                self.subVBroadcast.refresh()
+                self.subVBroadcast.stopEvent.clear()
+                
+                # No output til more data has been collected.
+                print "Collecting data..."
+                time.sleep(self.duration+1)
+                
+                # Start loop update again.
+                readThread = threading.Thread(target=self.subVBroadcast.loop_update,args=(update_delay,))
+                readThread.start()
+
+            time.sleep(update_delay) 
             
-            while self.subVBroadcast.len_history()<(self.duration*60):
-                print "Waiting to collect more data...(%d)"%self.subVBroadcast.len_history()
-                time.sleep(1.5)
-            
-            while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
-                v = self.subVBroadcast.copy_v()
-                avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.copy_tdate(),
-                                                t0,
-                                                disp=True)
-                if len(v)>90:
-                    avgcoh = ceval.evaluateCoherence(avv[:,2],v[:,2])
-                    fout.write('%f\n'%avgcoh)
-                print "loop"     
-                if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
-                    # Sometimes deletion conflicts with writing.
-                    notDeleted = True
-                    while notDeleted:
-                        try:
-                            os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
-                            notDeleted = False
-                            print "run_gpr.txt successfully deleted."
-                        except OSError:
-                            print "run_gpr.txt unsuccessfully deleted."
-                            time.sleep(.1)
+        # Always end thread.
+        print "ending threads"
+        self.stop()
+        readThread.join()
+        updateBroadcastThread.join()
+        broadcastThread.join()
+        readThread.join()
 
-                    # Run GPR.
-                    print "Running GPR on this trial..."
-                    avv = fetch_matching_avatar_vel(avatar,self.trialType,
-                                                    self.subVBroadcast.copy_tdateHistory(),t0)
-                    avgcoh = ceval.evaluateCoherence( avv[:,2],self.subVBroadcast.copy_vHistory()[:,2] )
-                    nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
-                    open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
-                                                                                nextFraction))
-
-                    # Refresh history.
-                    event.set()
-                    self.subVBroadcast.refresh()
-                    event.clear()
-
-                    # No output til more data has been collected.
-                    print "Collecting data..."
-                    time.sleep(self.duration+1)
-                    
-                    # Start loop update again.
-                    t = threading.Thread(target=self.subVBroadcast.loop_update,args=(event,update_delay))
-                    t.start()
-
-                time.sleep(update_delay) 
-            
-            # Always end thread.
-            print "ending thread"
-            event.set()
-            t.join()
-
-            with open('%s/%s'%(DATADR,'end_port_read.txt'),'w') as f:
-                f.write('')
+        with open('%s/%s'%(DATADR,'end_port_read.txt'),'w') as f:
+            f.write('')
 
         print "Saving GPR."
         pickle.dump({'gprmodel':gprmodel},open('%s/%s'%(DATADR,'temp.p'),'wb'),-1)
+
+    def stop(self):
+        """Stop all thread that could be running. This does not wait for threads to stop."""
+        self.updateBroadcastEvent.set()
+        self.broadcast.stopEvent.set()
+        self.subVBroadcast.stopEvent.set()
 # end HandSyncExperiment
 
 
-class ANBroadcast(object):
+class ANReader(object):
     def __init__(self,duration,broadcast_file,parts_ix):
         """
         Class for keeping track of history of velocity.
@@ -577,6 +601,7 @@ class ANBroadcast(object):
         """
         self.duration = duration
         self.lock = threading.Lock()
+        self.stopEvent = threading.Event()
         
         # Open file and go to the end.
         self.fin = open(broadcast_file)
@@ -594,12 +619,6 @@ class ANBroadcast(object):
         n = len(self.tdateHistory)
         self.lock.release()
         return n
-
-    def copy_v(self):
-        self.lock.acquire()
-        v = self.v.copy()
-        self.lock.release()
-        return v
 
     def copy_tdate(self):
         self.lock.acquire()
@@ -645,7 +664,7 @@ class ANBroadcast(object):
         """
         Update record of velocities by reading latest velocities and throwing out old velocities.
         
-        Must interpolate missing points in between readings. Best way to do this cheaply is to use a
+        NOTE: Must interpolate missing points in between readings. Best way to do this cheaply is to use a
         Kalman filter to add a new point instead of refitting a global spline every time we get a
         new set of points.
         """
@@ -675,20 +694,24 @@ class ANBroadcast(object):
 
         self.lock.release()
 
-    def loop_update(self,event,dt):
+    def loop_update(self,dt):
         """
-        Loop update til event is set.
+        Loop update til self.stopEvent is set.
 
         Parameters
         ----------
-        event : threading.Event
         dt : float
             Number of seconds to wait between updates. Must be greater than 0.3.
         """
-        assert dt>=.3,"Update loop too fast for acquiring outside of function."
-        while not event.is_set():
-            self.update()
-            time.sleep(dt)
+        try:
+            assert dt>=.3,"Update loop too fast for acquiring outside of function."
+            while not self.stopEvent.is_set():
+                self.update()
+                time.sleep(dt)
+        except Exception,err:
+            print err.parameter
+        finally:
+            print "ANReader reader thread stopped."
     
     def fetch_new_vel(self):
         """
@@ -723,7 +746,7 @@ class ANBroadcast(object):
         self.t = t
         # sync datetimes with linearly spaced seconds.
         self.tdate = np.array([self.tdate[0]+timedelta(0,i/60) for i in xrange(len(t))])
-# end ANBroadcast
+# end ANReader
 
 
 
@@ -740,9 +763,11 @@ class DataBroadcaster(object):
         self.port = port
         self.host = host
         self.lock = threading.Lock()
+        self.stopEvent = threading.Event()
         self._payload = ''
+        self.connectionInterrupted = False
 
-    def update_str(self,snew):
+    def update_payload(self,snew):
         """
         Update string of data that is being transmitted.
         
@@ -754,25 +779,38 @@ class DataBroadcaster(object):
         self._payload = snew
         self.lock.release()
 
-    def broadcast(self,event,pause=1):
+    def broadcast(self,pause=1,verbose=False):
         """
-        Loop broadcast payload to port with pause in between broadcasts. Payload is protected so
-        that it can be updated safely from another function.
+        Loop broadcast payload to port with pause in between broadcasts. Payload is locked so
+        that it can be updated safely from another function while this loop is running.
+
+        self.connectionInterrupted keeps track of whether or not connection with server was closed
+        by client or not.
 
         Parameters
         ----------
-        event : threading.Event
         pause : float,1
             Number of seconds to wait before looping.
+        verbose : bool,False
         """
-        while not event.is_set():
-            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            sock.connect((self.host,self.port))
+        while not self.stopEvent.is_set():
+            try:
+                sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+                sock.connect((self.host,self.port))
 
-            self.lock.acquire()
-            sock.send(self._payload)
-            self.lock.release()
+                self.lock.acquire()
+                nBytesSent = sock.send(self._payload)
+                self.lock.release()
+                
+                if verbose: print '%d bytes sent'%nBytesSent
 
-            sock.close()
-            time.sleep(pause)
+                sock.close()
+                time.sleep(pause)  # if this pause goes immediately after connect, data transmission
+                                   # is interrupted
+            except:
+                print "Error: Connection to server broken."
+                self.connectionInterrupted = True
+                break
+        print "DataBroadcaster thread stopped"
+        self.connectionInterrupted = False
 #end DataBroadcaster
