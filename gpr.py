@@ -75,11 +75,13 @@ class CoherenceEvaluator(object):
         avg_coh : float
         '''
         assert len(v1)==len(v2)
+
         # Scipy.signal's coherence implementation. Not yet Eddie-coherence.
         self.f,self.C = coherence(v1,v2,
                                   fs=self.SAMPLE_FREQ,
                                   nperseg=self.WINDOW_LENGTH,
-                                  nfft=2 * self.WINDOW_LENGTH)
+                                  nfft=2 * self.WINDOW_LENGTH,
+                                  noverlap=self.WINDOW_LENGTH//4)
         
         # Evaluate Average Coherence by the Trapezoid rule.
         freqIx = (self.f>0)&(self.f<self.maxfreq)
@@ -114,18 +116,23 @@ class GPR(object):
     Class performs the gpr and writes the new visibility fraction/time to outputFile
     '''
     def __init__(self,
-                 GPRKernel = 1.0 * RBF(length_scale=1.0, length_scale_bounds=(1e-1, 10.0)),
-                 TMIN=0.5,TMAX=2,TSTEP=0.1,
-                 FMIN=0.1,FMAX=0.9,FSTEP=0.1):
+                 GPRKernel = 1.0 * RBF(length_scale=np.array([.5,.2]), length_scale_bounds=(1e-1, 10.0)),
+                 tmin=0.5,tmax=2,tstep=0.1,
+                 fmin=0.1,fmax=0.9,fstep=0.1):
         '''
-        TMIN is minimum window time; FMIN minimum visibility fraction.
+        Parameters
+        ----------
+        tmin : float
+            minimum window time
+        fmin : float
+            minimum visibility fraction.
         '''
-        self.TMIN = TMIN
-        self.TMAX = TMAX
-        self.TSTEP = TSTEP
-        self.FMIN = FMIN
-        self.FMAX = FMAX
-        self.FSTEP = FSTEP
+        self.tmin = tmin
+        self.tmax = tmax
+        self.tstep = tstep
+        self.fmin = fmin
+        self.fmax = fmax
+        self.fstep = fstep
         
         self.kernel = GPRKernel
         
@@ -134,8 +141,8 @@ class GPR(object):
         self.coherences = np.zeros(0)
         
         # Create two grids for t and f.
-        self.meshPoints = np.meshgrid(np.arange(self.TMIN,self.TMAX+self.TSTEP,self.TSTEP),
-                                      np.arange(self.FMIN,self.FMAX+self.FSTEP,self.FSTEP))
+        self.meshPoints = np.meshgrid(np.arange(self.tmin,self.tmax+self.tstep,self.tstep),
+                                      np.arange(self.fmin,self.fmax+self.fstep,self.fstep))
         # Flatten t and f grids and stack them into an Nx2 array.
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
@@ -153,10 +160,9 @@ class GPR(object):
     def max_uncertainty(self):
         '''
         Returns next_duration,next_fraction as the point where the variance of the GPR is max
-        # Currently finds maximum uncertainty,and then returns a point with
-        # that uncertainty as the update value. But really this should be a
-        # point which would minimize the total uncertainty.
-
+        Currently finds maximum uncertainty, and then returns a point with that uncertainty as the
+        update value. But really this should be a point which would minimize the total uncertainty.
+        
         Returns
         -------
         next_window_duration : float
