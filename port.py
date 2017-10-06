@@ -191,6 +191,7 @@ def read_an_port_file(fopen,partsIx,verbose=False):
 
     # Taking anything that has been added to the file from current read position.
     # The first time the file is opened, the read position is at the beginning of the file.
+    # The ANReader instance should open the file and seek to the end before calling this function.
     fopen.seek(0,1)
     ln = fopen.read() 
     # Take last line. 
@@ -203,11 +204,11 @@ def read_an_port_file(fopen,partsIx,verbose=False):
     for el in ln:
         # Some values seem to be cutoff because microseconds is precisely 0.
         el = el.split()
-        if el[0]!='Timestamp':
+        if el[0]!='Timestamp' and len(el)==947:
             if len(el[0])!=26 :
                 el[0] += '.000000'
             
-            # Read in data.
+            # Read in data. Sometimes there seems to problems with the data that as been read in.
             subT = np.append(subT,datetime.strptime(el[0], '%Y-%m-%dT%H:%M:%S.%f'))
             subV = np.append(subV,[[float(f) for f in [el[ix] for ix in partsIx]]],axis=0)
     return subT,subV
@@ -410,7 +411,7 @@ class HandSyncExperiment(object):
     def start(self,
               update_delay=.3,
               initial_window_duration=1.0,initial_vis_fraction=0.5,
-              min_window_duration=.5,max_window_duration=2,
+              min_window_duration=.6,max_window_duration=2,
               min_vis_fraction=.1,max_vis_fraction=.9):
         """
         Run realtime analysis for experiment.
@@ -429,6 +430,9 @@ class HandSyncExperiment(object):
         fraction to file. Waiting for run_gpr.txt and writing to next_setting.txt.
 
         When end.txt is written, experiment ends.
+
+        NOTE:
+        - only calculate coherence along z-axis
         
         Parameters
         ----------
@@ -446,18 +450,21 @@ class HandSyncExperiment(object):
         
         # Setup routines for calculating coherence.
         coheval = CoherenceEvaluator(10)  # arg is max freq to consider
-        gprmodel = GPR(TMIN=min_window_duration,TMAX=max_window_duration,
-                       FMIN=min_vis_fraction,FMAX=max_vis_fraction)
+        gprmodel = GPR(tmin=min_window_duration,tmax=max_window_duration,
+                       fmin=min_vis_fraction,fmax=max_vis_fraction)
         nextDuration = np.around(initial_window_duration,1)
         nextFraction = np.around(initial_vis_fraction,1)
         assert min_window_duration<=nextDuration<=max_window_duration
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
-        
+        with open('%s/next_setting.txt'%DATADR,'w') as f:
+            f.write('%1.1f,%1.1f'%(nextDuration,nextFraction))
+
         # Open port for communication with UE4 engine. This will send the current coherence value to
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
         self.broadcast.update_payload('0.0')
         broadcastThread = threading.Thread(target=self.broadcast.broadcast,kwargs={'verbose':False})
+        broadcastThread.start()
 
         # Wait til start_time.txt has been written to start experiment..
         t0 = self.wait_for_start_time()
@@ -478,8 +485,7 @@ class HandSyncExperiment(object):
                     if len(v)>=160:
                         avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
                         self.broadcast.update_payload('%1.1f'%avgcoh)
-                    else: print "Not enough data"
-                    time.sleep(0.2)
+                    time.sleep(0.5)
             except Exception,err:
                 print err.parameter
             finally:
@@ -497,13 +503,11 @@ class HandSyncExperiment(object):
         while self.subVBroadcast.len_history()<(self.duration*60):
             print "Waiting to collect more data...(%d)"%self.subVBroadcast.len_history()
             time.sleep(1.5)
-        broadcastThread.start()
         if self.broadcast.connectionInterrupted:
             raise Exception
         updateBroadcastThread.start()
 
         # Run GPR for the next windows setting.
-        print "Running GPR loop."
         while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
             if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
                 # Sometimes deletion conflicts with writing.
@@ -666,7 +670,7 @@ class ANReader(object):
         
         NOTE: Must interpolate missing points in between readings. Best way to do this cheaply is to use a
         Kalman filter to add a new point instead of refitting a global spline every time we get a
-        new set of points.
+        new set of points which is what is happening now.
         """
         vnew,tdatenew = self.fetch_new_vel()
         if len(vnew)==0:
@@ -689,7 +693,7 @@ class ANReader(object):
         assert len(self.v)==len(self.t)==len(self.tdate) 
         
         # Must have enough points to interpolate.
-        if len(self.v)>10:
+        if len(self.v)>50:
             self._interpolate()
 
         self.lock.release()
@@ -739,8 +743,9 @@ class ANReader(object):
         interpolation.
         """
         from utils import MultiUnivariateSpline
-
-        splineV = MultiUnivariateSpline(self.t,self.v)
+        
+        # Must be careful with knot spacing because the data frequency is highly variable.
+        splineV = MultiUnivariateSpline(self.t,self.v,fit_type='Uni')
         t = np.arange(self.t[0],self.t[-1],1/60)
         self.v = splineV(t)
         self.t = t

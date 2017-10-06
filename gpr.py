@@ -87,6 +87,7 @@ class CoherenceEvaluator(object):
         freqIx = (self.f>0)&(self.f<self.maxfreq)
         avg_coherence = np.trapz(self.C[freqIx],x=self.f[freqIx]) / (self.f[freqIx].max()-self.f[freqIx].min())
         
+        if np.isnan(avg_coherence): avg_coherence = 0.
         return avg_coherence
     
     def evaluatePerformance(self):

@@ -33,11 +33,14 @@ class MultiUnivariateSpline(object):
         """
         Simple extension of UnivariateSpline to handle multidimensional data.
         
-        Params:
-        -------
+        Parameters
+        ----------
         t (ndarray)
         x (ndarray)
             If 2d, then (n_samples,n_dim).
+        knot_spacing : float,1/30
+        fit_type : str,'LSQ'
+
         **kwargs
         """
         assert x.ndim==2
@@ -736,22 +739,22 @@ def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
     "proportional" the length of the data by fixing the number of knots to be proportional to the length of
     the data set.
 
-    Params:
-    -------
-    x (ndarray)
+    Parameters
+    ----------
+    x : ndarray
         n_time x n_dim
-    t (ndarray of datetime.datetime)
-    spline_kwargs (dict)
-    offset (float)
+    t : ndarray of datetime.datetime
+    spline_kwargs : dict
+    offset : float
         Offset to time vector.
-    use_univariate (bool=False)
+    use_univariate : bool,False
         By default, use LSQUnivariateSpline which allows us to choose the knots which is useful for comparable
         fits on data sets of different sizes.
-    knot_spacing (float=1/30)
+    knot_spacing : float,1/30
         Distance between uniformly spaced knots.
 
-    Returns:
-    --------
+    Returns
+    -------
     xSpline (UnivariateSpline or MultiUnivariateSpline)
     tLin (ndarray)
     """
