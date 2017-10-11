@@ -11,19 +11,19 @@ from load import calc_file_headers
 import threading
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
-PORT = 7003  # Calculation data.
+PORT = 7006  # Calculation data.
 DATADR = os.path.expanduser('~')+'/Dropbox/Sync_trials/Data'
 
 # Functions for reading from broadcasting port.
 def read_port():
     def incoming(host, port):
         """Open specified port and return file-like object"""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         sock.connect((host,port))
         # In worst case scenario, all 947 fields will be 9 bytes with 1 space in between and a \n
-        # character.
-        t,data = datetime.now(),sock.recv(9470*2)
+        # character , but AN only returns 1024 bytes at a time.
+        t,data = datetime.now(),sock.recv(1024)
         sock.close()
         return t,data
     
@@ -57,6 +57,7 @@ def _format_port_output(s):
 
 def record_AN_port(fname,savedr='C:/Users/Eddie/Dropbox/Sync_trials/Data'):
     """
+    NOTE: Need two threads. One to read from port and other to save to file.
     Start recording data from Axis Neuron port when presence of start.txt is detected and stop when
     end_port_read.txt is detected in DATADR.
 
@@ -338,7 +339,7 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
 # Classes #
 # ======= #
 class HandSyncExperiment(object):
-    def __init__(self,duration,trial_type,broadcast_port=5001):
+    def __init__(self,duration,trial_type,parts_ix,broadcast_port=5001):
         """
         Parameters
         ----------
@@ -352,7 +353,7 @@ class HandSyncExperiment(object):
         """
         self.duration = duration
         self.trialType = trial_type
-        self.partsIx = None
+        self.partsIx = parts_ix
         self.broadcastPort = broadcast_port
 
     def load_avatar(self):
@@ -404,15 +405,14 @@ class HandSyncExperiment(object):
         velocity.
         """
         while not os.path.isfile('%s/%s'%(DATADR,'start_gpr.txt')):
-            self.subVBroadcast.update()
             time.sleep(.5)
-        self.subVBroadcast.refresh()
 
     def start(self,
               update_delay=.3,
               initial_window_duration=1.0,initial_vis_fraction=0.5,
               min_window_duration=.6,max_window_duration=2,
-              min_vis_fraction=.1,max_vis_fraction=.9):
+              min_vis_fraction=.1,max_vis_fraction=.9,
+              verbose=False):
         """
         Run realtime analysis for experiment.
         
@@ -443,6 +443,7 @@ class HandSyncExperiment(object):
         max_window_duration : float,2
         min_vis_fraction : float,.1
         max_vis_fraction : float,.9
+        verbose : bool,False
         """
         from load import subject_settings_v3,VRTrial
         from gpr import CoherenceEvaluator,GPR
@@ -470,89 +471,75 @@ class HandSyncExperiment(object):
         t0 = self.wait_for_start_time()
         avatar = self.load_avatar()
 
-        # Initialize thread reading the subject's velocities.
-        self.subVBroadcast = ANReader(self.duration,
-                                         '%s/%s'%(DATADR,'an_port.txt'),
-                                         self.partsIx)
-        readThread = threading.Thread(target=self.subVBroadcast.loop_update,args=(update_delay,))
-
-        # Set up thread for updating value of streaming braodcast of coherence.
-        def update_broadcaster(stopEvent):
-            try:
-                while not stopEvent.is_set():
-                    v = self.subVBroadcast.copy_v()
-                    avv = fetch_matching_avatar_vel(avatar,self.trialType,self.subVBroadcast.copy_tdate(),t0)
-                    if len(v)>=160:
-                        avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
-                        self.broadcast.update_payload('%1.1f'%avgcoh)
-                    time.sleep(0.5)
-            except Exception,err:
-                print err.parameter
-            finally:
-                print "updateBroadcastThread stopped"
-        self.updateBroadcastEvent = threading.Event()
-        updateBroadcastThread = threading.Thread(target=update_broadcaster,args=(self.updateBroadcastEvent,))
-
         # Wait til fully visible trial has finished and read data while waiting so that we can erase
         # it before starting the next trial.
         time.sleep(self.duration+1)
         self.wait_for_start_gpr()
         
-        print "Starting threads."
-        readThread.start()
-        while self.subVBroadcast.len_history()<(self.duration*60):
-            print "Waiting to collect more data...(%d)"%self.subVBroadcast.len_history()
-            time.sleep(1.5)
-        if self.broadcast.connectionInterrupted:
-            raise Exception
-        updateBroadcastThread.start()
+        if verbose:
+            print "Starting threads."
+        with ANReader(self.duration,self.partsIx,verbose=True) as reader:
+            # Set up thread for updating value of streaming braodcast of coherence.
+            def update_broadcaster(stopEvent):
+                try:
+                    while not stopEvent.is_set():
+                        v,t,tAsDate = reader.copy_recent()
+                        if len(v)>=160:
+                            avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
+                            avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
+                            self.broadcast.update_payload('%1.1f'%avgcoh)
+                        time.sleep(0.5)
+                finally:
+                    print "updateBroadcastThread stopped"
+            self.updateBroadcastEvent = threading.Event()
+            updateBroadcastThread = threading.Thread(target=update_broadcaster,args=(self.updateBroadcastEvent,))
 
-        # Run GPR for the next windows setting.
-        while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
-            if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
-                # Sometimes deletion conflicts with writing.
-                notDeleted = True
-                while notDeleted:
-                    try:
-                        os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
-                        notDeleted = False
-                        print "run_gpr.txt successfully deleted."
-                    except OSError:
-                        print "run_gpr.txt unsuccessfully deleted."
-                        time.sleep(.1)
+            while reader.len_history()<(self.duration*60):
+                if verbose:
+                    print "Waiting to collect more data...(%d)"%reader.len_history()
+                time.sleep(1.5)
+            if self.broadcast.connectionInterrupted:
+                raise Exception
+            updateBroadcastThread.start()
+            
+            # Run GPR for the next windows setting.
+            while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
+                if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
+                    # Sometimes deletion conflicts with writing.
+                    notDeleted = True
+                    while notDeleted:
+                        try:
+                            os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
+                            notDeleted = False
+                            print "run_gpr.txt successfully deleted."
+                        except OSError:
+                            print "run_gpr.txt unsuccessfully deleted."
+                            time.sleep(.1)
 
-                # Run GPR.
-                print "Running GPR on this trial..."
-                avv = fetch_matching_avatar_vel(avatar,self.trialType,
-                                                self.subVBroadcast.copy_tdateHistory(),t0)
-                avgcoh = coheval.evaluateCoherence( avv[:,2],self.subVBroadcast.copy_vHistory()[:,2] )
-                nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
-                open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
-                                                                            nextFraction))
+                    # Run GPR.
+                    print "Running GPR on this trial..."
+                    v,t,tdateHistory = reader.copy_history()
+                    avv = fetch_matching_avatar_vel(avatar,self.trialType,
+                                                    tdateHistory,t0)
+                    avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
+                    nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
+                    open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
+                                                                                nextFraction))
 
-                # Stop thread and refresh history.
-                self.subVBroadcast.stopEvent.set()
-                readThread.join()
-                self.subVBroadcast.refresh()
-                self.subVBroadcast.stopEvent.clear()
-                
-                # No output til more data has been collected.
-                print "Collecting data..."
-                time.sleep(self.duration+1)
-                
-                # Start loop update again.
-                readThread = threading.Thread(target=self.subVBroadcast.loop_update,args=(update_delay,))
-                readThread.start()
-
-            time.sleep(update_delay) 
+                    # Stop thread reading from port and refresh history.
+                    reader.refresh()
+                    while reader.len_history()<(self.duration*60):
+                        if verbose:
+                            print "Waiting to collect more data...(%d)"%reader.len_history()
+                        time.sleep(1.5)
+                    
+                time.sleep(update_delay) 
             
         # Always end thread.
-        print "ending threads"
+        print "Ending threads..."
         self.stop()
-        readThread.join()
         updateBroadcastThread.join()
         broadcastThread.join()
-        readThread.join()
 
         with open('%s/%s'%(DATADR,'end_port_read.txt'),'w') as f:
             f.write('')
@@ -564,14 +551,20 @@ class HandSyncExperiment(object):
         """Stop all thread that could be running. This does not wait for threads to stop."""
         self.updateBroadcastEvent.set()
         self.broadcast.stopEvent.set()
-        self.subVBroadcast.stopEvent.set()
 # end HandSyncExperiment
 
 
 class ANReader(object):
-    def __init__(self,duration,broadcast_file,parts_ix):
+    def __init__(self,duration,parts_ix,
+                 port_buffer_size=9460,
+                 max_buffer_size=1000,
+                 recent_buffer_size=180,
+                 verbose=False):
         """
-        Class for keeping track of history of velocity.
+        Class for reading from Axis Neuron UDP port and writing to file. UDP port reading is just
+        saved to an array in memory which is fast, but the writing to disk is limited by disk access
+        rates (much slower and unreliable).
+        This will also keeping track of history of velocity.
         
         Parameters
         ----------
@@ -581,6 +574,11 @@ class ANReader(object):
             Where data from AN port is broadcast.
         parts_ix : list of ints
             Indices of corresponding column headers in broadcast file.
+        port_buffer_size : int,9460
+        max_buffer_size : int,1000
+            Number of port calls to keep in memory at any given time.
+        recent_buffer_size : int,180
+        verbose : bool,False
 
         Subfields
         ---------
@@ -591,8 +589,6 @@ class ANReader(object):
         vHistory : ndarray
             All history since last refresh.
         tHistory : ndarray
-            All history since last refresh.
-        tdateHistory : ndarray
             All history since last refresh.
         lock : threading.Lock
 
@@ -606,151 +602,237 @@ class ANReader(object):
         self.duration = duration
         self.lock = threading.Lock()
         self.stopEvent = threading.Event()
+        self.readCondition = threading.Condition()
         
-        # Open file and go to the end.
-        self.fin = open(broadcast_file)
-        self.fin.seek(0,2)
-        
+        if type(parts_ix) is int:
+            parts_ix = [parts_ix]
         self.partsIx = parts_ix
+        self.portBufferSize = port_buffer_size
+        self.maxBufferSize = max_buffer_size
+        self.recentBufferSize = recent_buffer_size
+        self.verbose = verbose
+        self.vHistory = []
+        self.tAsDateHistory = []
+        self.v = []
+        self.tAsDate = []
 
-        self.refresh()
+        print "done setting up"
+    
+    def __enter__(self):
+        if self.verbose:
+            print "Setting port up."
+        self.setup_port()
+
+        # Start listening to port.
+        if self.verbose:
+            print "Listening"
+        self.readThread = threading.Thread(target=self.listen_port)
+        self.readThread.start()
+
+        #if write:
+        #    self.write_to_file()
+        #
+        #self.partsIx = parts_ix
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.verbose:
+            print "Initiating cleanup..."
+        self.stopEvent.set()
+        if self.verbose:
+            print "Waiting for thread to join..."
+        self.readThread.join()
+        if self.verbose:
+            print "Closing socket."
+        self.sock.close()
 
     # ========================= # 
     # Safe data access methods. #
     # ========================= # 
     def len_history(self):
-        self.lock.acquire()
-        n = len(self.tdateHistory)
-        self.lock.release()
-        return n
+        return len(self.tAsDateHistory)
 
-    def copy_tdate(self):
-        self.lock.acquire()
-        tdate = self.tdate.copy()
-        self.lock.release()
-        return tdate
-
-    def copy_v(self):
-        self.lock.acquire()
-        v = self.v.copy()
-        self.lock.release()
-        return v
-
-    def copy_vHistory(self):
-        self.lock.acquire()
-        vHistory = self.vHistory.copy()
-        self.lock.release()
-        return vHistory
-
-    def copy_tdateHistory(self):
-        self.lock.acquire()
-        tdateHistory = self.tdateHistory.copy()
-        self.lock.release()
-        return tdateHistory
-
-    # =============== #
-    # Update methods. #
-    # =============== #
-    def refresh(self):
-        """Clear stored arrays including history."""
-        self.lock.acquire()
-
-        self.v = np.zeros((0,3))
-        self.t = np.array(())
-        self.tdate = np.array(())
-        self.vHistory = np.zeros((0,3))
-        self.tHistory = np.array(())
-        self.tdateHistory = np.array(())
-
-        self.lock.release()
-
-    def update(self):
+    def copy_recent(self,interpolate=True):
         """
-        Update record of velocities by reading latest velocities and throwing out old velocities.
-        
-        NOTE: Must interpolate missing points in between readings. Best way to do this cheaply is to use a
-        Kalman filter to add a new point instead of refitting a global spline every time we get a
-        new set of points which is what is happening now.
-        """
-        vnew,tdatenew = self.fetch_new_vel()
-        if len(vnew)==0:
-            print "Nothing new to read."
-            return
-        
-        self.lock.acquire()
-
-        # Update arrays with new data. 
-        self.vHistory = np.append(self.vHistory,vnew,axis=0)
-        self.tdateHistory = np.append(self.tdateHistory,tdatenew)
-        now = datetime.now()
-        self.tHistory = np.array([(t-now).total_seconds() for t in self.tdateHistory])
-        
-        # Only keep data points that are within self.duration of now.
-        tix = self.tHistory>-self.duration
-        self.v = self.vHistory[tix]
-        self.t = self.tHistory[tix]
-        self.tdate = self.tdateHistory[tix]
-        assert len(self.v)==len(self.t)==len(self.tdate) 
-        
-        # Must have enough points to interpolate.
-        if len(self.v)>50:
-            self._interpolate()
-
-        self.lock.release()
-
-    def loop_update(self,dt):
-        """
-        Loop update til self.stopEvent is set.
-
         Parameters
         ----------
-        dt : float
-            Number of seconds to wait between updates. Must be greater than 0.3.
-        """
-        try:
-            assert dt>=.3,"Update loop too fast for acquiring outside of function."
-            while not self.stopEvent.is_set():
-                self.update()
-                time.sleep(dt)
-        except Exception,err:
-            print err.parameter
-        finally:
-            print "ANReader reader thread stopped."
-    
-    def fetch_new_vel(self):
-        """
-        Return the velocity history interpolated at a constant frame rate since the last query as specified by
-        current read position in file. Be careful because this could mean parsing entire file if the
-        read position is at beginning. Calls read_an_port_file().
+        interpolate : bool,True
 
         Returns
         -------
         v : ndarray
-            Array of dimensions (n_time,3).
-        tdate : ndarray
-            Time as datetime.
+        t : ndarray
+        tAsDate : ndarray
         """
-        from datetime import timedelta
-        from utils import MultiUnivariateSpline
+        self.lock.acquire()
 
-        # Extract data from file.
-        subT,subV = read_an_port_file(self.fin,self.partsIx)
-        return subV,subT
+        # Must be careful accessing these arrays because they're being asynchronously updated.
+        v = self.v[:]
+        t = self.tAsDate[:]
+        if len(v)==0 or len(t)==0:
+            self.lock.release()
+            return np.array([]),np.array([]),np.array([])
+        if len(v)<len(t):
+            t = t[:len(t)-len(v)]
+        elif len(v)>len(t):
+            v = v[:len(v)-len(t)]
+        assert len(t)==len(v), "%d,%d"%(len(t),len(v))
+
+        tAsDate = t
+        t = np.cumsum([0.] + [dt.total_seconds() for dt in np.diff(t)])
+        if interpolate and len(v)>10:
+            t,v,tAsDate = self._interpolate(t,v,tAsDate)
+        else:
+            self.lock.release()
+            return np.array([]),np.array([]),np.array([])
+        
+        self.lock.release()
+        return np.array(v),np.array(t),np.array(tAsDate)
+
+    def copy_history(self,interpolate=True):
+        self.lock.acquire()
+        v = self.vHistory[:]
+        t = self.tAsDateHistory[:]
+        
+        # Must be careful accessing these arrays because they're being asynchronously updated.
+        v = self.v[:]
+        t = self.tAsDate[:]
+        if len(v)==0 or len(t)==0:
+            self.lock.release()
+            return np.array([]),np.array([]),np.array([]),np.array([])
+        if len(v)<len(t):
+            t = t[:len(t)-len(v)]
+        elif len(v)>len(t):
+            v = v[:len(v)-len(t)]
+        assert len(t)==len(v) 
+
+        tAsDate = t
+        t = np.cumsum([0.] + [dt.total_seconds() for dt in np.diff(t)])
+        if interpolate and len(v)>10:
+            t,v,tAsDate = self._interpolate(t,v,tAsDate)
+        else:
+            raise Exception("Can't interpolate")
+        
+        self.lock.release()
+        return np.array(v),np.array(t),np.array(tAsDate)
     
-    def _interpolate(self):
+    # =============== # 
+    # Data recording. #
+    # =============== # 
+    def setup_port(self):
+        self.sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        self.sock.bind((HOST,PORT))
+        self.rawData = []
+
+    def read_port(self):
+        """
+        Read port and return something if a data point was returned.
+
+        Returns
+        -------
+        Empty list if no data, otherwise tuple of data and read times.
+        """
+        rawData = ''
+        readTimes = []
+        while len(rawData)<18000:
+            rawData += self.sock.recv(self.portBufferSize)
+            readTimes.append(datetime.now())
+        rawData = rawData.split('\n')
+        nBytes = [len(i) for i in rawData]
+
+        rawData = rawData[nBytes.index(max(nBytes))].split()
+        if len(rawData)!=946:  # number of cols in calc file
+            return []
+        return rawData,readTimes[nBytes.index(max(nBytes))]
+
+    def read_velocity(self):
+        """
+        Get a data point from the port.
+        """
+        v = []
+        while len(v)==0:
+            data = self.read_port()
+            if len(data)>0:
+                v = [float(data[0][ix]) for ix in self.partsIx]
+        return v,data[1]
+
+    def listen_port(self):
+        """Loop listening to the port."""
+        # .pop and .append are atomic operations so they're thread safe.
+        # http://effbot.org/pyfaq/what-kinds-of-global-value-mutation-are-thread-safe.htm
+        # http://effbot.org/zone/thread-synchronization.htm#problems-with-simple-locking
+        # https://stackoverflow.com/questions/6319207/are-lists-thread-safe
+        while not self.stopEvent.is_set():
+            v,t = self.read_velocity()
+
+            if len(self.vHistory)==self.maxBufferSize:
+                self.vHistory.pop(0)
+                self.tAsDateHistory.pop(0)
+            self.vHistory.append(v)
+            self.tAsDateHistory.append(t)
+
+            if len(self.v)==self.recentBufferSize:
+                self.v.pop(0)
+                self.tAsDate.pop(0)
+            self.v.append(v)
+            self.tAsDate.append(t)
+
+    # ================== #
+    # Interface methods. #
+    # ================== #
+    def refresh(self):
+        """Clear stored arrays including history."""
+        self.stopEvent.set()
+        if self.verbose:
+            print "Waiting for thread to join..."
+        self.readThread.join()
+
+        self.stopEvent.clear()
+        
+        self.lock.acquire()
+        #while len(self.v)>0:
+        #    self.v.pop(0)
+        #    self.tAsDate.pop(0)
+        #    self.vHistory.pop(0)
+        #    self.tAsDateHistory.pop(0)
+        self.v = []
+        self.tAsDate = []
+        self.vHistory = []
+        self.tAsDateHistory = []
+        self.lock.release()
+
+        # Start listening to port.
+        self.readThread = threading.Thread(target=self.listen_port)
+        self.readThread.start()
+    
+    # ======== #
+    # Private. #
+    # ======== #
+    def _interpolate(self,t,v,tdate=None):
         """
         Interpolate velocity trajectory on record and replace self.t and self.v with linearly spaced
         interpolation.
+
+        Parameters
+        ----------
+        t : ndarray
+        v : ndarray
+        tdate : ndarray,None
         """
         from utils import MultiUnivariateSpline
+        assert len(t)==len(v)
         
         # Must be careful with knot spacing because the data frequency is highly variable.
-        splineV = MultiUnivariateSpline(self.t,self.v,fit_type='Uni')
-        t = np.arange(self.t[0],self.t[-1],1/60)
-        self.v = splineV(t)
-        self.t = t
+        splineV = MultiUnivariateSpline(t,v,fit_type='Uni')
+        t = np.arange(t[0],t[-1],1/60)
+        v = splineV(t)
+        t = t
+
         # sync datetimes with linearly spaced seconds.
-        self.tdate = np.array([self.tdate[0]+timedelta(0,i/60) for i in xrange(len(t))])
+        if not tdate is None:
+            tdate = np.array([tdate[0]+timedelta(0,i/60) for i in xrange(len(t))])
+            return t,v,tdate
+        return t,v
 # end ANReader
 
 

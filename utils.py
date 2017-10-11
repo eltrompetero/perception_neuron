@@ -43,6 +43,10 @@ class MultiUnivariateSpline(object):
 
         **kwargs
         """
+        if type(t) is list:
+            t = np.array(t)
+        if type(x) is list:
+            x = np.array(x)
         assert x.ndim==2
         self.splines = []
         self.knot_spacing = knot_spacing
