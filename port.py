@@ -19,8 +19,11 @@ DATADR = os.path.expanduser('~')+'/Dropbox/Sync_trials/Data'
 
 
 
-def record_AN_port(fname,savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
-                   start_file='start.txt',stop_file='end_port_read.txt'):
+def record_AN_port(fname,
+                   savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
+                   host=HOST,
+                   start_file='start.txt',
+                   stop_file='end_port_read.txt'):
     """
     Start recording data from Axis Neuron port when presence of start.txt is detected
     and stop when end_port_read.txt is detected in DATADR.
@@ -29,6 +32,9 @@ def record_AN_port(fname,savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Da
     ----------
     fname : str
     savedr : str,'~/Dropbox/Sync_trials/Data/'
+    host : str,HOST
+    start_file : str
+    stop_file : str
     """
     f = open('%s/%s'%(savedr,fname),'w')
 
@@ -41,7 +47,7 @@ def record_AN_port(fname,savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Da
         print "Waiting for start.txt..."
         time.sleep(1)
 
-    with ANReader(2,range(946)) as reader:
+    with ANReader(2,range(946),host=host) as reader:
         while not os.path.isfile('%s/%s'%(savedr,stop_file)):
             v,t = reader.read_velocity()
             t = t.isoformat()
@@ -378,7 +384,7 @@ class HandSyncExperiment(object):
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
         self.broadcast.update_payload('0.0')
-        broadcastThread = threading.Thread(target=self.broadcast.broadcast,kwargs={'verbose':False})
+        broadcastThread = threading.Thread(target=self.broadcast.broadcast,kwargs={'verbose':verbose})
         broadcastThread.start()
 
         # Wait til start_time.txt has been written to start experiment..
@@ -472,6 +478,7 @@ class HandSyncExperiment(object):
 
 class ANReader(object):
     def __init__(self,duration,parts_ix,
+                 host=HOST,port=PORT,
                  port_buffer_size=9460,
                  max_buffer_size=1000,
                  recent_buffer_size=180,
@@ -486,6 +493,9 @@ class ANReader(object):
         ----------
         duration : float
             Number of seconds to keep track in the past.
+        parts_ix : list of ints
+        host : str,HOST
+        port : int,PORT
         broadcast_file : str
             Where data from AN port is broadcast.
         parts_ix : list of ints
@@ -523,6 +533,8 @@ class ANReader(object):
         if type(parts_ix) is int:
             parts_ix = [parts_ix]
         self.partsIx = parts_ix
+        self.host = host
+        self.port = port
         self.portBufferSize = port_buffer_size
         self.maxBufferSize = max_buffer_size
         self.recentBufferSize = recent_buffer_size
@@ -630,9 +642,10 @@ class ANReader(object):
     # Data recording. #
     # =============== # 
     def setup_port(self):
-        self.sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((HOST,PORT))
+        print "trying to bind to host %s"%self.host
+        self.sock.bind((self.host,self.port))
         self.rawData = []
 
     def read_port(self):
