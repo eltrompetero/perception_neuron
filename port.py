@@ -416,10 +416,10 @@ class HandSyncExperiment(object):
         """
         Run realtime analysis for experiment.
         
-        Code waits til when start.txt becomes available to read in avatar start time.
+        Code waits til when start_time.txt becomes available to read in avatar start time.
         
         The threads that are running:
-        0. readThread: read an_port.txt to get the latest velocity data
+        0. reader thread to read velocities from Axis Neuron UDP port.
         1. updateBroadcastThread: assess subject's performance relative to the avatar and
             update coherence value
         2. broadcastThread: broadcast subject's performance to port 5001
@@ -439,6 +439,7 @@ class HandSyncExperiment(object):
         update_delay : float,.3
             Number of seconds to wait between updating arrays when calculating realtime coherence.
         initial_window_duration : float,1.0
+        initial_vis_fraction : float,0.5
         min_window_duration : float,.5
         max_window_duration : float,2
         min_vis_fraction : float,.1
