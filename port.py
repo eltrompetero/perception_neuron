@@ -1,15 +1,17 @@
-# ===================================================================================== #
+# ================================================================================== #
 # Module for reading data from Axis Neuron broadcast port.
 # Author: Eddie Lee edl56@cornell.edu
-# ===================================================================================== #
+# ================================================================================== #
 from __future__ import division
 import numpy as np
 from datetime import datetime,timedelta
-import os,time,socket,shutil
+import os
+import time
+import socket
+import shutil
 import pandas as pd
 from load import calc_file_headers
-
-#import threading
+import threading
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
 PORT = 7006  # Calculation data.
