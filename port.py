@@ -19,6 +19,39 @@ DATADR = os.path.expanduser('~')+'/Dropbox/Sync_trials/Data'
 
 
 
+def forward_AN_port(ports,
+                    host=HOST,
+                    start_file='start_forwarding',
+                    stop_file='stop_forwarding'):
+    """
+    Rebroadcast AN UDP broadcast from port 7006 to as many ports as given.
+    
+    Parameters
+    ----------
+    ports : list
+    host : str,HOST
+    start_file : str,'start_forwarding'
+    stop_file : str,'stop_forwarding'
+    """
+    # Check that recording has started as given by presence of lock file.
+    while not os.path.isfile('%s/%s'%(DATADR,start_file)):
+        print "Waiting for %s..."%start_file
+        time.sleep(1)
+    
+    try:
+        listenSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        listenSock.bind((host,PORT))
+        
+        servSocks = [socket.socket(socket.AF_INET,socket.SOCK_DGRAM) for p in ports]
+
+        while not os.path.isfile('%s/%s'%(DATADR,stop_file)):
+            data = listenSock.recv(1024)
+            for p,sock in zip(ports,servSocks):
+                sock.sendto(data,(host,p))
+    finally:
+        listenSock.close()
+        [sock.close() for sock in servSocks]
+
 def record_AN_port(fname,
                    savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
                    host=HOST,
@@ -479,7 +512,7 @@ class HandSyncExperiment(object):
 class ANReader(object):
     def __init__(self,duration,parts_ix,
                  host=HOST,port=PORT,
-                 port_buffer_size=9460,
+                 port_buffer_size=1024,
                  max_buffer_size=1000,
                  recent_buffer_size=180,
                  verbose=False):
@@ -663,26 +696,29 @@ class ANReader(object):
             readTimes.append(datetime.now())
         rawData = rawData.split('\n')
         nBytes = [len(i) for i in rawData]
-
+        
         rawData = rawData[nBytes.index(max(nBytes))].split()
+        print len(rawData)
         if len(rawData)!=946:  # number of cols in calc file
             return []
         return rawData,readTimes[nBytes.index(max(nBytes))]
 
     def read_velocity(self):
         """
-        Get a data point from the port.
-
-        Returns
-        -------
-        v : list
-        timestamp : datetime.datetime
-        """
+       Get a data point from the port.
+       Returns
+       -------
+       v : list
+       timestamp : datetime.datetime
+       """
         v = []
         while len(v)==0:
             data = self.read_port()
-            if len(data)>0:
-                v = [float(data[0][ix]) for ix in self.partsIx]
+            try:
+                if len(data)>0:
+                    v = [float(data[0][ix]) for ix in self.partsIx]
+            except ValueError:
+                    print "%s. Invalid float. Reading port again."%data[1].isoformat()
         return v,data[1]
 
     def listen_port(self):
@@ -705,6 +741,7 @@ class ANReader(object):
                 self.tAsDate.pop(0)
             self.v.append(v)
             self.tAsDate.append(t)
+            time.sleep(.2)
 
     # ================== #
     # Interface methods. #
