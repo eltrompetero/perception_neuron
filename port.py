@@ -8,159 +8,70 @@ from datetime import datetime,timedelta
 import os,time,socket,shutil
 import pandas as pd
 from load import calc_file_headers
-import threading
+
+#import threading
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
 PORT = 7006  # Calculation data.
 DATADR = os.path.expanduser('~')+'/Dropbox/Sync_trials/Data'
 
-# Functions for reading from broadcasting port.
-def read_port():
-    def incoming(host, port):
-        """Open specified port and return file-like object"""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-        sock.connect((host,port))
-        # In worst case scenario, all 947 fields will be 9 bytes with 1 space in between and a \n
-        # character , but AN only returns 1024 bytes at a time.
-        t,data = datetime.now(),sock.recv(1024)
-        sock.close()
-        return t,data
-    
-    data = ''
-    while data=='':
-        t,data = incoming(HOST, PORT)
-    
-    # Clean up data that is returned from port to be a single line.
-    lastn = len(data)-data[::-1].index('\n')-1
-    try:
-        plastn = len(data)-4-data[:lastn-2][::-1].index('\n')
-    except ValueError:
-        plastn = 0
 
-    return t,data[plastn:lastn]
-
-def format_port_output(s):
-    s=s.split(' ')[1:11]
-    f=[float(i) for i in s]
-    return f
-
-def _format_port_output(s):
-    """For BVH file."""
-    iloc=s.find('Caeli')
-    if iloc==-1:
-        return ['NaN']*10
-    s=s[iloc:].split(' ')[1:11]
-    f=[float(i) for i in s]
-    return f
-# end port section
-
-def record_AN_port(fname,savedr='C:/Users/Eddie/Dropbox/Sync_trials/Data'):
+def record_AN_port(fname,savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
+                   start_file='start.txt',stop_file='end_port_read.txt'):
     """
-    NOTE: Need two threads. One to read from port and other to save to file.
-    Start recording data from Axis Neuron port when presence of start.txt is detected and stop when
-    end_port_read.txt is detected in DATADR.
-
-    Must be run on Windows running the UE4 setup.
+    Start recording data from Axis Neuron port when presence of start.txt is detected
+    and stop when end_port_read.txt is detected in DATADR.
 
     Parameters
     ----------
     fname : str
-    savedr : str,'C:/Users/Eddie/Dropbox/Sync_trials/Data/'
+    savedr : str,'~/Dropbox/Sync_trials/Data/'
     """
-    f = open(fname,'w')
+    f = open('%s/%s'%(savedr,fname),'w')
+
+    # Write header line.
+    headers = calc_file_headers()[:-1]
+    f.write('Timestamp, '+', '.join(headers)+'\n')
 
     # Check that recording has started as given by presence of lock file.
-    while not os.path.isfile('%s/%s'%(savedr,'start.txt')):
+    while not os.path.isfile('%s/%s'%(savedr,start_file)):
+        print "Waiting for start.txt..."
         time.sleep(1)
-    
-    # Write header line.
-    headers = list(calc_file_headers())
-    headers[-1] = ''.join(headers[-1].split())  # Remove space in last column header.
-    f.write('Timestamp '+' '.join(headers)+'\n')
-    
-    # Capture port output.
-    while not os.path.isfile('%s/%s'%(savedr,'end_port_read.txt')):
-        portOut = read_port()
-        t = portOut[0].isoformat()
-        f.write('%s %s\n'%(t,portOut[1].strip()))
-        f.flush()
+
+    with ANReader(2,range(946)) as reader:
+        while not os.path.isfile('%s/%s'%(savedr,stop_file)):
+            v,t = reader.read_velocity()
+            t = t.isoformat()
+
+            f.write('%s, %s\n'%(t,str(v)[1:-1]))
+            f.flush()
     
     f.close()
-
-def _fix_problem_dates(f,fname):
-    """
-    Insert missing datetime or missing microseconds at beginning of line. Put in 1900-01-01T00:00:00.000 if
-    missing date completely.
-    """
-    import uuid
-    tmpfile = str(uuid.uuid4())
-    with open('/tmp/'+tmpfile,'w') as fout:
-        # skip header lines
-        for i in xrange(5):
-            fout.write(f.readline())
-
-        for ln in f:
-            try:
-                d = datetime.strptime(ln[:26], '%Y-%m-%dT%H:%M:%S.%f')
-            except ValueError:
-                if len(ln[:26].split()[0])==19:
-                    # Some values seem to be cutoff because microseconds is precisely 0.
-                    #print "Inserting microseconds."
-                    ln = ln.split()
-                    ln[0] += '.000000'
-                    ln = ' '.join(ln)+'\n'
-                else:
-                    ln = '1900-01-01T00:00:00.000000 '+ln
-                # Sometimes, a single port broadcost seems to overlap with another.
-                if len(ln.split())>948:
-                    ln = ' '.join(ln.split()[:948])+'\n'
-            fout.write(ln) 
-    shutil.move('/tmp/'+tmpfile,fname)
 
 def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_kwargs={}):
     """
     With data from a single individual at this moment.
     
-    Params:
+    Parameters
+    ----------
+    fname : str
+    dr : str,''
+    time_as_dt : bool,True
+    
+    Returns
     -------
-    fname (str)
-    dr (str='')
-    time_as_dt (bool=True)
-    fix_file (bool=True)
-        Parse input file and fix any problems with dates.
+    df : pandas.DataFrame
     """
     if len(dr)>0:
         fname = '%s/%s'%(dr,fname)
     
-    if fix_file:
-        # Insert missing times for the file to be read in.
-        with open(fname,'r') as f:
-            _fix_problem_dates(f,fname) 
-
-    # Read in start and stop times at beginning of file.
-    #with open(fname,'r') as f:
-    #    startTime = datetime.strptime( f.readline().split(' ')[-1] )
-    #    stopTime = datetime.strptime( f.readline().split(' ')[-1] )
-            
-    df = pd.read_csv(fname,delimiter=' ',skiprows=3,**read_csv_kwargs)
+    df = pd.read_csv(fname,**read_csv_kwargs)
     df.iloc[:,0] = df.iloc[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
 
-    # Linearly interpolate missing date times. Assuming that no two sequential data points are missing
-    # times which seems to be the case...
-    iloc = np.where( pd.DatetimeIndex(df['Timestamp']).year==1900 )[0]
-    for i in iloc:
-        if i>0 and i<(len(df)-1):
-            df.iloc[i,0] = timedelta(seconds=(df.iloc[i+1,0]-df.iloc[i-1,0]).total_seconds()/2) + df.iloc[i-1,0]
-    # Remove last data point if the time is uncertain.
-    if pd.DatetimeIndex(df.tail(1)['Timestamp']).year==1900:
-        df = df.iloc[:-1]
-
     if time_as_dt:
-        # Convert time stamp into time differences in seconds. This means we have to remove the first data
-        # point.
-        dt = np.diff(df.iloc[:,0]).astype(int)/1e9
-        df = df.iloc[1:,:]
+        # Convert time stamp into time differences in seconds since first measurement.
+        dt = np.cumsum( np.concatenate(([0],np.diff(df.iloc[:,0]).astype(int)/1e9)) )
         df['Timestamp'] = df['Timestamp'].apply(pd.to_numeric,errors='coerce')
         df['Timestamp'] = dt
     return df
@@ -479,13 +390,15 @@ class HandSyncExperiment(object):
         
         if verbose:
             print "Starting threads."
-        with ANReader(self.duration,self.partsIx,verbose=True) as reader:
+        with ANReader(self.duration,self.partsIx,
+                      verbose=True,
+                      recent_buffer_size=self.duration*60) as reader:
             # Set up thread for updating value of streaming braodcast of coherence.
             def update_broadcaster(stopEvent):
                 try:
                     while not stopEvent.is_set():
                         v,t,tAsDate = reader.copy_recent()
-                        if len(v)>=160:
+                        if len(v)>=(self.duration*60*.95):
                             avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
                             avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
                             self.broadcast.update_payload('%1.1f'%avgcoh)
@@ -616,8 +529,6 @@ class ANReader(object):
         self.tAsDateHistory = []
         self.v = []
         self.tAsDate = []
-
-        print "done setting up"
     
     def __enter__(self):
         if self.verbose:
@@ -630,10 +541,6 @@ class ANReader(object):
         self.readThread = threading.Thread(target=self.listen_port)
         self.readThread.start()
 
-        #if write:
-        #    self.write_to_file()
-        #
-        #self.partsIx = parts_ix
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -677,7 +584,6 @@ class ANReader(object):
             t = t[:len(t)-len(v)]
         elif len(v)>len(t):
             v = v[:len(v)-len(t)]
-        assert len(t)==len(v), "%d,%d"%(len(t),len(v))
 
         tAsDate = t
         t = np.cumsum([0.] + [dt.total_seconds() for dt in np.diff(t)])
@@ -688,6 +594,7 @@ class ANReader(object):
             return np.array([]),np.array([]),np.array([])
         
         self.lock.release()
+        assert len(t)==len(v), "%d,%d"%(len(t),len(v))
         return np.array(v),np.array(t),np.array(tAsDate)
 
     def copy_history(self,interpolate=True):
@@ -722,6 +629,7 @@ class ANReader(object):
     # =============== # 
     def setup_port(self):
         self.sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((HOST,PORT))
         self.rawData = []
 
@@ -749,6 +657,11 @@ class ANReader(object):
     def read_velocity(self):
         """
         Get a data point from the port.
+
+        Returns
+        -------
+        v : list
+        timestamp : datetime.datetime
         """
         v = []
         while len(v)==0:
