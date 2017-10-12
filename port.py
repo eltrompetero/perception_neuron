@@ -52,7 +52,7 @@ def forward_AN_port(ports,
         listenSock.close()
         [sock.close() for sock in servSocks]
 
-def record_AN_port(fname,
+def record_AN_port(fname,port,
                    savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
                    host=HOST,
                    start_file='start.txt',
@@ -64,6 +64,7 @@ def record_AN_port(fname,
     Parameters
     ----------
     fname : str
+    port : int
     savedr : str,'~/Dropbox/Sync_trials/Data/'
     host : str,HOST
     start_file : str
@@ -80,15 +81,18 @@ def record_AN_port(fname,
         print "Waiting for start.txt..."
         time.sleep(1)
 
-    with ANReader(2,range(946),host=host) as reader:
+    reader = ANReader(2,range(946),port=port,host=host)
+    try:
+        reader.setup_port()
         while not os.path.isfile('%s/%s'%(savedr,stop_file)):
             v,t = reader.read_velocity()
             t = t.isoformat()
 
             f.write('%s, %s\n'%(t,str(v)[1:-1]))
             f.flush()
-    
-    f.close()
+    finally:
+        reader.sock.close()
+        f.close()
 
 def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_kwargs={}):
     """
@@ -706,6 +710,7 @@ class ANReader(object):
     def read_velocity(self):
         """
        Get a data point from the port.
+       
        Returns
        -------
        v : list
@@ -719,6 +724,7 @@ class ANReader(object):
                     v = [float(data[0][ix]) for ix in self.partsIx]
             except ValueError:
                     print "%s. Invalid float. Reading port again."%data[1].isoformat()
+            time.sleep(.01)
         return v,data[1]
 
     def listen_port(self):
@@ -741,7 +747,6 @@ class ANReader(object):
                 self.tAsDate.pop(0)
             self.v.append(v)
             self.tAsDate.append(t)
-            time.sleep(.2)
 
     # ================== #
     # Interface methods. #
