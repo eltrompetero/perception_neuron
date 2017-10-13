@@ -440,6 +440,7 @@ class HandSyncExperiment(object):
         if verbose:
             print "Starting threads."
         with ANReader(self.duration,self.partsIx,
+                      port=7011,
                       verbose=True,
                       port_buffer_size=8000,
                       recent_buffer_size=self.duration*60) as reader:
