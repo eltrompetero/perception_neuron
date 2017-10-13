@@ -93,7 +93,6 @@ def record_AN_port(fname,port,
             t = t.isoformat()
 
             f.write('%s, %s\n'%(t,str(v)[1:-1]))
-            f.flush()
     finally:
         reader.sock.close()
         f.close()
@@ -425,8 +424,24 @@ class HandSyncExperiment(object):
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
         self.broadcast.update_payload('0.0')
-        broadcastThread = threading.Thread(target=self.broadcast.broadcast,kwargs={'verbose':verbose})
+        broadcastThread = threading.Thread(target=self.broadcast.broadcast,
+                                           kwargs={'pause':.2,'verbose':verbose})
         broadcastThread.start()
+
+        # Set up thread for updating value of streaming broadcast of coherence.
+        # This relies on reader.
+        def update_broadcaster(reader,stopEvent):
+            try:
+                while not stopEvent.is_set():
+                    v,t,tAsDate = reader.copy_recent()
+                    if len(v)>=(self.duration*60*.95):
+                        avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
+                        avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
+                        self.broadcast.update_payload('%1.1f'%avgcoh)
+                    time.sleep(0.1)
+            finally:
+                print "updateBroadcastThread stopped"
+        self.updateBroadcastEvent = threading.Event()
 
         # Wait til start_time.txt has been written to start experiment..
         t0 = self.wait_for_start_time()
@@ -444,20 +459,9 @@ class HandSyncExperiment(object):
                       verbose=True,
                       port_buffer_size=8000,
                       recent_buffer_size=self.duration*60) as reader:
-            # Set up thread for updating value of streaming braodcast of coherence.
-            def update_broadcaster(stopEvent):
-                try:
-                    while not stopEvent.is_set():
-                        v,t,tAsDate = reader.copy_recent()
-                        if len(v)>=(self.duration*60*.95):
-                            avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
-                            avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
-                            self.broadcast.update_payload('%1.1f'%avgcoh)
-                        time.sleep(0.5)
-                finally:
-                    print "updateBroadcastThread stopped"
-            self.updateBroadcastEvent = threading.Event()
-            updateBroadcastThread = threading.Thread(target=update_broadcaster,args=(self.updateBroadcastEvent,))
+            
+            updateBroadcastThread = threading.Thread(target=update_broadcaster,
+                                                     args=(reader,self.updateBroadcastEvent))
 
             while reader.len_history()<(self.duration*60):
                 if verbose:
