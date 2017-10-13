@@ -21,6 +21,7 @@ DATADR = os.path.expanduser('~')+'/Dropbox/Sync_trials/Data'
 
 def forward_AN_port(ports,
                     host=HOST,
+                    buffer_size=1024,
                     start_file='start_forwarding',
                     stop_file='stop_forwarding'):
     """
@@ -30,6 +31,7 @@ def forward_AN_port(ports,
     ----------
     ports : list
     host : str,HOST
+    buffer_size : int,1024
     start_file : str,'start_forwarding'
     stop_file : str,'stop_forwarding'
     """
@@ -45,7 +47,7 @@ def forward_AN_port(ports,
         servSocks = [socket.socket(socket.AF_INET,socket.SOCK_DGRAM) for p in ports]
 
         while not os.path.isfile('%s/%s'%(DATADR,stop_file)):
-            data = listenSock.recv(1024)
+            data = listenSock.recv(buffer_size)
             for p,sock in zip(ports,servSocks):
                 sock.sendto(data,(host,p))
     finally:
@@ -67,9 +69,11 @@ def record_AN_port(fname,port,
     port : int
     savedr : str,'~/Dropbox/Sync_trials/Data/'
     host : str,HOST
-    start_file : str
-    stop_file : str
+    start_file : str,'start.txt'
+    stop_file : str,'end_port_read.txt'
     """
+    import platform
+
     f = open('%s/%s'%(savedr,fname),'w')
 
     # Write header line.
@@ -81,7 +85,7 @@ def record_AN_port(fname,port,
         print "Waiting for start.txt..."
         time.sleep(1)
 
-    reader = ANReader(2,range(946),port=port,host=host)
+    reader = ANReader(2,range(946),port=port,host=host,port_buffer_size=8000)
     try:
         reader.setup_port()
         while not os.path.isfile('%s/%s'%(savedr,stop_file)):
@@ -437,6 +441,7 @@ class HandSyncExperiment(object):
             print "Starting threads."
         with ANReader(self.duration,self.partsIx,
                       verbose=True,
+                      port_buffer_size=8000,
                       recent_buffer_size=self.duration*60) as reader:
             # Set up thread for updating value of streaming braodcast of coherence.
             def update_broadcaster(stopEvent):
@@ -537,7 +542,10 @@ class ANReader(object):
             Where data from AN port is broadcast.
         parts_ix : list of ints
             Indices of corresponding column headers in broadcast file.
-        port_buffer_size : int,9460
+        port_buffer_size : int,1024
+            On Mac OS, this is the default buffer size for AN as of v3.8.42.6503. For Windows, you
+            must adjust this to be larger than 6000 (at least) because the buffer size is bigger.
+            Otherwise messages will be dropped.
         max_buffer_size : int,1000
             Number of port calls to keep in memory at any given time.
         recent_buffer_size : int,180
@@ -693,6 +701,8 @@ class ANReader(object):
         -------
         Empty list if no data, otherwise tuple of data and read times.
         """
+        from datetime import timedelta
+        
         rawData = ''
         readTimes = []
         while len(rawData)<18000:
@@ -702,20 +712,23 @@ class ANReader(object):
         nBytes = [len(i) for i in rawData]
         
         rawData = rawData[nBytes.index(max(nBytes))].split()
-        print len(rawData)
         if len(rawData)!=946:  # number of cols in calc file
+            print "%d cols in calc output"%len(rawData)
             return []
-        return rawData,readTimes[nBytes.index(max(nBytes))]
+        
+        # Take time to the mean of the first and last read times. Read times seem to
+        # typically fall between 10-30 ms.
+        return rawData, readTimes[0] + timedelta( seconds=(readTimes[-1]-readTimes[0]).total_seconds()/2. )
 
     def read_velocity(self):
         """
-       Get a data point from the port.
-       
-       Returns
-       -------
-       v : list
-       timestamp : datetime.datetime
-       """
+        Get a data point from the port.
+        
+        Returns
+        -------
+        v : list
+        timestamp : datetime.datetime
+        """
         v = []
         while len(v)==0:
             data = self.read_port()
@@ -724,7 +737,9 @@ class ANReader(object):
                     v = [float(data[0][ix]) for ix in self.partsIx]
             except ValueError:
                     print "%s. Invalid float. Reading port again."%data[1].isoformat()
-            time.sleep(.01)
+            # This sleep time works well on the Mac. Almost always returns a buffer of
+            # 946 data points.
+            #time.sleep(.01)
         return v,data[1]
 
     def listen_port(self):
