@@ -316,8 +316,12 @@ class HandSyncExperiment(object):
         self.partsIx = parts_ix
         self.broadcastPort = broadcast_port
 
-    def load_avatar(self):
+    def load_avatar(self,return_subject=False):
         """
+        Parameters
+        ----------
+        return_subject : bool,False
+
         Returns
         -------
         avatar : dict
@@ -339,7 +343,10 @@ class HandSyncExperiment(object):
 
         trial = VRTrial(person,modelhandedness,rotation,dr)
         avatar = trial.templateTrial
-
+        
+        if return_subject:
+            subject = trial.subjectTrial
+            return avatar,subject
         return avatar
 
     def wait_for_start_time(self):
@@ -411,7 +418,7 @@ class HandSyncExperiment(object):
         import cPickle as pickle
         
         # Setup routines for calculating coherence.
-        coheval = CoherenceEvaluator(10)  # arg is max freq to consider
+        coheval = CoherenceEvaluator(10,SAMPLE_FREQ=30,WINDOW_LENGTH=30)  # arg is max freq to consider
         gprmodel = GPR(tmin=min_window_duration,tmax=max_window_duration,
                        fmin=min_vis_fraction,fmax=max_vis_fraction)
         nextDuration = np.around(initial_window_duration,1)
@@ -441,13 +448,14 @@ class HandSyncExperiment(object):
             try:
                 while not stopEvent.is_set():
                     v,t,tAsDate = reader.copy_recent()
-                    if len(v)>=(self.duration*60*.95):
+                    if len(v)>=(self.duration*30*.95):
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
-                        #avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
-                        v = np.random.random(size=avv.shape)
-                        avgcoh = np.abs( (avv*v).sum(1) / 
-                                         (np.linalg.norm(avv,axis=1)*np.linalg.norm(v,axis=1))
-                                       ).mean()
+                        v = fetch_matching_avatar_vel(subject,self.trialType,tAsDate,t0)
+                        avgcoh = coheval.evaluateCoherence( avv[:,2],avv[:,2] )
+                        #v = np.random.random(size=avv.shape)
+                        #avgcoh = np.abs( (avv*v).sum(1) / 
+                        #                 (np.linalg.norm(avv,axis=1)*np.linalg.norm(v,axis=1))
+                        #               ).mean()
                         print "new coherence is %1.2f"%avgcoh
                         self.broadcast.update_payload('%1.2f'%avgcoh)
                     time.sleep(0.1)
@@ -457,7 +465,7 @@ class HandSyncExperiment(object):
 
         # Wait til start_time.txt has been written to start experiment..
         t0 = self.wait_for_start_time()
-        avatar = self.load_avatar()
+        avatar,subject = self.load_avatar(return_subject=True)
 
         # Wait til fully visible trial has finished and read data while waiting so that we can erase
         # it before starting the next trial.
@@ -478,6 +486,7 @@ class HandSyncExperiment(object):
             while reader.len_history()<(self.duration*60):
                 if verbose:
                     print "Waiting to collect more data...(%d)"%reader.len_history()
+                self.broadcast.update_payload('0.00')
                 time.sleep(1.5)
             if self.broadcast.connectionInterrupted:
                 raise Exception
@@ -512,6 +521,7 @@ class HandSyncExperiment(object):
                     while reader.len_history()<(self.duration*60):
                         if verbose:
                             print "Waiting to collect more data...(%d)"%reader.len_history()
+                        self.broadcast.update_payload('0.00')
                         time.sleep(1.5)
                     
                 time.sleep(update_delay) 
@@ -811,7 +821,7 @@ class ANReader(object):
     # ======== #
     # Private. #
     # ======== #
-    def _interpolate(self,t,v,tdate=None):
+    def _interpolate(self,t,v,tdate=None,dt=1/30):
         """
         Interpolate velocity trajectory on record and replace self.t and self.v with linearly spaced
         interpolation.
@@ -821,19 +831,21 @@ class ANReader(object):
         t : ndarray
         v : ndarray
         tdate : ndarray,None
+        dt : float,1/30
+            Time spacing for interpolation.
         """
         from utils import MultiUnivariateSpline
         assert len(t)==len(v)
         
         # Must be careful with knot spacing because the data frequency is highly variable.
         splineV = MultiUnivariateSpline(t,v,fit_type='Uni')
-        t = np.arange(t[0],t[-1],1/60)
+        t = np.arange(t[0],t[-1],dt)
         v = splineV(t)
         t = t
 
         # sync datetimes with linearly spaced seconds.
         if not tdate is None:
-            tdate = np.array([tdate[0]+timedelta(0,i/60) for i in xrange(len(t))])
+            tdate = np.array([tdate[0]+timedelta(0,i*dt) for i in xrange(len(t))])
             return t,v,tdate
         return t,v
 # end ANReader
