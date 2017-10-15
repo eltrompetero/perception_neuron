@@ -266,8 +266,7 @@ def right_hand_col_indices():
 
 def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
     """
-    Get the stretch of avatar velocities that aligns with the velocity data of the subject. Assumes
-    that the start time for the avatar is given in ~/Dropbox/Sync_trials/Data/start.txt
+    Get the stretch of avatar velocities that aligns with the velocity data of the subject. 
 
     Parameters
     ----------
@@ -278,6 +277,7 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
     t : array of datetime objects
         Stretch of time to return data from.
     t0 : datetime
+    verbose : bool,False
 
     Returns
     -------
@@ -298,7 +298,7 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
 # Classes #
 # ======= #
 class HandSyncExperiment(object):
-    def __init__(self,duration,trial_type,parts_ix,broadcast_port=5001):
+    def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001):
         """
         Parameters
         ----------
@@ -306,8 +306,9 @@ class HandSyncExperiment(object):
             Seconds into past to analyze for real time coherence measure.
         trial_type : str
             'avatar','avatar0','hand','hand0'
-        parts_ix : str
-            Indices of the columns in an_port file to extract and analyze.
+        parts_ix : list,None
+            Indices of the columns in an_port file to extract and analyze. If None, this will be
+            replaced automatically in start by the relevant hand.
         broadcast_port : int,5001
         """
         self.duration = duration
@@ -419,13 +420,19 @@ class HandSyncExperiment(object):
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
         with open('%s/next_setting.txt'%DATADR,'w') as f:
             f.write('%1.1f,%1.1f'%(nextDuration,nextFraction))
+        with open('%s/left_or_right.txt'%DATADR,'r') as f:
+            handedness = f.read().rstrip()
+        if handedness=='left':
+            self.partsIx = left_hand_col_indices()
+        else:
+            self.partsIx = right_hand_col_indices()
 
         # Open port for communication with UE4 engine. This will send the current coherence value to
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
-        self.broadcast.update_payload('0.0')
+        self.broadcast.update_payload('0.00')
         broadcastThread = threading.Thread(target=self.broadcast.broadcast,
-                                           kwargs={'pause':.2,'verbose':verbose})
+                                           kwargs={'pause':.5,'verbose':verbose})
         broadcastThread.start()
 
         # Set up thread for updating value of streaming broadcast of coherence.
@@ -436,8 +443,13 @@ class HandSyncExperiment(object):
                     v,t,tAsDate = reader.copy_recent()
                     if len(v)>=(self.duration*60*.95):
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
-                        avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
-                        self.broadcast.update_payload('%1.1f'%avgcoh)
+                        #avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
+                        v = np.random.random(size=avv.shape)
+                        avgcoh = np.abs( (avv*v).sum(1) / 
+                                         (np.linalg.norm(avv,axis=1)*np.linalg.norm(v,axis=1))
+                                       ).mean()
+                        print "new coherence is %1.2f"%avgcoh
+                        self.broadcast.update_payload('%1.2f'%avgcoh)
                     time.sleep(0.1)
             finally:
                 print "updateBroadcastThread stopped"
@@ -853,9 +865,7 @@ class DataBroadcaster(object):
         ----------
         snew : str
         """
-        self.lock.acquire()
         self._payload = snew
-        self.lock.release()
 
     def broadcast(self,pause=1,verbose=False):
         """
@@ -871,24 +881,24 @@ class DataBroadcaster(object):
             Number of seconds to wait before looping.
         verbose : bool,False
         """
-        while not self.stopEvent.is_set():
-            try:
-                sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-                sock.connect((self.host,self.port))
-
-                self.lock.acquire()
+        # try to connect to port
+        try:
+            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            sock.connect((self.host,self.port))
+        except:
+            print "Connection to %s:%d could not be established."%(self.host,self.port)
+            return 
+        
+        # try to send data
+        try:
+            while not self.stopEvent.is_set():
                 nBytesSent = sock.send(self._payload)
-                self.lock.release()
-                
-                if verbose: print '%d bytes sent'%nBytesSent
-
-                sock.close()
+                    
+                if verbose: print '%d bytes sent, %s'%(nBytesSent,self._payload)
                 time.sleep(pause)  # if this pause goes immediately after connect, data transmission
                                    # is interrupted
-            except:
-                print "Error: Connection to server broken."
-                self.connectionInterrupted = True
-                break
+        finally:
+            sock.close()
+        
         print "DataBroadcaster thread stopped"
-        self.connectionInterrupted = False
 #end DataBroadcaster
