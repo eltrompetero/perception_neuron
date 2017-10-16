@@ -13,7 +13,7 @@ from numpy import pi
 
 def max_coherence(windowSpec,trials):
     """
-    Shifted max coherence across all trials.
+    Time shifted max coherence across all trials.
     """
     maxcoh = np.zeros((len(trials),4))
     

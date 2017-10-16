@@ -418,7 +418,7 @@ class HandSyncExperiment(object):
         import cPickle as pickle
         
         # Setup routines for calculating coherence.
-        coheval = CoherenceEvaluator(10,SAMPLE_FREQ=30,WINDOW_LENGTH=30)  # arg is max freq to consider
+        coheval = CoherenceEvaluator(5,sample_freq=30,window_length=30)  # arg is max freq to consider
         gprmodel = GPR(tmin=min_window_duration,tmax=max_window_duration,
                        fmin=min_vis_fraction,fmax=max_vis_fraction)
         nextDuration = np.around(initial_window_duration,1)
@@ -451,7 +451,7 @@ class HandSyncExperiment(object):
                     if len(v)>=(self.duration*30*.95):
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
                         v = fetch_matching_avatar_vel(subject,self.trialType,tAsDate,t0)
-                        avgcoh = coheval.evaluateCoherence( avv[:,2],avv[:,2] )
+                        avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
                         #v = np.random.random(size=avv.shape)
                         #avgcoh = np.abs( (avv*v).sum(1) / 
                         #                 (np.linalg.norm(avv,axis=1)*np.linalg.norm(v,axis=1))

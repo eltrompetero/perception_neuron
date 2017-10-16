@@ -10,15 +10,15 @@ class CoherenceEvaluator(object):
     update() evaluates the average coherence over the given time.
     These assume V_person and V_avatar are pre-aligned and have the same length.
     '''
-    def __init__(self,maxfreq,SAMPLE_FREQ=60,WINDOW_LENGTH=90):
+    def __init__(self,maxfreq,sample_freq=60,window_length=90):
         '''
         Parameters
         ----------
         maxfreq : float
             Max frequency up to which to average coherence.
-        SAMPLE_FREQ : float,60
+        sampleFreq : float,60
             Sampling frequency
-        WINDOW_LENGTH : int,90
+        windowLength : int,90
             Number ofdata points to use in window for coherence calculation.
 
         Subfields
@@ -27,8 +27,8 @@ class CoherenceEvaluator(object):
         coherences
         '''
         self.maxfreq = maxfreq
-        self.SAMPLE_FREQ = SAMPLE_FREQ
-        self.WINDOW_LENGTH = WINDOW_LENGTH
+        self.sampleFreq = sample_freq
+        self.windowLength = window_length
         
         self.v = None
         self.v_av = None
@@ -59,7 +59,7 @@ class CoherenceEvaluator(object):
     def resetPerformance(self):
         self.performanceValues = np.empty(0)
         
-    def evaluateCoherence(self,v1,v2):
+    def evaluateCoherence(self,v1,v2,use_cwt=True):
         '''
         Returns average coherence between current v and v_av data vectors.
 
@@ -75,14 +75,19 @@ class CoherenceEvaluator(object):
         avg_coh : float
         '''
         assert len(v1)==len(v2)
+        from utils import cwt_coherence
+            
+        if not use_cwt:
+            # Scipy.signal's coherence implementation.
+            self.f,self.C = coherence(v1,v2,
+                                      fs=self.sampleFreq,
+                                      nperseg=self.windowLength,
+                                      nfft=2 * self.windowLength,
+                                      noverlap=self.windowLength//4)
+        else:
+            self.f,self.C = cwt_coherence(v1,v2,1,sampling_period=1/self.sampleFreq)
+            self.C *= -1 
 
-        # Scipy.signal's coherence implementation. Not yet Eddie-coherence.
-        self.f,self.C = coherence(v1,v2,
-                                  fs=self.SAMPLE_FREQ,
-                                  nperseg=self.WINDOW_LENGTH,
-                                  nfft=2 * self.WINDOW_LENGTH,
-                                  noverlap=self.WINDOW_LENGTH//4)
-        
         # Evaluate Average Coherence by the Trapezoid rule.
         freqIx = (self.f>0)&(self.f<self.maxfreq)
         avg_coherence = np.trapz(self.C[freqIx],x=self.f[freqIx]) / (self.f[freqIx].max()-self.f[freqIx].min())

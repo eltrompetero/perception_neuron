@@ -303,16 +303,22 @@ def coherence_before_vis(subcwt,avcwt,f,vis,dt,min_freq=0,max_freq=10):
         return -avgC
     return avgC
 
-def cwt_coherence(x,y,nskip,scale=np.logspace(0,2,100),**kwargs):
+def cwt_coherence(x,y,nskip,
+                  scale=np.logspace(0,2,100),
+                  sampling_period=1/60,
+                  **kwargs):
     """
-    Use the wavelet transform to measure coherence.
+    Use the continuous wavelet transform to measure coherence.
 
     Parameters
     ----------
     x : ndarray
     y : ndarray
     nskip : int
+        Number of indices to skip when averaging across spectra for coherence. This is to reduce
+        correlation between samples when averaging.
     scale : list
+        Scale of continuous wavelets.
     **kwargs
 
     Returns
@@ -322,8 +328,8 @@ def cwt_coherence(x,y,nskip,scale=np.logspace(0,2,100),**kwargs):
     """
     import pywt
     assert len(x)==len(y)
-    xcwt,f = pywt.cwt(x,scale,'cgau1',sampling_period=1/60,**kwargs)
-    ycwt,f = pywt.cwt(y,scale,'cgau1',sampling_period=1/60,**kwargs)
+    xcwt,f = pywt.cwt(x,scale,'cgau1',sampling_period=sampling_period,**kwargs)
+    ycwt,f = pywt.cwt(y,scale,'cgau1',sampling_period=sampling_period,**kwargs)
     
     # Get indices of points with some overlap.
     selectix = np.arange(nskip,len(x),nskip,dtype=int)
@@ -338,6 +344,8 @@ def cwt_coherence(x,y,nskip,scale=np.logspace(0,2,100),**kwargs):
 def max_coh_time_shift(subv,temv,
                        dtgrid=np.linspace(0,1,100),
                        mx_freq=10,
+                       sampling_rate=60,
+                       window_width=2,
                        disp=False,
                        ax=None):
     """
@@ -346,30 +354,38 @@ def max_coh_time_shift(subv,temv,
     Parameters
     ----------
     subv : ndarray
+        Subject time series.
     temv : ndarray
+        Template time series.
     dtgrid : ndarray,np.linspace(0,1,100)
-    bds : float or tuple,1
-        Bounds for counting phase difference that is within bounds.
+    window_width : float,2
+        Window duration for computing coherence in terms of seconds.
     disp : bool,False
     ax : AxesSubplot,None
         
     Returns
     -------
+    dt : float
+        Time shift in seconds that maximizes scipy coherence. Time shift is relative to subject
+        time, i.e.  negative shift is shifting subject back in time and positive is shifting subject
+        forwards in time. If subject is tracking template, then dt>0.
+    maxcoh : float
+        Coherence max.
     """
     from scipy.signal import coherence
         
     # Convert dtgrid to index shifts.
-    dtgrid = np.unique(np.around(dtgrid*60).astype(int))
-    
+    dtgrid = np.unique(np.around(dtgrid*sampling_rate).astype(int))
     coh = np.zeros(len(dtgrid))
+    window_width = int(sampling_rate*window_width)
     
     for i,dt in enumerate(dtgrid):
         if dt<0:
-            f,c = coherence(subv[-dt:],temv[:dt],fs=60,nperseg=120)
+            f,c = coherence(subv[-dt:],temv[:dt],fs=sampling_rate,nperseg=window_width)
         elif dt>0:
-            f,c = coherence(subv[:-dt],temv[dt:],fs=60,nperseg=120)
+            f,c = coherence(subv[:-dt],temv[dt:],fs=sampling_rate,nperseg=window_width)
         else:
-            f,c = coherence(subv,temv,fs=60,nperseg=120)
+            f,c = coherence(subv,temv,fs=sampling_rate,nperseg=window_width)
         coh[i] = abs(c)[f<mx_freq].mean()
         
     shiftix = np.argmax(coh)
@@ -377,10 +393,10 @@ def max_coh_time_shift(subv,temv,
     if disp:
         if ax is None:
             fig,ax = plt.subplots()
-        ax.plot(dtgrid/60,coh,'o')
+        ax.plot(dtgrid/sampling_rate,coh,'o')
         ax.set(xlabel='dt',ylabel='coherence')
         
-    return dtgrid[shiftix]/60
+    return dtgrid[shiftix]/sampling_rate,coh[shiftix]
 
 def min_phase_time_shift(freq,subjectAngle,templateAngle,
                          bds=1,
