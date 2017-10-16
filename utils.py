@@ -354,7 +354,8 @@ def max_coh_time_shift(subv,temv,
     Parameters
     ----------
     subv : ndarray
-        Subject time series.
+        Subject time series. If multiple cols, each col is taken to be a data point and the average
+        coherence is maximized.
     temv : ndarray
         Template time series.
     dtgrid : ndarray,np.linspace(0,1,100)
@@ -376,18 +377,27 @@ def max_coh_time_shift(subv,temv,
         
     # Convert dtgrid to index shifts.
     dtgrid = np.unique(np.around(dtgrid*sampling_rate).astype(int))
-    coh = np.zeros(len(dtgrid))
+    if subv.ndim==1:
+        coh = np.zeros(len(dtgrid))
+    else:
+        coh = np.zeros((len(dtgrid),subv.shape[1]))
     window_width = int(sampling_rate*window_width)
     
-    for i,dt in enumerate(dtgrid):
-        if dt<0:
-            f,c = coherence(subv[-dt:],temv[:dt],fs=sampling_rate,nperseg=window_width)
-        elif dt>0:
-            f,c = coherence(subv[:-dt],temv[dt:],fs=sampling_rate,nperseg=window_width)
-        else:
-            f,c = coherence(subv,temv,fs=sampling_rate,nperseg=window_width)
-        coh[i] = abs(c)[f<mx_freq].mean()
+    def _calc_coh(subv,temv):
+        for i,dt in enumerate(dtgrid):
+            if dt<0:
+                f,c = coherence(subv[-dt:],temv[:dt],fs=sampling_rate,nperseg=window_width)
+            elif dt>0:
+                f,c = coherence(subv[:-dt],temv[dt:],fs=sampling_rate,nperseg=window_width)
+            else:
+                f,c = coherence(subv,temv,fs=sampling_rate,nperseg=window_width)
+            coh[i] = abs(c)[f<mx_freq].mean()
+        return coh
         
+    if subv.ndim==1:
+        coh = _calc_coh(subv,temv)
+    else:
+        coh = np.vstack([_calc_coh(subv[:,i],temv[:,i]) for i in xrange(subv.shape[1])]).mean(1)
     shiftix = np.argmax(coh)
     
     if disp:
