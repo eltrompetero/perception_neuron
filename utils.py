@@ -319,7 +319,10 @@ def cwt_coherence(x,y,nskip,
         correlation between samples when averaging.
     scale : list
         Scale of continuous wavelets.
+    sampling_period : float,1/60
+        Used to choose scales.
     **kwargs
+        for pywt.cwt()
 
     Returns
     -------
@@ -338,8 +341,79 @@ def cwt_coherence(x,y,nskip,
     Pav = ( np.abs(ycwt[:,selectix])**2 ).mean(-1)
     Pcross = ( xcwt[:,selectix]*ycwt[:,selectix].conjugate() ).mean(-1)
     coh = np.abs(Pcross)**2/Psub/Pav
+    
+    # Skip low frequencies that have periods longer the duration of the window.
+    fCutoff = f<(1/(len(x)*sampling_period))
 
-    return f,coh
+    return f[f>=fCutoff],coh[f>=fCutoff]
+
+def cwt_coherence_auto_nskip(x,y,
+                             scale=np.logspace(0,2,100),
+                             sampling_period=1/60,
+                             period_multiple=1,
+                             **kwargs):
+    """
+    Use the continuous wavelet transform to measure coherence but automatically choose the amount to
+    subsample separately for each frequency when averaging. The subsampling is determined by nskip
+    which only takes a sample every period of the relevant frequency.
+
+    Parameters
+    ----------
+    x : ndarray
+    y : ndarray
+    nskip : int
+        Number of indices to skip when averaging across spectra for coherence. This is to reduce
+        correlation between samples when averaging.
+    scale : list
+        Scale of continuous wavelets.
+    sampling_period : float,1/60
+        Used to choose scales.
+    **kwargs
+        for pywt.cwt()
+
+    Returns
+    -------
+    f : ndarray
+    coherence : ndarray
+    """
+    import pywt
+    assert len(x)==len(y)
+    xcwt,f = pywt.cwt(x,scale,'cgau1',sampling_period=sampling_period,**kwargs)
+    ycwt,f = pywt.cwt(y,scale,'cgau1',sampling_period=sampling_period,**kwargs)
+    
+    Psub = np.zeros(len(f))
+    Pav = np.zeros(len(f))
+    Pcross = np.zeros(len(f),dtype=complex)
+    #PsubStd = np.zeros(len(f))
+    #PavStd = np.zeros(len(f))
+    #PcrossStd = np.zeros(len(f))
+
+    # For each freq, skip roughly by a period.
+    for fIx,f_ in enumerate(f):
+        nskip = int(1/f_/sampling_period)
+        if nskip>(len(x)//3):
+            Psub[fIx] = np.nan
+            Pav[fIx] = np.nan
+            Pcross[fIx] = np.nan
+        else:
+            selectix = np.arange(nskip,len(x),nskip,dtype=int)
+            #print f_,len(selectix)
+
+            Psub[fIx] = ( np.abs(xcwt[fIx,selectix])**2 ).mean(-1)
+            Pav[fIx] = ( np.abs(ycwt[fIx,selectix])**2 ).mean(-1)
+            Pcross[fIx] = ( xcwt[fIx,selectix]*ycwt[fIx,selectix].conjugate() ).mean(-1)
+
+            #PsubStd[fIx] = ( np.abs(xcwt[fIx,selectix])**2 ).std(-1)
+            #PavStd[fIx] = ( np.abs(ycwt[fIx,selectix])**2 ).std(-1)
+            #PcrossStd[fIx] = ( xcwt[fIx,selectix]*ycwt[fIx,selectix].conjugate() ).std(-1)
+
+    coh = np.abs(Pcross)**2/Psub/Pav
+    #stds = (PsubStd,PavStd,PcrossStd)
+
+    # Skip low frequencies that have periods longer the duration of the window.
+    fCutoff = f<(period_multiple/(len(x)*sampling_period))
+
+    return f[f>fCutoff],coh[f>fCutoff]
 
 def max_coh_time_shift(subv,temv,
                        dtgrid=np.linspace(0,1,100),
