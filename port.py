@@ -57,11 +57,11 @@ def forward_AN_port(ports,
 def record_AN_port(fname,port,
                    savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
                    host=HOST,
-                   start_file='start.txt',
-                   stop_file='end_port_read.txt'):
+                   start_file='start',
+                   stop_file='end_port_read'):
     """
-    Start recording data from Axis Neuron port when presence of start.txt is detected
-    and stop when end_port_read.txt is detected in DATADR.
+    Start recording data from Axis Neuron port when presence of start is detected
+    and stop when end_port_read is detected in DATADR.
 
     Parameters
     ----------
@@ -69,8 +69,8 @@ def record_AN_port(fname,port,
     port : int
     savedr : str,'~/Dropbox/Sync_trials/Data/'
     host : str,HOST
-    start_file : str,'start.txt'
-    stop_file : str,'end_port_read.txt'
+    start_file : str,'start'
+    stop_file : str,'end_port_read'
     """
     import platform
 
@@ -82,7 +82,7 @@ def record_AN_port(fname,port,
 
     # Check that recording has started as given by presence of lock file.
     while not os.path.isfile('%s/%s'%(savedr,start_file)):
-        print "Waiting for start.txt..."
+        print "Waiting for start..."
         time.sleep(1)
 
     reader = ANReader(2,range(946),port=port,host=host,port_buffer_size=8000)
@@ -264,7 +264,7 @@ def right_hand_col_indices():
             nameIx += 1
     return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
 
-def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
+def fetch_matching_avatar_vel(avatar,part,t,t0=None,verbose=False):
     """
     Get the stretch of avatar velocities that aligns with the velocity data of the subject. 
 
@@ -274,9 +274,9 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
         This would be the templateTrial loaded in VRTrial.
     part : str
         Choose from 'avatar','avatar0','hand','hand0'.
-    t : array of datetime objects
-        Stretch of time to return data from.
-    t0 : datetime
+    t : array of floats or datetime objects
+        Stretch of time to return data from. If t0 is specified, this needs to be datetime objects.
+    t0 : datetime,None
     verbose : bool,False
 
     Returns
@@ -284,8 +284,9 @@ def fetch_matching_avatar_vel(avatar,part,t,t0,verbose=False):
     v : ndarray
         Avatar's velocity that matches given time stamps.
     """
-    # Transform dt to time in seconds.
-    t = np.array([i.total_seconds() for i in t-t0])
+    if not t0 is None:
+        # Transform dt to time in seconds.
+        t = np.array([i.total_seconds() for i in t-t0])
     if verbose:
         print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
 
@@ -329,8 +330,10 @@ class HandSyncExperiment(object):
         """
         from load import subject_settings_v3 as subject_settings
         from load import VRTrial
-        handedness = open('%s/%s'%(DATADR,'left_or_right.txt')).readline().rstrip()
-
+        handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
+        
+        # NOTE: This relies on the fact that these experiments took data from these avatar trials,
+        # but you should fetch just the avatar data from the original recordings.
         if handedness=='left':
             person,modelhandedness,rotation,dr = subject_settings(0)
             self.partsIx = left_hand_col_indices()
@@ -349,6 +352,13 @@ class HandSyncExperiment(object):
             return avatar,subject
         return avatar
 
+    def wait_for_start(self):
+        """
+        Wait til start file is written.
+        """
+        while not os.path.isfile('%s/%s'%(DATADR,'start')):
+            time.sleep(.5)
+
     def wait_for_start_time(self):
         """
         Get the time at which the trial started.
@@ -358,20 +368,20 @@ class HandSyncExperiment(object):
         t0 : datetime
             The time at which the trial was started.
         """
-        while not os.path.isfile('%s/%s'%(DATADR,'start_time.txt')):
+        while not os.path.isfile('%s/%s'%(DATADR,'start_time')):
             time.sleep(.5)
         # Give some time for the initial time to be written by UE4.
         time.sleep(.5)
-        with open('%s/%s'%(DATADR,'start_time.txt'),'r') as f:
+        with open('%s/%s'%(DATADR,'start_time'),'r') as f:
             t0 = datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f')
         return t0
    
     def wait_for_start_gpr(self):
         """
-        Once start_gpr.txt has been written, erase self.subVBroadcast's memory of the history of
+        Once start_gpr has been written, erase self.subVBroadcast's memory of the history of
         velocity.
         """
-        while not os.path.isfile('%s/%s'%(DATADR,'start_gpr.txt')):
+        while not os.path.isfile('%s/%s'%(DATADR,'start_gpr')):
             time.sleep(.5)
 
     def start(self,
@@ -383,7 +393,7 @@ class HandSyncExperiment(object):
         """
         Run realtime analysis for experiment.
         
-        Code waits til when start_time.txt becomes available to read in avatar start time.
+        Code waits til when start_time becomes available to read in avatar start time.
         
         The threads that are running:
         0. reader thread to read velocities from Axis Neuron UDP port.
@@ -394,9 +404,9 @@ class HandSyncExperiment(object):
         Thread communication happens through members that are updated using thread locks.
         
         In while loop, run GPR prediction step and write the next window duration and visible
-        fraction to file. Waiting for run_gpr.txt and writing to next_setting.txt.
+        fraction to file. Waiting for run_gpr and writing to next_setting.
 
-        When end.txt is written, experiment ends.
+        When end is written, experiment ends.
 
         NOTE:
         - only calculate coherence along z-axis
@@ -414,8 +424,11 @@ class HandSyncExperiment(object):
         verbose : bool,False
         """
         from load import subject_settings_v3,VRTrial
+        from utils import check_coherence_with_null
         from gpr import CoherenceEvaluator,GPR
         import cPickle as pickle
+
+        self.wait_for_start()
         
         # Setup routines for calculating coherence.
         coheval = CoherenceEvaluator(5,sample_freq=30,window_length=30)  # arg is max freq to consider
@@ -425,9 +438,9 @@ class HandSyncExperiment(object):
         nextFraction = np.around(initial_vis_fraction,1)
         assert min_window_duration<=nextDuration<=max_window_duration
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
-        with open('%s/next_setting.txt'%DATADR,'w') as f:
+        with open('%s/next_setting'%DATADR,'w') as f:
             f.write('%1.1f,%1.1f'%(nextDuration,nextFraction))
-        with open('%s/left_or_right.txt'%DATADR,'r') as f:
+        with open('%s/left_or_right'%DATADR,'r') as f:
             handedness = f.read().rstrip()
         if handedness=='left':
             self.partsIx = left_hand_col_indices()
@@ -444,26 +457,37 @@ class HandSyncExperiment(object):
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader.
+        nullt = np.arange(30*avatar['avatarT'].max())/30
+        loadedData = pickle.load('%s/%s'%(os.path.expanduser('~'),
+                                          '/Dropbox/Research/tango/py/cohnull_avatar.p'),'rb')
+        nully,nullz = loadedData['nully'],loadedData['nullz']
         def update_broadcaster(reader,stopEvent):
             try:
                 while not stopEvent.is_set():
                     v,t,tAsDate = reader.copy_recent()
                     if len(v)>=(self.duration*30*.95):
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
-                        v = fetch_matching_avatar_vel(subject,self.trialType,tAsDate,t0)
-                        avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
-                        #v = np.random.random(size=avv.shape)
-                        #avgcoh = np.abs( (avv*v).sum(1) / 
-                        #                 (np.linalg.norm(avv,axis=1)*np.linalg.norm(v,axis=1))
-                        #               ).mean()
+                        #avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
+                        
+                        # Calculate performance metric as an average over y and z axes.
+                        dt = (tAsDate[0]-t0).total_seconds()
+                        avgcoh = 0
+                        avgcoh += check_coherence_with_null( dt,
+                                                             v[:,1],avv[:,1],
+                                                             nullt,nully[1],nully[2]  )
+                        avgcoh += check_coherence_with_null( dt,
+                                                             v[:,2],avv[:,2],
+                                                             nullt,nullz[1],nullz[2]  )
+                        avgcoh /= 2
                         print "new coherence is %1.2f"%avgcoh
                         self.broadcast.update_payload('%1.2f'%avgcoh)
-                    time.sleep(0.1)
+                    else:
+                        time.sleep(0.1)
             finally:
                 print "updateBroadcastThread stopped"
         self.updateBroadcastEvent = threading.Event()
 
-        # Wait til start_time.txt has been written to start experiment..
+        # Wait til start_time has been written to start experiment..
         t0 = self.wait_for_start_time()
         avatar,subject = self.load_avatar(return_subject=True)
 
@@ -493,17 +517,17 @@ class HandSyncExperiment(object):
             updateBroadcastThread.start()
             
             # Run GPR for the next windows setting.
-            while not os.path.isfile('%s/%s'%(DATADR,'end.txt')):
-                if os.path.isfile('%s/%s'%(DATADR,'run_gpr.txt')):
+            while not os.path.isfile('%s/%s'%(DATADR,'end')):
+                if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
                     # Sometimes deletion conflicts with writing.
                     notDeleted = True
                     while notDeleted:
                         try:
-                            os.remove('%s/%s'%(DATADR,'run_gpr.txt'))
+                            os.remove('%s/%s'%(DATADR,'run_gpr'))
                             notDeleted = False
-                            print "run_gpr.txt successfully deleted."
+                            print "run_gpr successfully deleted."
                         except OSError:
-                            print "run_gpr.txt unsuccessfully deleted."
+                            print "run_gpr unsuccessfully deleted."
                             time.sleep(.1)
 
                     # Run GPR.
@@ -513,7 +537,7 @@ class HandSyncExperiment(object):
                                                     tdateHistory,t0)
                     avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
                     nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
-                    open('%s/next_setting.txt'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
+                    open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                                 nextFraction))
 
                     # Stop thread reading from port and refresh history.
@@ -532,7 +556,7 @@ class HandSyncExperiment(object):
         updateBroadcastThread.join()
         broadcastThread.join()
 
-        with open('%s/%s'%(DATADR,'end_port_read.txt'),'w') as f:
+        with open('%s/%s'%(DATADR,'end_port_read'),'w') as f:
             f.write('')
 
         print "Saving GPR."

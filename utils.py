@@ -85,6 +85,107 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def precompute_coherence_nulls(v,t0,windowDuration,pool,
+        sampling_rate=30,n_iters=100):
+    """
+    Calculate coherence values for trajectory with many samples of white noise. 
+    
+    This uses multiprocess to speed up calculation.
+    
+    Parameters
+    ----------
+    v : function
+        Given times, return signal.
+    t0 : ndarray
+        Times at which windows begin for calculating nulls.
+    windowDuration : float
+        Window duration in seconds
+    pool : multiprocess.Pool
+        Pool for parallelizing computation.
+        
+    Returns
+    -------
+    One tuple for each x,y,z axis with
+    f : ndarray
+        Frequencies at which coherence was calculated
+    coh_mean : ndarray
+        Mean of coherence over random noise samples.
+    coh_std : ndarray
+        Std of coherence over random noise samples.
+    """
+    import multiprocess as mp
+    
+    def f(t0):
+        # Data to analyize.
+        t = t0+np.arange(windowDuration*sampling_rate)/sampling_rate
+        v_ = v(t)
+        
+        # Coherence null values for each axis independently.
+        Cnullx,Cnully,Cnullz = [],[],[]
+        for i in xrange(n_iters):
+            fx,cwtcohx = cwt_coherence_auto_nskip(v_[:,0],np.random.normal(size=len(v_)),
+                                         sampling_period=1/sampling_rate,period_multiple=3)
+            fy,cwtcohy = cwt_coherence_auto_nskip(v_[:,1],np.random.normal(size=len(v_)),
+                                         sampling_period=1/sampling_rate,period_multiple=3)
+            fz,cwtcohz = cwt_coherence_auto_nskip(v_[:,2],np.random.normal(size=len(v_)),
+                                         sampling_period=1/sampling_rate,period_multiple=3)
+            Cnullx.append( cwtcohx )
+            Cnully.append( cwtcohy )
+            Cnullz.append( cwtcohz )
+        Cnullx = np.vstack(Cnullx)
+        Cnully = np.vstack(Cnully)
+        Cnullz = np.vstack(Cnullz)
+        
+        mux,stdx = Cnullx.mean(0),Cnullx.std(0)
+        muy,stdy = Cnully.mean(0),Cnully.std(0)
+        muz,stdz = Cnullz.mean(0),Cnullz.std(0)
+        
+        return fx,fy,fz,mux,muy,muz,stdx,stdy,stdz
+
+    fx,fy,fz,cohmux,cohmuy,cohmuz,cohstdx,cohstdy,cohstdz = zip(*pool.map(f,t0))
+    
+    return ( (fx[0],np.vstack(cohmux),np.vstack(cohstdx)),
+             (fy[0],np.vstack(cohmuy),np.vstack(cohstdy)),
+             (fz[0],np.vstack(cohmuz),np.vstack(cohstdz)) )
+
+def check_coherence_with_null(t0,subv,avv,tnull,cohnullmu,cohnullstd,
+                              sampling_rate=30):
+    """
+    Given subject's trajectory compare it with the given null and return the fraction of
+    frequencies at which the subject exceeds the null.
+    
+    Parameters
+    ----------
+    t0 : float
+        Time relative to the start of the avatar velocity data at which subject and 
+        avatar velocities arrays start.
+    subv : ndarray
+        Subject vel
+    avv : ndarray
+        Avatar vel
+    tnull : ndarray
+        Times at which null calculations were made.
+    cohnullmu : ndarray
+        Dimensions of (n_time,n_freq)
+    cohnullstd : ndarray
+    
+    Returns
+    -------
+    performanceMetric
+    """
+    f,cwtcoh = cwt_coherence_auto_nskip(subv,avv,
+                                        sampling_period=1/sampling_rate,period_multiple=3)
+    # Simple (not very good) check to make sure cwt was calculated in the same way.
+    assert len(cwtcoh)==cohnullmu.shape[1]
+    
+    tIx = np.argmin(np.abs(tnull-t0))
+    
+    # Ignore nans
+    notnanix = (np.isnan(cwtcoh)|np.isnan(cohnullmu[tIx]))==0
+    betterPerfFreqIx = cwtcoh[notnanix]>(cohnullmu[tIx][notnanix]+cohnullstd[tIx][notnanix]/2)
+    
+    return ( betterPerfFreqIx ).mean()
+
 def phase_coherence(x,y):
     """
     Parameters
