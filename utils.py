@@ -1,7 +1,10 @@
-# A lot of smaller helper functions used for manipulating Axis Neuron files.
+# ================================================================================================ # 
+# Helper functions and modules that are imported into every other module in this package. These
+# should not depend on other modules.
 # 
-# Edward Lee edl56@cornell.edu
+# Author: Eddie Lee, edl56@cornell.edu
 # 2017-03-28
+# ================================================================================================ # 
 
 from __future__ import division
 try:
@@ -17,13 +20,17 @@ from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline,interp1d
 import entropy as info
 from scipy.signal import fftconvolve
 from misc.utils import unique_rows
-import load
 from numba import jit
 import multiprocess as mp
 from scipy.optimize import minimize
 from scipy.signal import spectrogram,savgol_filter,fftconvolve
 from misc.angle import *
 import pywt
+import os
+
+# Declare global variables for entire package.
+DATADR = os.path.expanduser('~')+'/Dropbox/Sync_trials/Data'
+
 
 # ================== # 
 # Class definitions.
@@ -85,174 +92,34 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
-def precompute_coherence_nulls(v,t0,windowDuration,pool,
-        sampling_rate=30,n_iters=100):
+def fetch_matching_avatar_vel(avatar,part,t,t0=None,verbose=False):
     """
-    Calculate coherence values for trajectory with many samples of white noise. 
-    
-    This uses multiprocess to speed up calculation.
-    
+    Get the stretch of avatar velocities that aligns with the velocity data of the subject. 
+
     Parameters
     ----------
-    v : function
-        Given times, return signal.
-    t0 : ndarray
-        Times at which windows begin for calculating nulls.
-    windowDuration : float
-        Window duration in seconds
-    pool : multiprocess.Pool
-        Pool for parallelizing computation.
-        
-    Returns
-    -------
-    One tuple for each x,y,z axis with
-    f : ndarray
-        Frequencies at which coherence was calculated
-    coh_mean : ndarray
-        Mean of coherence over random noise samples.
-    coh_std : ndarray
-        Std of coherence over random noise samples.
-    """
-    import multiprocess as mp
-    
-    def f(t0):
-        # Data to analyize.
-        t = t0+np.arange(windowDuration*sampling_rate)/sampling_rate
-        v_ = v(t)
-        
-        # Coherence null values for each axis independently.
-        Cnullx,Cnully,Cnullz = [],[],[]
-        for i in xrange(n_iters):
-            fx,cwtcohx = cwt_coherence_auto_nskip(v_[:,0],np.random.normal(size=len(v_)),
-                                         sampling_period=1/sampling_rate,period_multiple=3)
-            fy,cwtcohy = cwt_coherence_auto_nskip(v_[:,1],np.random.normal(size=len(v_)),
-                                         sampling_period=1/sampling_rate,period_multiple=3)
-            fz,cwtcohz = cwt_coherence_auto_nskip(v_[:,2],np.random.normal(size=len(v_)),
-                                         sampling_period=1/sampling_rate,period_multiple=3)
-            Cnullx.append( cwtcohx )
-            Cnully.append( cwtcohy )
-            Cnullz.append( cwtcohz )
-        Cnullx = np.vstack(Cnullx)
-        Cnully = np.vstack(Cnully)
-        Cnullz = np.vstack(Cnullz)
-        
-        mux,stdx = Cnullx.mean(0),Cnullx.std(0)
-        muy,stdy = Cnully.mean(0),Cnully.std(0)
-        muz,stdz = Cnullz.mean(0),Cnullz.std(0)
-        
-        return fx,fy,fz,mux,muy,muz,stdx,stdy,stdz
-
-    fx,fy,fz,cohmux,cohmuy,cohmuz,cohstdx,cohstdy,cohstdz = zip(*pool.map(f,t0))
-    
-    return ( (fx[0],np.vstack(cohmux),np.vstack(cohstdx)),
-             (fy[0],np.vstack(cohmuy),np.vstack(cohstdy)),
-             (fz[0],np.vstack(cohmuz),np.vstack(cohstdz)) )
-
-def check_coherence_with_null(t0,subv,avv,tnull,cohnullmu,cohnullstd,
-                              sampling_rate=30):
-    """
-    Given subject's trajectory compare it with the given null and return the fraction of
-    frequencies at which the subject exceeds the null.
-    
-    Parameters
-    ----------
-    t0 : float
-        Time relative to the start of the avatar velocity data at which subject and 
-        avatar velocities arrays start.
-    subv : ndarray
-        Subject vel
-    avv : ndarray
-        Avatar vel
-    tnull : ndarray
-        Times at which null calculations were made.
-    cohnullmu : ndarray
-        Dimensions of (n_time,n_freq)
-    cohnullstd : ndarray
-    
-    Returns
-    -------
-    performanceMetric
-    """
-    f,cwtcoh = cwt_coherence_auto_nskip(subv,avv,
-                                        sampling_period=1/sampling_rate,period_multiple=3)
-    # Simple (not very good) check to make sure cwt was calculated in the same way.
-    assert len(cwtcoh)==cohnullmu.shape[1]
-    
-    tIx = np.argmin(np.abs(tnull-t0))
-    
-    # Ignore nans
-    notnanix = (np.isnan(cwtcoh)|np.isnan(cohnullmu[tIx]))==0
-    betterPerfFreqIx = cwtcoh[notnanix]>(cohnullmu[tIx][notnanix]+cohnullstd[tIx][notnanix]/2)
-    
-    return ( betterPerfFreqIx ).mean()
-
-def phase_coherence(x,y):
-    """
-    Parameters
-    ----------
-    x : ndarray
-    y : ndarray
-    S : ndarray
-        Smoothing filter for 2d convolution.
+    avatar : dict
+        This would be the templateTrial loaded in VRTrial.
+    part : str
+        Choose from 'avatar','avatar0','hand','hand0'.
+    t : array of floats or datetime objects
+        Stretch of time to return data from. If t0 is specified, this needs to be datetime objects.
+    t0 : datetime,None
+    verbose : bool,False
 
     Returns
     -------
-    Phase coherence
+    v : ndarray
+        Avatar's velocity that matches given time stamps.
     """
-    xcwt,f = pywt.cwt(x,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
-    ycwt,f = pywt.cwt(y,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
+    if not t0 is None:
+        # Transform dt to time in seconds.
+        t = np.array([i.total_seconds() for i in t-t0])
+    if verbose:
+        print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
 
-    smoothx = np.abs(xcwt)
-    smoothy = np.abs(ycwt)
-    smoothxy = xcwt*ycwt.conjugate()
-
-    smoothcoh = smoothxy.mean(1) / ( smoothx*smoothy ).mean(1)
-    return f,smoothcoh
-
-def tf_phase_coherence(x,y,S):
-    """
-    Parameters
-    ----------
-    x : ndarray
-    y : ndarray
-    S : ndarray
-        Smoothing filter for 2d convolution.
-
-    Returns
-    -------
-    """
-    from scipy.signal import convolve2d
-
-    xcwt,f = pywt.cwt(x,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
-    ycwt,f = pywt.cwt(y,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
-
-    smoothx = convolve2d(np.abs(xcwt)**2,S,mode='same')
-    smoothy = convolve2d(np.abs(ycwt)**2,S,mode='same')
-    smoothxy = convolve2d(xcwt*ycwt.conjugate(),S,mode='same')
-    
-    smoothcoh = smoothxy.mean(1) / np.sqrt(( smoothx*smoothy ).mean(1))
-    return f,smoothcoh
-
-def tf_coherence(x,y,S):
-    """
-    Parameters
-    ----------
-    x : ndarray
-    y : ndarray
-    S : ndarray
-        Smoothing filter for 2d convolution.
-    """
-    from scipy.signal import convolve2d
-
-    xcwt,f = pywt.cwt(x,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
-    ycwt,f = pywt.cwt(y,np.logspace(0,2,100),'cgau1',sampling_period=1/60,precision=12)
-
-    smoothx = convolve2d(np.abs(xcwt)**2,S,mode='same')
-    smoothy = convolve2d(np.abs(ycwt)**2,S,mode='same')
-    smoothxy = convolve2d(xcwt*ycwt.conjugate(),S,mode='same')
-
-    smoothcoh = smoothxy/np.sqrt(smoothx*smoothy)
-    return f,smoothcoh
+    # Return part of avatar's trajectory that agrees with the stipulated time bounds.
+    return avatar[part+'V'](t)
 
 def window_mutual_info(vel,vis,dt0,dt1,vel1=None,select_vis_start=True):
     """
@@ -359,229 +226,6 @@ def corrcoef_before_vis(subv,avv,vis,dt):
     visStartIx = visStartIx[(visStartIx>=0)&(visStartIx<len(vis))]
     
     return np.corrcoef(subv[visStartIx],avv[visStartIx])[0,1]
-
-def coherence_before_vis(subcwt,avcwt,f,vis,dt,min_freq=0,max_freq=10):
-    """
-    Coherence using the wavelet transform for dt seconds around the visibility turning back on.
-    
-    Parameters
-    ----------
-    subcwt
-    avcwt
-    f : ndarray
-        Frequencies.
-    vis
-    dt : float
-        temporal distance from the start of a new visibility section. Positive value is for
-        before visibility starts.
-    min_freq : float,0
-    max_freq : float,10
-
-    Returns
-    -------
-    Average coherence between (min_freq,max_freq).
-    """
-    # Get indices of points near the end of the invisibility window.
-    dtprev = int(dt*60)
-    visStartIx = np.where(np.diff(vis)==1)[0]-dtprev
-    visStartIx = visStartIx[(visStartIx>=0)&(visStartIx<len(vis))]
-
-    Psub = ( np.abs(subcwt[:,visStartIx])**2 ).mean(-1)
-    Pav = ( np.abs(avcwt[:,visStartIx])**2 ).mean(-1)
-    Pcross = ( subcwt[:,visStartIx]*avcwt[:,visStartIx].conjugate() ).mean(-1)
-    
-    coh = np.abs(Pcross)**2/Psub/Pav
-    freqix = (f>=min_freq)&(f<=max_freq)
-
-    # Errors.
-    #print ( Psub/( np.abs(subcwt[:,visStartIx])**2 ).std(-1) )[freqix]
-    #print ( Pav/( np.abs(avcwt[:,visStartIx])**2 ).std(-1) )[freqix]
-    #print ( np.abs(Pcross)**2/(np.abs( subcwt[:,visStartIx]*avcwt[:,visStartIx].conjugate()
-    #    )**2).std(-1) )[freqix]
-
-    avgC = np.trapz(coh[freqix],x=f[freqix]) / (f[freqix].max()-f[freqix].min())
-    if avgC<0:
-        return -avgC
-    return avgC
-
-def cwt_coherence(x,y,nskip,
-                  scale=np.logspace(0,2,100),
-                  sampling_period=1/60,
-                  **kwargs):
-    """
-    Use the continuous wavelet transform to measure coherence.
-
-    Parameters
-    ----------
-    x : ndarray
-    y : ndarray
-    nskip : int
-        Number of indices to skip when averaging across spectra for coherence. This is to reduce
-        correlation between samples when averaging.
-    scale : list
-        Scale of continuous wavelets.
-    sampling_period : float,1/60
-        Used to choose scales.
-    **kwargs
-        for pywt.cwt()
-
-    Returns
-    -------
-    f : ndarray
-    coherence : ndarray
-    """
-    import pywt
-    assert len(x)==len(y)
-    xcwt,f = pywt.cwt(x,scale,'cgau1',sampling_period=sampling_period,**kwargs)
-    ycwt,f = pywt.cwt(y,scale,'cgau1',sampling_period=sampling_period,**kwargs)
-    
-    # Get indices of points with some overlap.
-    selectix = np.arange(nskip,len(x),nskip,dtype=int)
-
-    Psub = ( np.abs(xcwt[:,selectix])**2 ).mean(-1)
-    Pav = ( np.abs(ycwt[:,selectix])**2 ).mean(-1)
-    Pcross = ( xcwt[:,selectix]*ycwt[:,selectix].conjugate() ).mean(-1)
-    coh = np.abs(Pcross)**2/Psub/Pav
-    
-    # Skip low frequencies that have periods longer the duration of the window.
-    fCutoff = f<(1/(len(x)*sampling_period))
-
-    return f[f>=fCutoff],coh[f>=fCutoff]
-
-def cwt_coherence_auto_nskip(x,y,
-                             scale=np.logspace(0,2,100),
-                             sampling_period=1/60,
-                             period_multiple=1,
-                             **kwargs):
-    """
-    Use the continuous wavelet transform to measure coherence but automatically choose the amount to
-    subsample separately for each frequency when averaging. The subsampling is determined by nskip
-    which only takes a sample every period of the relevant frequency.
-
-    Parameters
-    ----------
-    x : ndarray
-    y : ndarray
-    nskip : int
-        Number of indices to skip when averaging across spectra for coherence. This is to reduce
-        correlation between samples when averaging.
-    scale : list
-        Scale of continuous wavelets.
-    sampling_period : float,1/60
-        Used to choose scales.
-    **kwargs
-        for pywt.cwt()
-
-    Returns
-    -------
-    f : ndarray
-    coherence : ndarray
-    """
-    import pywt
-    assert len(x)==len(y)
-    xcwt,f = pywt.cwt(x,scale,'cgau1',sampling_period=sampling_period,**kwargs)
-    ycwt,f = pywt.cwt(y,scale,'cgau1',sampling_period=sampling_period,**kwargs)
-    
-    Psub = np.zeros(len(f))
-    Pav = np.zeros(len(f))
-    Pcross = np.zeros(len(f),dtype=complex)
-    #PsubStd = np.zeros(len(f))
-    #PavStd = np.zeros(len(f))
-    #PcrossStd = np.zeros(len(f))
-
-    # For each freq, skip roughly by a period.
-    for fIx,f_ in enumerate(f):
-        nskip = int(1/f_/sampling_period)
-        if nskip>(len(x)//3):
-            Psub[fIx] = np.nan
-            Pav[fIx] = np.nan
-            Pcross[fIx] = np.nan
-        else:
-            selectix = np.arange(nskip,len(x),nskip,dtype=int)
-            #print f_,len(selectix)
-
-            Psub[fIx] = ( np.abs(xcwt[fIx,selectix])**2 ).mean(-1)
-            Pav[fIx] = ( np.abs(ycwt[fIx,selectix])**2 ).mean(-1)
-            Pcross[fIx] = ( xcwt[fIx,selectix]*ycwt[fIx,selectix].conjugate() ).mean(-1)
-
-            #PsubStd[fIx] = ( np.abs(xcwt[fIx,selectix])**2 ).std(-1)
-            #PavStd[fIx] = ( np.abs(ycwt[fIx,selectix])**2 ).std(-1)
-            #PcrossStd[fIx] = ( xcwt[fIx,selectix]*ycwt[fIx,selectix].conjugate() ).std(-1)
-
-    coh = np.abs(Pcross)**2/Psub/Pav
-    #stds = (PsubStd,PavStd,PcrossStd)
-
-    # Skip low frequencies that have periods longer the duration of the window.
-    fCutoff = f<(period_multiple/(len(x)*sampling_period))
-
-    return f[f>fCutoff],coh[f>fCutoff]
-
-def max_coh_time_shift(subv,temv,
-                       dtgrid=np.linspace(0,1,100),
-                       mx_freq=10,
-                       sampling_rate=60,
-                       window_width=2,
-                       disp=False,
-                       ax=None):
-    """
-    Find the global time shift that maximizes the coherence between two signals.
-    
-    Parameters
-    ----------
-    subv : ndarray
-        Subject time series. If multiple cols, each col is taken to be a data point and the average
-        coherence is maximized.
-    temv : ndarray
-        Template time series.
-    dtgrid : ndarray,np.linspace(0,1,100)
-    window_width : float,2
-        Window duration for computing coherence in terms of seconds.
-    disp : bool,False
-    ax : AxesSubplot,None
-        
-    Returns
-    -------
-    dt : float
-        Time shift in seconds that maximizes scipy coherence. Time shift is relative to subject
-        time, i.e.  negative shift is shifting subject back in time and positive is shifting subject
-        forwards in time. If subject is tracking template, then dt>0.
-    maxcoh : float
-        Coherence max.
-    """
-    from scipy.signal import coherence
-        
-    # Convert dtgrid to index shifts.
-    dtgrid = np.unique(np.around(dtgrid*sampling_rate).astype(int))
-    if subv.ndim==1:
-        coh = np.zeros(len(dtgrid))
-    else:
-        coh = np.zeros((len(dtgrid),subv.shape[1]))
-    window_width = int(sampling_rate*window_width)
-    
-    def _calc_coh(subv,temv):
-        for i,dt in enumerate(dtgrid):
-            if dt<0:
-                f,c = coherence(subv[-dt:],temv[:dt],fs=sampling_rate,nperseg=window_width)
-            elif dt>0:
-                f,c = coherence(subv[:-dt],temv[dt:],fs=sampling_rate,nperseg=window_width)
-            else:
-                f,c = coherence(subv,temv,fs=sampling_rate,nperseg=window_width)
-            coh[i] = abs(c)[f<mx_freq].mean()
-        return coh
-        
-    if subv.ndim==1:
-        coh = _calc_coh(subv,temv)
-    else:
-        coh = np.vstack([_calc_coh(subv[:,i],temv[:,i]) for i in xrange(subv.shape[1])]).mean(1)
-    shiftix = np.argmax(coh)
-    
-    if disp:
-        if ax is None:
-            fig,ax = plt.subplots()
-        ax.plot(dtgrid/sampling_rate,coh,'o')
-        ax.set(xlabel='dt',ylabel='coherence')
-        
-    return dtgrid[shiftix]/sampling_rate,coh[shiftix]
 
 def min_phase_time_shift(freq,subjectAngle,templateAngle,
                          bds=1,
@@ -1076,44 +720,6 @@ def spec_and_phase(X,noverlap,
 
     phase = np.angle(spec)
     return f,t,spec,phase
-
-def pipeline_phase_lag(v1,v2,dt,
-                       maxshift=60,
-                       windowlength=100,
-                       v_threshold=.03,
-                       measure='dot',
-                       save='temp.p'):
-    """
-    Find phase lag for each dimension separately and for the vector including all dimensions together.
-    
-    Params:
-    -------
-    v1,v2,dt
-    maxshift (int=60)
-    windowlength (int=100)
-    v_threshold (float=.03)
-    save (str='temp.p')
-    """
-    import cPickle as pickle
-
-    phasexyz,overlapcostxyz = [],[]
-    for i in xrange(3):
-        p,o = phase_lag(v1[:,i],v2[:,i],maxshift,windowlength,
-                        measure=measure,dt=dt)
-        phasexyz.append(p)
-        overlapcostxyz.append(o)
-    phase,overlapcost = phase_lag(v1,v2,maxshift,windowlength,
-                                  measure=measure,dt=dt)
-    
-    if save:
-        print "Pickling results as %s"%save
-        pickle.dump({'phase':phase,'overlapcost':overlapcost,
-                     'phasexyz':phasexyz,'overlapcostxyz':overlapcostxyz,
-                     'maxshift':maxshift,'windowlength':windowlength,
-                     'measure':measure,
-                     'v1':v1,'v2':v2},
-                    open(save,'wb'),-1)
-    return phasexyz,phase,overlapcostxyz,overlapcost
 
 def quaternion_to_rot(q,normalize=False):
     """

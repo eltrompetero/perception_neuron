@@ -11,6 +11,44 @@ from filter import *
 from numpy import pi
 
 
+def pipeline_phase_lag(v1,v2,dt,
+                       maxshift=60,
+                       windowlength=100,
+                       v_threshold=.03,
+                       measure='dot',
+                       save='temp.p'):
+    """
+    Find phase lag for each dimension separately and for the vector including all dimensions together.
+    
+    Params:
+    -------
+    v1,v2,dt
+    maxshift (int=60)
+    windowlength (int=100)
+    v_threshold (float=.03)
+    save (str='temp.p')
+    """
+    import cPickle as pickle
+
+    phasexyz,overlapcostxyz = [],[]
+    for i in xrange(3):
+        p,o = phase_lag(v1[:,i],v2[:,i],maxshift,windowlength,
+                        measure=measure,dt=dt)
+        phasexyz.append(p)
+        overlapcostxyz.append(o)
+    phase,overlapcost = phase_lag(v1,v2,maxshift,windowlength,
+                                  measure=measure,dt=dt)
+    
+    if save:
+        print "Pickling results as %s"%save
+        pickle.dump({'phase':phase,'overlapcost':overlapcost,
+                     'phasexyz':phasexyz,'overlapcostxyz':overlapcostxyz,
+                     'maxshift':maxshift,'windowlength':windowlength,
+                     'measure':measure,
+                     'v1':v1,'v2':v2},
+                    open(save,'wb'),-1)
+    return phasexyz,phase,overlapcostxyz,overlapcost
+
 def max_coherence(windowSpec,trials):
     """
     Time shifted max coherence across all trials.
