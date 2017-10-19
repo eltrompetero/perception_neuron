@@ -24,7 +24,6 @@ class HandSyncExperiment(object):
         """
         self.duration = duration
         self.trialType = trial_type
-        self.partsIx = parts_ix
         self.broadcastPort = broadcast_port
 
     def load_avatar(self,return_subject=False):
@@ -46,10 +45,8 @@ class HandSyncExperiment(object):
         # but you should fetch just the avatar data from the original recordings.
         if handedness=='left':
             person,modelhandedness,rotation,dr = subject_settings(0)
-            self.partsIx = left_hand_col_indices()
         elif handedness=='right':
             person,modelhandedness,rotation,dr = subject_settings(2)
-            self.partsIx = right_hand_col_indices()
         else:
             print handedness
             raise Exception
@@ -152,12 +149,15 @@ class HandSyncExperiment(object):
         with open('%s/left_or_right'%DATADR,'r') as f:
             handedness = f.read().rstrip()
         if handedness=='left':
-            self.partsIx = left_hand_col_indices()
+            self.subPartsIx = left_hand_col_indices()
+            self.avPartsIx = right_hand_col_indices()
         else:
-            self.partsIx = right_hand_col_indices()
-        avatar,subject = self.load_avatar(return_subject=True)
+            self.avPartsIx = left_hand_col_indices()
+            self.subPartsIx = right_hand_col_indices()
+        avatar = self.load_avatar()
         windowsInIndexUnits = int(30*self.duration)
-
+        performance = []  # history of performance
+        
         # Open port for communication with UE4 engine. This will send the current coherence value to
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
@@ -179,20 +179,20 @@ class HandSyncExperiment(object):
                     v,t,tAsDate = reader.copy_recent()
                     if len(v)>=(windowsInIndexUnits):
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
-                        #avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
                         
                         # Calculate performance metric as an average over y and z axes.
                         dt = (tAsDate[0]-t0).total_seconds()
-                        avgcoh = 0
-                        avgcoh += check_coherence_with_null( dt,
-                                                 v[-windowsInIndexUnits:,1],avv[-windowsInIndexUnits:,1],
-                                                 nullt,nully[1],nully[2]  )
-                        avgcoh += check_coherence_with_null( dt,
-                                                 v[-windowsInIndexUnits:,2],avv[-windowsInIndexUnits:,2],
-                                                 nullt,nullz[1],nullz[2]  )
-                        avgcoh /= 2
-                        print "new coherence is %1.2f"%avgcoh
-                        self.broadcast.update_payload('%1.2f'%avgcoh)
+                        performance.append( check_coherence_with_null( dt,
+                                                                 v[-windowsInIndexUnits:,1],
+                                                                 avv[-windowsInIndexUnits:,1],
+                                                                 nullt,nully[1],nully[2]  ) )
+                        performance[-1] += check_coherence_with_null( dt,
+                                                                 v[-windowsInIndexUnits:,2],
+                                                                 avv[-windowsInIndexUnits:,2],
+                                                                 nullt,nullz[1],nullz[2]  )
+                        performance[-1] /= 2
+                        print "new coherence is %1.2f"%np.mean(performance[-7:])
+                        self.broadcast.update_payload('%1.2f'%np.mean(performance[-7:]))
                     else:
                         time.sleep(0.1)
             finally:
@@ -209,7 +209,7 @@ class HandSyncExperiment(object):
         
         if verbose:
             print "Starting threads."
-        with ANReader(self.duration,self.partsIx,
+        with ANReader(self.duration,self.subPartsIx,
                       port=7011,
                       verbose=True,
                       port_buffer_size=8000,
@@ -271,7 +271,8 @@ class HandSyncExperiment(object):
             f.write('')
 
         print "Saving GPR."
-        pickle.dump({'gprmodel':gprmodel},open('%s/%s'%(DATADR,'temp.p'),'wb'),-1)
+        pickle.dump({'gprmodel':gprmodel,'performance':performance,'v':v,'t':t},
+                    open('%s/%s'%(DATADR,'temp.p'),'wb'),-1)
 
     def stop(self):
         """Stop all thread that could be running. This does not wait for threads to stop."""
