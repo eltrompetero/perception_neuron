@@ -239,46 +239,41 @@ class ANReader(object):
         t : ndarray
         tAsDate : ndarray
         """
-        self.lock.acquire()
-
-        # Must be careful accessing these arrays because they're being asynchronously updated.
         v = self.v[:]
         t = self.tAsDate[:]
+
+        # Must be careful accessing these arrays because they're being asynchronously updated.
+        # Fetch only the oldest overlapping data points.
         if len(v)==0 or len(t)==0:
-            self.lock.release()
             return np.array([]),np.array([]),np.array([])
         if len(v)<len(t):
-            t = t[:len(t)-len(v)]
+            t = t[:len(v)]
         elif len(v)>len(t):
-            v = v[:len(v)-len(t)]
+            v = v[:len(t)]
+        assert len(v)==len(t)
 
         tAsDate = t
         t = np.cumsum([0.] + [dt.total_seconds() for dt in np.diff(t)])
         if interpolate and len(v)>10:
             t,v,tAsDate = self._interpolate(t,v,tAsDate)
         else:
-            self.lock.release()
             return np.array([]),np.array([]),np.array([])
         
-        self.lock.release()
         assert len(t)==len(v), "%d,%d"%(len(t),len(v))
         return np.array(v),np.array(t),np.array(tAsDate)
 
     def copy_history(self,interpolate=True):
-        self.lock.acquire()
         v = self.vHistory[:]
         t = self.tAsDateHistory[:]
         
         # Must be careful accessing these arrays because they're being asynchronously updated.
-        v = self.v[:]
-        t = self.tAsDate[:]
+        # Fetch only the oldest overlapping data points.
         if len(v)==0 or len(t)==0:
-            self.lock.release()
             return np.array([]),np.array([]),np.array([]),np.array([])
         if len(v)<len(t):
-            t = t[:len(t)-len(v)]
+            t = t[:len(v)]
         elif len(v)>len(t):
-            v = v[:len(v)-len(t)]
+            v = v[:len(t)]
         assert len(t)==len(v) 
 
         tAsDate = t
@@ -288,7 +283,6 @@ class ANReader(object):
         else:
             raise Exception("Can't interpolate")
         
-        self.lock.release()
         return np.array(v),np.array(t),np.array(tAsDate)
     
     # =============== # 
@@ -331,7 +325,7 @@ class ANReader(object):
 
     def read_velocity(self):
         """
-        Get a data point from the port.
+        Guarantee a data point from the port.
         
         Returns
         -------
