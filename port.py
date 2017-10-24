@@ -423,10 +423,12 @@ class ANReader(object):
             Time spacing for interpolation.
         """
         from utils import MultiUnivariateSpline
+        from scipy.interpolate import interp1d
         assert len(t)==len(v)
-        
+
         # Must be careful with knot spacing because the data frequency is highly variable.
-        splineV = MultiUnivariateSpline(t,v,fit_type='Uni')
+        #splineV = MultiUnivariateSpline(t,v,fit_type='Uni')
+        splineV = interp1d(t,v,axis=0,assume_sorted=True,copy=False)
         t = np.arange(t[0],t[-1],dt)
         v = splineV(t)
         t = t
