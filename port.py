@@ -221,6 +221,16 @@ class ANReader(object):
             print "Closing socket."
         self.sock.close()
 
+    def empty_buffer(self):
+        """Empty buffer."""
+        self.sock.setblocking(0)
+        try:
+            while True:
+                self.sock.recv(self.portBufferSize)
+        except:
+            # When nothing is read from the buffer
+            pass
+        self.sock.setblocking(1)
     # ========================= # 
     # Safe data access methods. #
     # ========================= # 
@@ -291,8 +301,9 @@ class ANReader(object):
     def setup_port(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        print "trying to bind to host %s"%self.host
+        print "Trying to bind to host (%s,%d)"%(self.host,self.port)
         self.sock.bind((self.host,self.port))
+        print "Bound."
         self.rawData = []
 
     def read_port(self):
@@ -307,12 +318,15 @@ class ANReader(object):
         
         rawData = ''
         readTimes = []
-        while len(rawData)<18000:
+        
+        self.empty_buffer()
+        while len(rawData)<17200:
             rawData += self.sock.recv(self.portBufferSize)
             readTimes.append(datetime.now())
         rawData = rawData.split('\n')
         nBytes = [len(i) for i in rawData]
         
+        # Take the longest read and split it by space delimiter.
         rawData = rawData[nBytes.index(max(nBytes))].split()
         if len(rawData)!=946:  # number of cols in calc file
             print "%d cols in calc output"%len(rawData)

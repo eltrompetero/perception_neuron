@@ -11,20 +11,21 @@ import cPickle as pickle
 import os
 
 
-def left_hand_col_indices():
-    # Get the columns with the data that we're interested in.
-    columns = calc_file_headers()
-    skeleton = calc_file_body_parts()
-    nameIx = 0
-    for i,s in enumerate(skeleton):
-        if not 'contact' in s:
-            for j,c in enumerate(columns):
-                columns[j] = c.replace(str(nameIx+1).zfill(2),s)
-            nameIx += 1
-    return [columns.index(p)+1 for p in ['LeftHand-V-x','LeftHand-V-y','LeftHand-V-z']]
+def left_hand_col_indices(add_one=True):
+    """
+    Get column indices that correspond to the velocities vx, vy,vz of the left hand. In the calc
+    file, these cols start at 1 (and not 0) so these col indices are incremented by one. You must
+    specify not to do this one if you want to use these as indices for a Python array.
+    
+    Parameters
+    ----------
+    add_one : bool,True
 
-def right_hand_col_indices():
-    # Get the columns with the data that we're interested in.
+    Returns
+    -------
+    idx : list
+        Indices of left hand velocities incremented by one if add_one is True.
+    """
     columns = calc_file_headers()
     skeleton = calc_file_body_parts()
     nameIx = 0
@@ -33,7 +34,36 @@ def right_hand_col_indices():
             for j,c in enumerate(columns):
                 columns[j] = c.replace(str(nameIx+1).zfill(2),s)
             nameIx += 1
-    return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
+    if add_one:
+        return [columns.index(p)+1 for p in ['LeftHand-V-x','LeftHand-V-y','LeftHand-V-z']]
+    return [columns.index(p) for p in ['LeftHand-V-x','LeftHand-V-y','LeftHand-V-z']]
+
+def right_hand_col_indices(add_one=True):
+    """
+    Get column indices that correspond to the velocities vx, vy,vz of the left hand. In the calc
+    file, these cols start at 1 (and not 0) so these col indices are incremented by one. You must
+    specify not to do this one if you want to use these as indices for a Python array.
+    
+    Parameters
+    ----------
+    add_one : bool,True
+
+    Returns
+    -------
+    idx : list
+        Indices of left hand velocities incremented by one if add_one is True.
+    """
+    columns = calc_file_headers()
+    skeleton = calc_file_body_parts()
+    nameIx = 0
+    for i,s in enumerate(skeleton):
+        if not 'contact' in s:
+            for j,c in enumerate(columns):
+                columns[j] = c.replace(str(nameIx+1).zfill(2),s)
+            nameIx += 1
+    if add_one:
+        return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
+    return [columns.index(p) for p in ['LeftHand-V-x','LeftHand-V-y','LeftHand-V-z']]
 
 def calc_file_body_parts():
     """
@@ -109,19 +139,37 @@ def calc_file_headers():
                   'Dropbox/Research/py_lib/perceptionneuron/calc_file_headers.p'),'rb'))['headers']
     return headers
 
-def load_calc(fname,cols='V',read_csv_kwargs={},zd=True,df=None):
+def load_calc(fname,cols='V',read_csv_kwargs={},return_zd=True,df=None):
     """
     Load calculation file output by Axis Neuron. 
     Note that z-axis points into the ground by default.
     2016-12-05
 
-    Params:
-    -------
-    fname (str)
-    skeleton (list of str)
+    Parameters
+    ----------
+    fname : str
+    skeleton : list of str
         Names fo the bones specified in fname.
-    cols (str)
-        Data columns to keep. Columns are XVQAW (position, vel, quaternion, acc, angular vel)
+    cols : str
+        Data columns to keep. Columns are XVQAW (position, vel, quaternion, acc, angular vel). Order
+        does not matter.
+    read_csv_kwargs : dict
+        kwargs for pandas.read_csv
+    return_zd : bool,True
+        Return direction in which user was initially facing.
+    df : pandas.DataFrame
+        Supply an already loaded calc file to read from.
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        Loaded calc file. Cols have been renamed so that numbers have been replaced by strings.
+    zd : ndarray
+        Vector of direction user was initially facing.
+
+    Example
+    -------
+    >>> df,zd = load_calc('Eddie.calc',cols='V')
     """
     from ising.heisenberg import rotate
     
@@ -146,7 +194,7 @@ def load_calc(fname,cols='V',read_csv_kwargs={},zd=True,df=None):
     df.columns = columns
     
     # Read Zd axis, the original direction that the wearer is facing.
-    if zd:
+    if return_zd:
         with open(fname,'r') as f:
             zd = np.array([float(i) for i in f.readline().split('\t')[1:]])
         return df,zd
