@@ -288,10 +288,11 @@ class ANReader(object):
 
         tAsDate = t
         t = np.cumsum([0.] + [dt.total_seconds() for dt in np.diff(t)])
-        if interpolate and len(v)>10:
-            t,v,tAsDate = self._interpolate(t,v,tAsDate)
-        else:
-            raise Exception("Can't interpolate")
+        if interpolate:
+            if len(v)>10:
+                t,v,tAsDate = self._interpolate(t,v,tAsDate)
+            else:
+                raise Exception("Can't interpolate")
         
         return np.array(v),np.array(t),np.array(tAsDate)
     

@@ -160,11 +160,11 @@ class HandSyncExperiment(object):
         
         # Open port for communication with UE4 engine. This will send the current coherence value to
         # UE4.
-        #self.broadcast = DataBroadcaster(self.broadcastPort)
-        #self.broadcast.update_payload('0.00')
-        #broadcastThread = threading.Thread(target=self.broadcast.broadcast,
-        #                                   kwargs={'pause':.5,'verbose':verbose})
-        #broadcastThread.start()
+        self.broadcast = DataBroadcaster(self.broadcastPort)
+        self.broadcast.update_payload('0.00')
+        broadcastThread = threading.Thread(target=self.broadcast.broadcast,
+                                           kwargs={'pause':.5,'verbose':verbose})
+        broadcastThread.start()
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader which is declared later.
@@ -192,7 +192,7 @@ class HandSyncExperiment(object):
                                                                  nullt,nullz[1],nullz[2]  )
                         performance[-1] /= 2
                         print "new coherence is %1.2f"%np.mean(performance[-7:])
-                        #self.broadcast.update_payload('%1.2f'%np.mean(performance[-7:]))
+                        self.broadcast.update_payload('%1.2f'%np.mean(performance[-7:]))
                     else:
                         time.sleep(0.1)
             finally:
@@ -215,17 +215,17 @@ class HandSyncExperiment(object):
                       port_buffer_size=8192,
                       recent_buffer_size=self.duration*60) as reader:
             
-            #updateBroadcastThread = threading.Thread(target=update_broadcaster,
-            #                                         args=(reader,self.updateBroadcastEvent))
+            updateBroadcastThread = threading.Thread(target=update_broadcaster,
+                                                     args=(reader,self.updateBroadcastEvent))
 
             while reader.len_history()<(self.duration*60):
                 if verbose:
                     print "Waiting to collect more data...(%d)"%reader.len_history()
-                #self.broadcast.update_payload('0.00')
+                self.broadcast.update_payload('0.00')
                 time.sleep(1.5)
             #if self.broadcast.connectionInterrupted:
-                #raise Exception
-            #updateBroadcastThread.start()
+            #    raise Exception
+            updateBroadcastThread.start()
             
             # Run GPR for the next windows setting.
             while not os.path.isfile('%s/%s'%(DATADR,'end')):
@@ -264,8 +264,8 @@ class HandSyncExperiment(object):
         # Always end thread.
         print "Ending threads..."
         self.stop()
-        #updateBroadcastThread.join()
-        #broadcastThread.join()
+        updateBroadcastThread.join()
+        broadcastThread.join()
 
         with open('%s/%s'%(DATADR,'end_port_read'),'w') as f:
             f.write('')
@@ -276,8 +276,8 @@ class HandSyncExperiment(object):
 
     def stop(self):
         """Stop all thread that could be running. This does not wait for threads to stop."""
-        #self.updateBroadcastEvent.set()
-        #self.broadcast.stopEvent.set()
+        self.updateBroadcastEvent.set()
+        self.broadcast.stopEvent.set()
         return
 # end HandSyncExperiment
 
