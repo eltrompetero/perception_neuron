@@ -99,7 +99,21 @@ class HandSyncExperiment(object):
               verbose=False):
         """
         Run realtime analysis for experiment.
+                
+        Parameters
+        ----------
+        update_delay : float,.3
+            Number of seconds to wait between updating arrays when calculating realtime coherence.
+        initial_window_duration : float,1.0
+        initial_vis_fraction : float,0.5
+        min_window_duration : float,.5
+        max_window_duration : float,2
+        min_vis_fraction : float,.1
+        max_vis_fraction : float,.9
+        verbose : bool,False
         
+        Notes
+        -----
         Code waits til when start_time becomes available to read in avatar start time.
         
         The threads that are running:
@@ -117,18 +131,6 @@ class HandSyncExperiment(object):
 
         NOTE:
         - only calculate coherence along z-axis
-        
-        Parameters
-        ----------
-        update_delay : float,.3
-            Number of seconds to wait between updating arrays when calculating realtime coherence.
-        initial_window_duration : float,1.0
-        initial_vis_fraction : float,0.5
-        min_window_duration : float,.5
-        max_window_duration : float,2
-        min_vis_fraction : float,.1
-        max_vis_fraction : float,.9
-        verbose : bool,False
         """
         from data_access import subject_settings_v3,VRTrial
         from coherence import CoherenceEvaluator,GPR,check_coherence_with_null

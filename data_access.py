@@ -475,9 +475,11 @@ class VRTrial(object):
         for i in ix:
             try:
                 if source=='subject' or source=='s':
-                    phases = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
+                    phases = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),
+                                         'rb'))['phases']
                 elif source=='template' or source=='t':
-                    phases = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))['phases']
+                    phases = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),
+                                         'rb'))['phases']
 
                 phases = [np.vstack(p) for p in phases]
                 selection.append(( self.windowsByPart[trialType][i][0],phases ))
@@ -585,10 +587,11 @@ class VRTrial(object):
 
     def pickle_trial_dicts(self,disp=False):
         """
-        Put data for analysis into easily accessible pickles. Right now, I have visibility and hand 
-        velocities for AN port data and motionbuilder files.
+        Put data for analysis into easily accessible pickles. Right now, I extract only visibility
+        and hand velocities for AN port data and avatar's motionbuilder files.
         """
         from pipeline import extract_motionbuilder_model2,extract_AN_port
+        from utils import match_time
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
@@ -628,16 +631,15 @@ class VRTrial(object):
 
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             # Since the AN trial starts after the mbTrial...the offset is positive.
-            subjectTrial[part+'V'],subjectTrial[part+'T'] = utils.match_time(subjectTrial[part+'V'],
-                               subjectTrial[part+'T'],
-                               1/60,
-                               offset=(subjectTrial[part+'T'][0]-templateTrial[part+'T'][0]).total_seconds(),
-                               use_univariate=True)
-            templateTrial[part+'V'],templateTrial[part+'T'] = utils.match_time(templateTrial[part+'V'],
-                                                                             templateTrial[part+'T'],
-                                                                             1/60,
-                                                                             use_univariate=True)
-            
+            subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
+                   subjectTrial[part+'T'],
+                   1/60,
+                   offset=(subjectTrial[part+'T'][0]-templateTrial[part+'T'][0]).total_seconds(),
+                   use_univariate=True)
+            templateTrial[part+'V'],templateTrial[part+'T'] = match_time(templateTrial[part+'V'],
+                                                                     templateTrial[part+'T'],
+                                                                     1/60,
+                                                                     use_univariate=True)
             
             # Separate the different visible trials into separate arrays.
             # Times for when visible/invisible windows start.
@@ -689,7 +691,6 @@ class VRTrial(object):
 
             timeix = (templateTrial[part+'T']<=invisibleStart[0])&(templateTrial[part+'T']>=0)
             templateSplitTrials[part+'visibility'].insert( 0,visibility[timeix] )
-
         
         pickle.dump({'templateTrial':templateTrial,
                      'subjectTrial':subjectTrial,

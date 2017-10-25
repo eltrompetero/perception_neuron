@@ -331,9 +331,9 @@ def cwt_coherence_auto_nskip(x,y,
     #stds = (PsubStd,PavStd,PcrossStd)
 
     # Skip low frequencies that have periods longer the duration of the window.
-    fCutoff = f<(period_multiple/(len(x)*sampling_period))
+    fCutoffIx = f>(period_multiple/(len(x)*sampling_period))
 
-    return f[f>fCutoff],coh[f>fCutoff]
+    return f[fCutoffIx],coh[fCutoffIx]
 
 def max_coh_time_shift(subv,temv,
                        dtgrid=np.linspace(0,1,100),
