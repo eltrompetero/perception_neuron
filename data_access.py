@@ -646,14 +646,16 @@ class VRTrial(object):
             start = np.zeros((len(visible)+len(invisible)),dtype=object)
             start[::2] = visible
             start[1::2] = invisible
+            # Units of seconds.
             start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
             start = np.cumsum(start)
-            invisibleStart = start[::2]
-            visibleStart = start[1::2] 
+            invisibleStart = start[::2]  # as seconds
+            visibleStart = start[1::2]  # as seconds
             
             # When target is invisible, set visibility to 0.
             visibility = np.ones_like(templateTrial[part+'T'])
             for i,j in zip(invisibleStart,visibleStart):
+                assert i<j
                 visibility[(templateTrial[part+'T']>=i) & (templateTrial[part+'T']<j)] = 0
             if len(visible)<len(invisible):
                 visibility[(templateTrial[part+'T']>=invisible[-1])] = 0

@@ -65,16 +65,16 @@ def load_visibility(fname,dr=''):
     """
     Load visible/invisible toggle times.
 
-    Params:
-    -------
-    fname (str)
-    dr (str='')
+    Parameters
+    ----------
+    fname : str
+    dr : str,''
 
-    Returns:
-    --------
-    visible (ndarray)
+    Returns
+    -------
+    visible : ndarray
         First time is when animation starts.
-    invisible (ndarray)
+    invisible : ndarray
     """
     from datetime import datetime
 
@@ -98,8 +98,8 @@ def load_visibility(fname,dr=''):
 
 def window_specs(person,dr):
     """
-    Get when the different visible/invisible cycles occur in the given experiment. These data are obtained
-    from visibility text files output from UE4.
+    Get when the different visible/invisible cycles occur in the given experiment. These data are
+    obtained from visibility text files output from UE4.
     
     Returns:
     --------

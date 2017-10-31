@@ -98,6 +98,7 @@ def check_coherence_with_null(t0,subv,avv,tnull,cohnullmu,cohnullstd,
     -------
     performanceMetric
     """
+    # Calculate coherence between given signals.
     f,cwtcoh = cwt_coherence_auto_nskip(subv,avv,
                                         sampling_period=1/sampling_rate,period_multiple=3)
     # Simple (not very good) check to make sure cwt was calculated in the same way.
@@ -105,6 +106,7 @@ def check_coherence_with_null(t0,subv,avv,tnull,cohnullmu,cohnullstd,
     
     tIx = np.argmin(np.abs(tnull-t0))
     
+    # Compare coherence will the sample of coherencen ulls given.
     # Ignore nans
     notnanix = (np.isnan(cwtcoh)|np.isnan(cohnullmu[tIx]))==0
     betterPerfFreqIx = cwtcoh[notnanix]>(cohnullmu[tIx][notnanix]+cohnullstd[tIx][notnanix]/2)
