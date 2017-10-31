@@ -55,7 +55,7 @@ def record_AN_port(fname,port,
                    savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
                    host=HOST,
                    start_file='start',
-                   stop_file='end_port_read'):
+                   stop_file='stop'):
     """
     Start recording data from Axis Neuron port when presence of start is detected
     and stop when end_port_read is detected in DATADR.
@@ -67,7 +67,7 @@ def record_AN_port(fname,port,
     savedr : str,'~/Dropbox/Sync_trials/Data/'
     host : str,HOST
     start_file : str,'start'
-    stop_file : str,'end_port_read'
+    stop_file : str,'stop'
     """
     import platform
 

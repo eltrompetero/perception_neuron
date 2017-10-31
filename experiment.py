@@ -119,7 +119,7 @@ class HandSyncExperiment(object):
         The threads that are running:
         0. reader thread to read velocities from Axis Neuron UDP port.
         1. updateBroadcastThread: assess subject's performance relative to the avatar and
-            update coherence value
+            update performance value
         2. broadcastThread: broadcast subject's performance to port 5001
         
         Thread communication happens through members that are updated using thread locks.
@@ -133,7 +133,7 @@ class HandSyncExperiment(object):
         - only calculate coherence along z-axis
         """
         from data_access import subject_settings_v3,VRTrial
-        from coherence import CoherenceEvaluator,GPR,check_coherence_with_null
+        from coherence import CoherenceEvaluator,GPR,DTWPerformance
         import cPickle as pickle
 
         self.wait_for_start()
@@ -142,6 +142,7 @@ class HandSyncExperiment(object):
         coheval = CoherenceEvaluator(5,sample_freq=30,window_length=30)  # arg is max freq to consider
         gprmodel = GPR(tmin=min_window_duration,tmax=max_window_duration,
                        fmin=min_vis_fraction,fmax=max_vis_fraction)
+        dtw = DTWPerformance()
         nextDuration = np.around(initial_window_duration,1)
         nextFraction = np.around(initial_vis_fraction,1)
         assert min_window_duration<=nextDuration<=max_window_duration
@@ -169,12 +170,7 @@ class HandSyncExperiment(object):
         broadcastThread.start()
 
         # Set up thread for updating value of streaming broadcast of coherence.
-        # This relies on reader which is declared later.
-        # Read in precomputed null coherence values.
-        loadedData = pickle.load(open('%s/%s'%(os.path.expanduser('~'),
-                                               '/Dropbox/Research/tango/py/cohnull_avatar.p'),'rb'))
-        nullt = loadedData['t0']
-        nully,nullz = loadedData['nully'],loadedData['nullz']
+        # This relies on reader to fetch data which is declared later.
         def update_broadcaster(reader,stopEvent):
             try:
                 while not stopEvent.is_set():
@@ -182,21 +178,18 @@ class HandSyncExperiment(object):
                     if len(v)>=(windowsInIndexUnits):
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
                         
-                        # Calculate performance metric as an average over y and z axes.
+                        # Calculate performance metric.
                         dt = (tAsDate[0]-t0).total_seconds()
-                        performance.append( check_coherence_with_null( dt,
-                                                                 v[-windowsInIndexUnits:,1],
-                                                                 avv[-windowsInIndexUnits:,1],
-                                                                 nullt,nully[1],nully[2]  ) )
-                        performance[-1] += check_coherence_with_null( dt,
-                                                                 v[-windowsInIndexUnits:,2],
-                                                                 avv[-windowsInIndexUnits:,2],
-                                                                 nullt,nullz[1],nullz[2]  )
-                        performance[-1] /= 2
-                        print "new coherence is %1.2f"%np.mean(performance[-7:])
-                        self.broadcast.update_payload('%1.2f'%np.mean(performance[-7:]))
-                    else:
-                        time.sleep(0.1)
+                        performance.append(
+                            dtw.compare(v[-windowsInIndexUnits:,1:],avv[-windowsInIndexUnits:,1:],dt=1/30) )
+                        # If timing is more than .5s off or performance is really bad.
+                        if performance[-1][1]>=.5 or performance[-1][0]<0:
+                            self.broadcast.update_payload('0.00')
+                            print "perf is %1.2f,%1.2f"%performance[-1]
+                        else:
+                            self.broadcast.update_payload('%1.2f'%performance[-1][0])
+                        print "new coherence is %s"%self.broadcast._payload
+                    time.sleep(0.1)
             finally:
                 print "updateBroadcastThread stopped"
         self.updateBroadcastEvent = threading.Event()
@@ -204,11 +197,6 @@ class HandSyncExperiment(object):
         # Wait til start_time has been written to start experiment..
         t0 = self.wait_for_start_time()
 
-        # Wait til fully visible trial has finished and read data while waiting so that we can erase
-        # it before starting the next trial.
-        time.sleep(self.duration+1)
-        self.wait_for_start_gpr()
-        
         if verbose:
             print "Starting threads."
         with ANReader(self.duration,self.subPartsIx,
@@ -254,11 +242,11 @@ class HandSyncExperiment(object):
                                                                             nextFraction))
 
                     # Stop thread reading from port and refresh history.
+                    self.broadcast.update_payload('0.00')
                     reader.refresh()
                     while reader.len_history()<(self.duration*60):
                         if verbose:
                             print "Waiting to collect more data...(%d)"%reader.len_history()
-                        #self.broadcast.update_payload('0.00')
                         time.sleep(1.5)
                     
                 time.sleep(update_delay) 
