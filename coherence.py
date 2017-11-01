@@ -14,6 +14,7 @@ from fastdtw import fastdtw
 def precompute_coherence_nulls(v,t0,windowDuration,pool,
         sampling_rate=30,n_iters=100):
     """
+    This is unnecessary! As noted in Tango NBIII 2017-10-30.
     Calculate coherence values for trajectory with many samples of white noise. 
     
     This uses multiprocess to speed up calculation.
@@ -74,43 +75,37 @@ def precompute_coherence_nulls(v,t0,windowDuration,pool,
              (fy[0],np.vstack(cohmuy),np.vstack(cohstdy)),
              (fz[0],np.vstack(cohmuz),np.vstack(cohstdz)) )
 
-def check_coherence_with_null(t0,subv,avv,tnull,cohnullmu,cohnullstd,
+def check_coherence_with_null(ref,sample,threshold,
                               sampling_rate=30):
     """
     Given subject's trajectory compare it with the given null and return the fraction of
-    frequencies at which the subject exceeds the null.
+    frequencies at which the subject exceeds the white noise null which is just a flat cutoff.
     
     Parameters
     ----------
-    t0 : float
-        Time relative to the start of the avatar velocity data at which subject and 
-        avatar velocities arrays start.
-    subv : ndarray
-        Subject vel
-    avv : ndarray
-        Avatar vel
-    tnull : ndarray
-        Times at which null calculations were made.
-    cohnullmu : ndarray
-        Dimensions of (n_time,n_freq)
-    cohnullstd : ndarray
-    
+    ref : ndarray
+        Reference signal against which to compare the sample. This determines the noise
+        threshold.
+    sample : ndarray
+        Sample signal to compare against reference signal.
+    threshold : float
+        This determines the constant with which to multiply the power spectrum of the reference
+        signal to determine the null cutoff.
+
     Returns
     -------
-    performanceMetric
+    performanceMetric : float
     """
+    assert 0<=threshold<=1
+    
     # Calculate coherence between given signals.
-    f,cwtcoh = cwt_coherence_auto_nskip(subv,avv,
-                                        sampling_period=1/sampling_rate,period_multiple=3)
-    # Simple (not very good) check to make sure cwt was calculated in the same way.
-    assert len(cwtcoh)==cohnullmu.shape[1],'%d, %d'%(len(cwtcoh),cohnullmu.shape[1])
+    f,cwtcoh = cwt_coherence_auto_nskip(ref,sample,
+                                        sampling_period=1/sampling_rate,
+                                        period_multiple=3)
     
-    tIx = np.argmin(np.abs(tnull-t0))
-    
-    # Compare coherence will the sample of coherencen ulls given.
     # Ignore nans
-    notnanix = (np.isnan(cwtcoh)|np.isnan(cohnullmu[tIx]))==0
-    betterPerfFreqIx = cwtcoh[notnanix]>(cohnullmu[tIx][notnanix]+cohnullstd[tIx][notnanix]/2)
+    notnanix = np.isnan(cwtcoh)==0
+    betterPerfFreqIx = cwtcoh[notnanix]>threshold
     
     return ( betterPerfFreqIx ).mean()
 
