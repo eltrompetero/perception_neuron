@@ -175,10 +175,11 @@ class HandSyncExperiment(object):
             try:
                 while not stopEvent.is_set():
                     v,t,tAsDate = reader.copy_recent()
-                    # Put into comparable coordinate system accounting for reflection symmetry.
-                    v[:] = v[:,[1,0,2]]
-                    v[:,2] *= -1
+                    
                     if len(v)>=(windowsInIndexUnits):
+                        # Put into comparable coordinate system accounting for reflection symmetry.
+                        v[:] = v[:,[1,0,2]]
+                        v[:,2] *= -1
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
                         
                         # Calculate performance metric.
