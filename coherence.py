@@ -8,6 +8,7 @@ import numpy as np
 from scipy.signal import coherence
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import RBF
+from fastdtw import fastdtw
 
 
 def precompute_coherence_nulls(v,t0,windowDuration,pool,
@@ -409,6 +410,44 @@ def max_coh_time_shift(subv,temv,
 # ======= #
 # Classes #
 # ======= #
+class DTWPerformance(object):
+    def __init__(self,dwt_kwargs={'dist':2}):
+        """
+        Class for using fast DWT to compare two temporal trajectories and return a performance metric.
+        
+        Parameters
+        ----------
+        """
+        self.dwtSettings = dwt_kwargs
+
+    def compare(self,x,y,dt=1.):
+        """
+        Parameters
+        ----------
+        x : ndarray
+        y : ndarray
+        dt : float,1
+            Sampling rate for x and y.
+
+        Returns
+        -------
+        inner : float
+            Normalized average inner product between x and y when indexed by warped path.
+        dtmax : float
+            Largest timing different from DTW algorithm.
+        """
+        from numpy.linalg import norm
+
+        dist,path = fastdtw(x,y,**self.dwtSettings)
+        path = np.vstack(path)
+
+        # Calculate correlation between the two vectors.
+        inner = ( (x[path[:,0]]*y[path[:,1]]).sum(1) / 
+                  (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)) ).mean()
+        dtmax = np.abs(np.diff(path,axis=1)).max() * dt
+
+        return inner,dtmax
+
 class CoherenceEvaluator(object):
     '''
     update() evaluates the average coherence over the given time.

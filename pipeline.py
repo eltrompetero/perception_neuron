@@ -649,13 +649,18 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
 
 def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
     """
-    Load model motion data. Assuming the play rate is a constant 1/60 Hz. Returned data is put into standard
-    global coordinate frame.
+    Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
+    exported. Returned data is put into standard global coordinate frame: x-axis is the axis between the two
+    subjects where positive is towards the front, y is the side to side, and z is up and down such that
+    positive y is determined by following the right hand rule.
     
-    Directory where animation data is stored is hard-coded.
+    These are pickled csv files that were exported from Mokka after preprocessing in Motionbuilder. Note that
+    the coordinate system in Motionbuilder and Mokka are different.
 
-    Returns:
-    --------
+    NOTE: Directory where animation data is stored is hard-coded.
+
+    Returns
+    -------
     trial_type (str)
     visible_start (datetime.datetime)
     modelhand (str)
@@ -676,7 +681,7 @@ def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
 
     mbT = np.array([timedelta(seconds=t)+visible_start for t in mbT])
 
-    # Put these in the standard global coordinate system.
+    # Put these in the standard global coordinate system as explained in function description.
     mbV[:,:] = mbV[:,[1,0,2]]
     mbV[:,1] *= -1
     return mbT,mbV
