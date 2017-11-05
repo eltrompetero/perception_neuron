@@ -90,6 +90,31 @@ class HandSyncExperiment(object):
         """
         while not os.path.isfile('%s/%s'%(DATADR,'start_gpr')):
             time.sleep(.5)
+    
+    def delete_file(self,fname,max_wait_time=1,dt=.02):
+        """
+        Try to delete file in DATADR. Return False if deletion is unsuccessful in given time frame.
+
+        Parameters
+        ----------
+        fname : str
+        max_wait_time : float
+        dt : float
+            Time to wait in each iteration of while loop.
+        """
+        notDeleted = True
+        t0 = datetime.now()
+        while notDeleted:
+            try:
+                os.remove('%s/%s'%(DATADR,fname))
+                notDeleted = False
+            except OSError:
+                if (datetime.now()-t0).total_seconds()>max_wait_time:
+                    print "Failed to delete %s."%fname
+                    return False
+                time.sleep(dt)
+        print "%s deleted."%fname
+        return True
 
     def start(self,
               update_delay=.3,
@@ -164,9 +189,9 @@ class HandSyncExperiment(object):
         # Open port for communication with UE4 engine. This will send the current coherence value to
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
-        self.broadcast.update_payload('0.00')
+        self.broadcast.update_payload('-1.0')
         broadcastThread = threading.Thread(target=self.broadcast.broadcast,
-                                           kwargs={'pause':.5,'verbose':verbose})
+                                           kwargs={'pause':.2,'verbose':verbose})
         broadcastThread.start()
 
         # Set up thread for updating value of streaming broadcast of coherence.
@@ -212,30 +237,25 @@ class HandSyncExperiment(object):
             updateBroadcastThread = threading.Thread(target=update_broadcaster,
                                                      args=(reader,self.updateBroadcastEvent))
 
-            while reader.len_history()<(self.duration*60):
+            while reader.len_history()<windowsInIndexUnits:
                 if verbose:
                     print "Waiting to collect more data...(%d)"%reader.len_history()
-                self.broadcast.update_payload('0.00')
-                time.sleep(1.5)
-            #if self.broadcast.connectionInterrupted:
+                self.broadcast.update_payload('-1.0')
+                time.sleep(1)
             #    raise Exception
             updateBroadcastThread.start()
-            
-            # Run GPR for the next windows setting.
+           
+
+            # After initial trial is done, refresh history of GPR.
+            while not os.path.isfile('%s/%s'%(DATADR,'initial_trial_done')):
+                time.sleep(.2)
+            self.broadcast.update_payload('-1.0')
+            reader.refresh()
+            self.delete_file('initial_trial_done')
+
             while not os.path.isfile('%s/%s'%(DATADR,'end')):
+                # Run GPR for the next windows setting.
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
-                    # Sometimes deletion conflicts with writing.
-                    notDeleted = True
-                    while notDeleted:
-                        try:
-                            os.remove('%s/%s'%(DATADR,'run_gpr'))
-                            notDeleted = False
-                            print "run_gpr successfully deleted."
-                        except OSError:
-                            print "run_gpr unsuccessfully deleted."
-                            time.sleep(.1)
-                    
-                    # Run GPR.
                     print "Running GPR on this trial..."
                     v,t,tdateHistory = reader.copy_history()
                     # Put into comparable coordinate system accounting for reflection symmetry.
@@ -249,13 +269,15 @@ class HandSyncExperiment(object):
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                             nextFraction))
 
-                    # Stop thread reading from port and refresh history.
-                    self.broadcast.update_payload('0.00')
+                    self.delete_file('run_gpr')
+
+                    # Refresh history.
+                    self.broadcast.update_payload('-1.0')
                     reader.refresh()
                     while reader.len_history()<(self.duration*60):
                         if verbose:
                             print "Waiting to collect more data...(%d)"%reader.len_history()
-                        time.sleep(1.5)
+                        time.sleep(1)
                     
                 time.sleep(update_delay) 
             
