@@ -11,6 +11,115 @@ from filter import *
 from numpy import pi
 
 
+def distance_dtw(spec_list,trial_type,trials,
+                  precision=.1,
+                  firstix=0,
+                  disp=1):
+    """
+    Calculate dtw statistics over all given trials for given window specs.
+
+    Parameters
+    ----------
+    spec_list : list
+        List of twoples (invisible_fraction,window_duration).
+    trial_type : str
+        Trial type. 'hand' or 'avatar'
+    trials : list of VRTrial instances
+    precision : float,.1
+    firstix : int
+    disp : bool,True
+
+    Returns
+    -------
+    distmat : ndarray
+    dtmat : ndarray
+        Cols are [avg_dt,std_dt,min,max]
+    """
+    # In last dim, first three cols correspond to xyz dimensions and last col is norm.
+    distmat = np.zeros((len(trials),len(spec_list),4))
+    dtmat = np.zeros((len(trials),len(spec_list),4))
+    
+    for itrial,trial in enumerate(trials):
+	for specix,spec in enumerate(spec_list):
+            # Get subject and template velocities.
+            output = _compare_dtw(trial,[spec]*2,[trial_type]*2,[precision]*2,
+                                  firstix=firstix,disp=disp)
+                        
+            if not output is None:
+                distmat[itrial,specix,:] = np.sqrt( (output[0]**2).mean(0) )
+                dt = np.diff(output[1],1)/30
+                dtmat[itrial,specix,:] = dt.mean(),dt.std(),dt.min(),dt.max()
+            else:
+                distmat[itrial,specix,:] = np.nan 
+                dtmat[itrial,specix,:] = np.nan 
+    return distmat,dtmat
+
+def _compare_dtw(trial,windows,trial_types,precisions,
+                       firstix=0,disp=True,
+                       template_only=False):
+    """
+    Compare coherence for the given windows specified for the subject and for the template.
+
+    Parameters
+    ----------
+    trial : VRTrial
+    windows : list of tuples
+    trial_types : list of strings
+    precisions : list of precision
+    firstix : int,0
+    disp : bool,True
+    template_only : bool,False
+
+    Returns
+    -------
+    dist : ndarray
+        (n_time,4) Cols are x, y, z then cosine of angle between velocity vectors.
+    path : ndarray
+    """
+    from fastdtw import fastdtw
+    try:
+        if template_only:
+            sspec,t,subjectv = trial.template_by_window_spec([windows[0]],
+                                                           trial_types[0],
+                                                           precisions[0]
+                                                          )[firstix]
+        else:
+            sspec,t,subjectv = trial.subject_by_window_spec([windows[0]],
+                                                             trial_types[0],
+                                                             precisions[0]
+                                                            )[firstix]
+        tspec,t,templatev = trial.template_by_window_spec([windows[1]],
+                                                           trial_types[1],
+                                                           precisions[1]
+                                                          )[firstix]
+        # Ensure that data sets are of the same size.
+        #t = t[-1200:]
+        #subjectv = subjectv[-1200:]
+        #templatev = templatev[-1200:]
+        #assert (len(subjectv)==1200) and (len(templatev)==1200)
+
+        if disp:
+            print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
+                                                                     tspec[0],tspec[1])
+        
+        if len(subjectv)==0:
+            return
+        
+        # Run dtw.
+        dtwdist,path = fastdtw(subjectv,templatev)
+        path = np.vstack(path)
+        dist = np.zeros((len(path),4))
+        for dimIx in xrange(3):
+            dist[:,dimIx] = subjectv[path[:,0],dimIx]-templatev[path[:,1],dimIx]
+        dist[:,3] = ( (subjectv[path[:,0]]*templatev[path[:,1]]).sum(1) /
+                      np.linalg.norm(subjectv[path[:,0]],axis=1)/np.linalg.norm(templatev[path[:,1]],axis=1) )
+        return dist,path
+    except Exception,err:
+        if disp:
+            print "No data for window spec (%1.1f,%1.1f)."%(windows[0][0],
+                                                            windows[0][1])
+        return
+
 def pipeline_phase_lag(v1,v2,dt,
                        maxshift=60,
                        windowlength=100,
