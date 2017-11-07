@@ -51,6 +51,50 @@ def forward_AN_port(ports,
         listenSock.close()
         [sock.close() for sock in servSocks]
 
+def _test_forward_timing(nIters=1000):
+    """
+    Test for the delay of forwarding a data point to a UDP port.
+    """
+    dt = np.zeros(nIters)
+    stopEvent = threading.Event()
+
+    try: 
+        # Create and start a server UDP port on thread.
+        servSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        def send_time():
+            while not stopEvent.is_set():
+                servSock.sendto(datetime.now().isoformat()+',',('127.0.0.1',7001))
+                time.sleep(.01)
+        servThread = threading.Thread(target=send_time)
+        servThread.start()
+        
+        # Listen to server and record time.
+        listenSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        listenSock.bind(('127.0.0.1',7001))
+        for i in xrange(nIters):
+            whenSent = listenSock.recv(54)
+            whenRec = datetime.now()
+
+            whenSent = whenSent.split(',')
+            ix = np.where(np.array([len(s) for s in whenSent])==26)[0][0]
+            if not ix is None:
+                whenSent = whenSent[ix]
+                whenSent = datetime.strptime(whenSent, '%Y-%m-%dT%H:%M:%S.%f')
+                
+                dt[i] = (whenRec-whenSent).total_seconds()
+        stopEvent.set()
+        servThread.join() 
+
+    finally:
+        servSock.close()
+        listenSock.close()
+    
+    print "For %d samples, the delay is"
+    print "Mean: %1.5f"%dt.mean()
+    print "Min,max: %1.5f,%1.5f"%(dt.min(),dt.max())
+    print "Std: %1.5f"%dt.std()
+    return dt
+
 def record_AN_port(fname,port,
                    savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
                    host=HOST,
