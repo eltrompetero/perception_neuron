@@ -406,14 +406,22 @@ def max_coh_time_shift(subv,temv,
 # Classes #
 # ======= #
 class DTWPerformance(object):
-    def __init__(self,dwt_kwargs={'dist':2}):
+    def __init__(self,norm_dv_threshold=.5,dt_threshold=.5,dwt_kwargs={'dist':2}):
         """
         Class for using fast DWT to compare two temporal trajectories and return a performance metric.
+        Performance is the fraction of time warped trajectories that the individuals remain within some
+        threshold preset.
         
         Parameters
         ----------
+        norm_dv_threshold : float,1
+            Max deviation allowed for one minus normalized dot product between vectors.
+        dt_threshold : float,.5
+            Max deviation for time allowed.
         """
         self.dwtSettings = dwt_kwargs
+        self.normdvThreshold = norm_dv_threshold
+        self.dtThreshold = dt_threshold
 
     def compare(self,x,y,dt=1.):
         """
@@ -426,10 +434,8 @@ class DTWPerformance(object):
 
         Returns
         -------
-        inner : float
-            Normalized average inner product between x and y when indexed by warped path.
-        dtmax : float
-            Largest timing different from DTW algorithm.
+        performance : float
+            Fraction of the length of given trajectories that are within set thresholds.
         """
         from numpy.linalg import norm
 
@@ -438,10 +444,12 @@ class DTWPerformance(object):
 
         # Calculate correlation between the two vectors.
         inner = ( (x[path[:,0]]*y[path[:,1]]).sum(1) / 
-                  (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)) ).mean()
-        dtmax = np.abs(np.diff(path,axis=1)).max() * dt
+                  (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)) )
+        dt = np.diff(path,axis=1) * dt
 
-        return inner,dtmax
+        # Calculate performance metric.
+        performance = ( ((1-inner)<self.normdtThreshold) & (np.abs(dt)<self.dtThreshold) ).mean()
+        return performance
 
 class CoherenceEvaluator(object):
     '''
