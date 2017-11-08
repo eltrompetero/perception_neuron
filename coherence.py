@@ -423,7 +423,7 @@ class DTWPerformance(object):
         self.normdvThreshold = norm_dv_threshold
         self.dtThreshold = dt_threshold
 
-    def compare(self,x,y,dt=1.):
+    def compare(self,x,y,dt=1.,strict=False):
         """
         Parameters
         ----------
@@ -448,7 +448,14 @@ class DTWPerformance(object):
         dt = np.diff(path,axis=1) * dt
 
         # Calculate performance metric.
-        performance = ( ((1-inner)<self.normdtThreshold) & (np.abs(dt)<self.dtThreshold) ).mean()
+        if strict:
+            if (np.abs(dt)<self.dtThreshold).all():
+                performance = ((1-inner)<self.normdvThreshold).mean()
+            else:
+                performance = 0.
+        else:
+            performance = ( ((1-inner)<self.normdvThreshold) & (np.abs(dt)<self.dtThreshold) ).mean()
+        
         return performance
 
 class CoherenceEvaluator(object):

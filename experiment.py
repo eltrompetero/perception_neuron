@@ -9,7 +9,7 @@ from axis_neuron import left_hand_col_indices,right_hand_col_indices
 from port import *
 
 class HandSyncExperiment(object):
-    def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001):
+    def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001,fs=30):
         """
         Parameters
         ----------
@@ -21,6 +21,8 @@ class HandSyncExperiment(object):
             Indices of the columns in an_port file to extract and analyze. If None, this will be
             replaced automatically in start by the relevant hand.
         broadcast_port : int,5001
+        fs : int
+            Sampling frequency for interpolated velocities.
         """
         self.duration = duration
         self.trialType = trial_type
@@ -28,6 +30,9 @@ class HandSyncExperiment(object):
 
     def load_avatar(self,return_subject=False):
         """
+        This loads the correct avatar for comparison of performance. The handedness of the subject is
+        read in from left_or_right.txt.
+
         Parameters
         ----------
         return_subject : bool,False
@@ -158,20 +163,21 @@ class HandSyncExperiment(object):
         - only calculate coherence along z-axis
         """
         from data_access import subject_settings_v3,VRTrial
-        from coherence import CoherenceEvaluator,GPR,DTWPerformance
+        from coherence import GPR,DTWPerformance
         import cPickle as pickle
 
         self.wait_for_start()
         
         # Setup routines for calculating coherence.
-        coheval = CoherenceEvaluator(5,sample_freq=30,window_length=30)  # arg is max freq to consider
         gprmodel = GPR(tmin=min_window_duration,tmax=max_window_duration,
                        fmin=min_vis_fraction,fmax=max_vis_fraction)
-        dtw = DTWPerformance()
+        perfEval = DTWPerformance()
+
         nextDuration = np.around(initial_window_duration,1)
         nextFraction = np.around(initial_vis_fraction,1)
         assert min_window_duration<=nextDuration<=max_window_duration
         assert min_vis_fraction<=nextFraction<=max_vis_fraction
+
         with open('%s/next_setting'%DATADR,'w') as f:
             f.write('%1.1f,%1.1f'%(nextDuration,nextFraction))
         with open('%s/left_or_right'%DATADR,'r') as f:
@@ -182,7 +188,7 @@ class HandSyncExperiment(object):
         else:
             self.avPartsIx = left_hand_col_indices(False)
             self.subPartsIx = right_hand_col_indices(False)
-        avatar = self.load_avatar()
+        avatar = self.load_avatar()  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
         
@@ -202,21 +208,16 @@ class HandSyncExperiment(object):
                     v,t,tAsDate = reader.copy_recent()
                     
                     if len(v)>=(windowsInIndexUnits):
-                        # Put into comparable coordinate system accounting for reflection symmetry.
+                        # Put into standard coordinate system (as in paper). Account for reflection symmetry.
                         v[:] = v[:,[1,0,2]]
                         v[:,2] *= -1
                         avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
                         
                         # Calculate performance metric.
-                        dt = (tAsDate[0]-t0).total_seconds()
-                        performance.append(
-                            dtw.compare(v[-windowsInIndexUnits:,1:],avv[-windowsInIndexUnits:,1:],dt=1/30) )
-                        # If timing is more than .5s off or performance is really bad.
-                        if performance[-1][1]>=.5 or performance[-1][0]<0:
-                            self.broadcast.update_payload('0.00')
-                            print "perf is %1.2f,%1.2f"%performance[-1]
-                        else:
-                            self.broadcast.update_payload('%1.2f'%performance[-1][0])
+                        performance.append( perfEval.compare(v,avv,dt=1/30,strict=True) )
+
+                        # Update performance.
+                        self.broadcast.update_payload('%1.2f'%performance[-1])
                         print "new coherence is %s"%self.broadcast._payload
                     time.sleep(0.1)
             finally:
@@ -264,8 +265,8 @@ class HandSyncExperiment(object):
 
                     avv = fetch_matching_avatar_vel(avatar,self.trialType,
                                                     tdateHistory,t0)
-                    avgcoh = coheval.evaluateCoherence( avv[:,2],v[:,2] )
-                    nextDuration,nextFraction = gprmodel.update( avgcoh,nextDuration,nextFraction )
+                    perf = perfEval.compare( avv,v,dt=1/30 )
+                    nextDuration,nextFraction = gprmodel.update( perf,nextDuration,nextFraction )
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                             nextFraction))
 
