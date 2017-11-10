@@ -28,10 +28,39 @@ class HandSyncExperiment(object):
         self.trialType = trial_type
         self.broadcastPort = broadcast_port
 
-    def load_avatar(self,return_subject=False):
+    def _load_avatar(self):
         """
         This loads the correct avatar for comparison of performance. The handedness of the subject is
         read in from left_or_right.txt.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        avatar : dict
+            Dictionary of avatar interpolation splines.
+        """
+        from pipeline import extract_motionbuilder_model2
+
+        handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
+        
+        # NOTE: This relies on the fact that these experiments took data from these avatar trials,
+        # but you should fetch just the avatar data from the original recordings.
+        if handedness=='left':
+            v = extract_motionbuilder_model2('avatar',0,'Right',return_time=False)
+        elif handedness=='right':
+            v = extract_motionbuilder_model2('avatar',0,'Left',return_time=False)
+        else:
+            print handedness
+            raise Exception
+
+        return v
+
+    def load_avatar(self,return_subject=False):
+        """
+        This loads the correct avatar for comparison of performance. The handedness of the subject is read in
+        from left_or_right.txt.
 
         Parameters
         ----------
@@ -46,8 +75,8 @@ class HandSyncExperiment(object):
         from data_access import VRTrial
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
-        # NOTE: This relies on the fact that these experiments took data from these avatar trials,
-        # but you should fetch just the avatar data from the original recordings.
+        # NOTE: This relies on the fact that these experiments took data from these avatar trials, but you
+        # should fetch just the avatar data from the original recordings.
         if handedness=='left':
             person,modelhandedness,rotation,dr = subject_settings(0)
         elif handedness=='right':
@@ -188,7 +217,7 @@ class HandSyncExperiment(object):
         else:
             self.avPartsIx = left_hand_col_indices(False)
             self.subPartsIx = right_hand_col_indices(False)
-        avatar = self.load_avatar()  # avatar for comparing velocities
+        avatar = self.load_avatar()['avatarV']  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
         
@@ -199,6 +228,9 @@ class HandSyncExperiment(object):
         broadcastThread = threading.Thread(target=self.broadcast.broadcast,
                                            kwargs={'pause':.2,'verbose':verbose})
         broadcastThread.start()
+
+        # Setup thread for recording port data.
+        recordThread = threading.Thread(target=record_AN_port,args=('an_port.txt',7010))
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader to fetch data which is declared later.
@@ -211,7 +243,7 @@ class HandSyncExperiment(object):
                         # Put into standard coordinate system (as in paper). Account for reflection symmetry.
                         v[:] = v[:,[1,0,2]]
                         v[:,2] *= -1
-                        avv = fetch_matching_avatar_vel(avatar,self.trialType,tAsDate,t0)
+                        avv = fetch_matching_avatar_vel(avatar,tAsDate,t0)
                         
                         # Calculate performance metric.
                         performance.append( perfEval.compare(v,avv,dt=1/30,strict=True) )
@@ -229,6 +261,7 @@ class HandSyncExperiment(object):
 
         if verbose:
             print "Starting threads."
+        recordThread.start()
         with ANReader(self.duration,self.subPartsIx,
                       port=7011,
                       verbose=True,
@@ -263,8 +296,7 @@ class HandSyncExperiment(object):
                     v[:] = v[:,[1,0,2]]
                     v[:,2] *= -1
 
-                    avv = fetch_matching_avatar_vel(avatar,self.trialType,
-                                                    tdateHistory,t0)
+                    avv = fetch_matching_avatar_vel(avatar,tdateHistory,t0)
                     perf = perfEval.compare( avv,v,dt=1/30 )
                     nextDuration,nextFraction = gprmodel.update( perf,nextDuration,nextFraction )
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
@@ -287,6 +319,7 @@ class HandSyncExperiment(object):
         self.stop()
         updateBroadcastThread.join()
         broadcastThread.join()
+        recordThread.join()
 
         with open('%s/%s'%(DATADR,'end_port_read'),'w') as f:
             f.write('')
@@ -301,4 +334,34 @@ class HandSyncExperiment(object):
         self.broadcast.stopEvent.set()
         return
 # end HandSyncExperiment
+
+def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
+    """
+    Get the stretch of avatar velocities that aligns with the velocity data of the subject. 
+
+    Parameters
+    ----------
+    avatar : dict
+        This would be the templateTrial loaded in VRTrial.
+    part : str
+        Choose from 'avatar','avatar0','hand','hand0'.
+    t : array of floats or datetime objects
+        Stretch of time to return data from. If t0 is specified, this needs to be datetime objects.
+    t0 : datetime,None
+    verbose : bool,False
+
+    Returns
+    -------
+    v : ndarray
+        Avatar's velocity that matches given time stamps.
+    """
+    if not t0 is None:
+        # Transform dt to time in seconds.
+        t = np.array([i.total_seconds() for i in t-t0])
+    if verbose:
+        print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
+
+    # Return part of avatar's trajectory that agrees with the stipulated time bounds.
+    return avatar(t)
+
 

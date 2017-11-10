@@ -176,6 +176,7 @@ class ANReader(object):
                  port_buffer_size=1024,
                  max_buffer_size=1000,
                  recent_buffer_size=180,
+                 always_empty_buffer=True,
                  verbose=False):
         """
         Class for reading from Axis Neuron UDP port and writing to file. UDP port reading is just
@@ -235,6 +236,7 @@ class ANReader(object):
         self.portBufferSize = port_buffer_size
         self.maxBufferSize = max_buffer_size
         self.recentBufferSize = recent_buffer_size
+        self.alwaysEmptyBuffer = always_empty_buffer
         self.verbose = verbose
         self.vHistory = []
         self.tAsDateHistory = []
@@ -275,6 +277,7 @@ class ANReader(object):
             # When nothing is read from the buffer
             pass
         self.sock.setblocking(1)
+
     # ========================= # 
     # Safe data access methods. #
     # ========================= # 
@@ -364,7 +367,8 @@ class ANReader(object):
         rawData = ''
         readTimes = []
         
-        self.empty_buffer()
+        if self.alwaysEmptyBuffer:
+            self.empty_buffer()
         while len(rawData)<17200:
             rawData += self.sock.recv(self.portBufferSize)
             readTimes.append(datetime.now())

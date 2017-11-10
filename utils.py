@@ -92,35 +92,6 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
-def fetch_matching_avatar_vel(avatar,part,t,t0=None,verbose=False):
-    """
-    Get the stretch of avatar velocities that aligns with the velocity data of the subject. 
-
-    Parameters
-    ----------
-    avatar : dict
-        This would be the templateTrial loaded in VRTrial.
-    part : str
-        Choose from 'avatar','avatar0','hand','hand0'.
-    t : array of floats or datetime objects
-        Stretch of time to return data from. If t0 is specified, this needs to be datetime objects.
-    t0 : datetime,None
-    verbose : bool,False
-
-    Returns
-    -------
-    v : ndarray
-        Avatar's velocity that matches given time stamps.
-    """
-    if not t0 is None:
-        # Transform dt to time in seconds.
-        t = np.array([i.total_seconds() for i in t-t0])
-    if verbose:
-        print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
-
-    # Return part of avatar's trajectory that agrees with the stipulated time bounds.
-    return avatar[part+'V'](t)
-
 def window_mutual_info(vel,vis,dt0,dt1,vel1=None,select_vis_start=True):
     """
     Mutual information between visible and invisible portions of window. Right now, this only looks

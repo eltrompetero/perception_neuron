@@ -756,7 +756,7 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
         return
 
 
-def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
+def extract_motionbuilder_model2(trial_type,visible_start,modelhand,return_time=True):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
     exported. Returned data is put into standard global coordinate frame: x-axis is the axis between the two
@@ -787,13 +787,14 @@ def extract_motionbuilder_model2(trial_type,visible_start,modelhand):
     mbT = mbdf['Time'].values.astype(float)
     mbT -= mbT[0]
     mbV = savgol_filter( mbdf['%sHand'%modelhand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
-
-    mbT = np.array([timedelta(seconds=t)+visible_start for t in mbT])
-
     # Put these in the standard global coordinate system as explained in function description.
     mbV[:,:] = mbV[:,[1,0,2]]
     mbV[:,1] *= -1
-    return mbT,mbV
+
+    if return_time:
+        mbT = np.array([timedelta(seconds=t)+visible_start for t in mbT])
+        return mbT,mbV
+    return mbV
 
 def extract_motionbuilder_model(trial_type,visible_start,modelhand):
     """
