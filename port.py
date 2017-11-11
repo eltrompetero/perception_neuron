@@ -99,7 +99,7 @@ def record_AN_port(fname,port,
                    savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
                    host=HOST,
                    start_file='start',
-                   stop_file='stop'):
+                   stop_file='end'):
     """
     Start recording data from Axis Neuron port when presence of start is detected
     and stop when end_port_read is detected in DATADR.
@@ -231,6 +231,8 @@ class ANReader(object):
         if type(parts_ix) is int:
             parts_ix = [parts_ix]
         self.partsIx = parts_ix
+        print "Extracting cols"
+        print self.partsIx
         self.host = host
         self.port = port
         self.portBufferSize = port_buffer_size
@@ -403,6 +405,7 @@ class ANReader(object):
                     v = [float(data[0][ix]) for ix in self.partsIx]
             except ValueError:
                     print "%s. Invalid float. Reading port again."%data[1].isoformat()
+        print self.partsIx
         return v,data[1]
 
     def listen_port(self):

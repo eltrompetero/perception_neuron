@@ -423,8 +423,9 @@ class DTWPerformance(object):
         self.normdvThreshold = norm_dv_threshold
         self.dtThreshold = dt_threshold
 
-    def compare(self,x,y,dt=1.,strict=False):
+    def time_average(self,x,y,dt=1.,strict=False):
         """
+        Measure performance as the fraction of time you are within the thresholds.
         Parameters
         ----------
         x : ndarray
@@ -456,6 +457,41 @@ class DTWPerformance(object):
         else:
             performance = ( ((1-inner)<self.normdvThreshold) & (np.abs(dt)<self.dtThreshold) ).mean()
         
+        return performance
+
+    def raw(self,x,y,dt=1.):
+        """
+        Performance as measured by the similarity of time warped trajectories. If time warping is too big,
+        then performance is 0.
+
+        Parameters
+        ----------
+        x : ndarray
+        y : ndarray
+        dt : float,1
+            Sampling rate for x and y.
+
+        Returns
+        -------
+        performance : float
+        """
+        from numpy.linalg import norm
+
+        dist,path = fastdtw(x,y,**self.dwtSettings)
+        path = np.vstack(path)
+
+        # Calculate correlation between the two vectors.
+        inner = ( (x[path[:,0]]*y[path[:,1]]).sum(1) / 
+                  (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)) )
+        dt = np.diff(path,axis=1) * dt
+
+        # Calculate performance metric.
+        if (np.abs(dt)<self.dtThreshold).all():
+            performance = inner.mean()
+            if performance<0:
+                performance = 0
+        else:
+            performance = 0.
         return performance
 
 class CoherenceEvaluator(object):

@@ -194,13 +194,13 @@ class HandSyncExperiment(object):
         from data_access import subject_settings_v3,VRTrial
         from coherence import GPR,DTWPerformance
         import cPickle as pickle
-
         self.wait_for_start()
         
         # Setup routines for calculating coherence.
         gprmodel = GPR(tmin=min_window_duration,tmax=max_window_duration,
                        fmin=min_vis_fraction,fmax=max_vis_fraction)
-        perfEval = DTWPerformance()
+        realTimePerfEval = DTWPerformance()
+        gprPerfEval = DTWPerformance()
 
         nextDuration = np.around(initial_window_duration,1)
         nextFraction = np.around(initial_vis_fraction,1)
@@ -244,9 +244,13 @@ class HandSyncExperiment(object):
                         v[:] = v[:,[1,0,2]]
                         v[:,2] *= -1
                         avv = fetch_matching_avatar_vel(avatar,tAsDate,t0)
+                        # Template avatar motion has been modified to account for reflection symmetry of left
+                        # and right hand motions.
+                        if handedness=='right':
+                            avv[:,1] *= -1
                         
                         # Calculate performance metric.
-                        performance.append( perfEval.compare(v,avv,dt=1/30,strict=True) )
+                        performance.append( realTimePerfEval.raw(v,avv,dt=1/30) )
 
                         # Update performance.
                         self.broadcast.update_payload('%1.2f'%performance[-1])
@@ -262,6 +266,7 @@ class HandSyncExperiment(object):
         if verbose:
             print "Starting threads."
         recordThread.start()
+        print self.subPartsIx
         with ANReader(self.duration,self.subPartsIx,
                       port=7011,
                       verbose=True,
@@ -295,9 +300,13 @@ class HandSyncExperiment(object):
                     # Put into comparable coordinate system accounting for reflection symmetry.
                     v[:] = v[:,[1,0,2]]
                     v[:,2] *= -1
+                    # Template avatar motion has been modified to account for reflection symmetry of left
+                    # and right hand motions.
+                    if handedness=='right':
+                        avv[:,1] *= -1
 
                     avv = fetch_matching_avatar_vel(avatar,tdateHistory,t0)
-                    perf = perfEval.compare( avv,v,dt=1/30 )
+                    perf = gprPerfEval.time_average( avv,v,dt=1/30 )
                     nextDuration,nextFraction = gprmodel.update( perf,nextDuration,nextFraction )
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                             nextFraction))

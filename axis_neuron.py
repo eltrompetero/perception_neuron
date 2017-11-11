@@ -63,7 +63,7 @@ def right_hand_col_indices(add_one=True):
             nameIx += 1
     if add_one:
         return [columns.index(p)+1 for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
-    return [columns.index(p) for p in ['LeftHand-V-x','LeftHand-V-y','LeftHand-V-z']]
+    return [columns.index(p) for p in ['RightHand-V-x','RightHand-V-y','RightHand-V-z']]
 
 def calc_file_body_parts():
     """
