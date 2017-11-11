@@ -246,8 +246,7 @@ class HandSyncExperiment(object):
                         avv = fetch_matching_avatar_vel(avatar,tAsDate,t0)
                         # Template avatar motion has been modified to account for reflection symmetry of left
                         # and right hand motions.
-                        if handedness=='right':
-                            avv[:,1] *= -1
+                        avv[:,1] *= -1
                         
                         # Calculate performance metric.
                         performance.append( realTimePerfEval.raw(v,avv,dt=1/30) )
@@ -300,12 +299,12 @@ class HandSyncExperiment(object):
                     # Put into comparable coordinate system accounting for reflection symmetry.
                     v[:] = v[:,[1,0,2]]
                     v[:,2] *= -1
-                    # Template avatar motion has been modified to account for reflection symmetry of left
-                    # and right hand motions.
-                    if handedness=='right':
-                        avv[:,1] *= -1
 
                     avv = fetch_matching_avatar_vel(avatar,tdateHistory,t0)
+                    # Template avatar motion has been modified to account for reflection symmetry of left
+                    # and right hand motions.
+                    avv[:,1] *= -1
+
                     perf = gprPerfEval.time_average( avv,v,dt=1/30 )
                     nextDuration,nextFraction = gprmodel.update( perf,nextDuration,nextFraction )
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,

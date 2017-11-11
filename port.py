@@ -231,8 +231,6 @@ class ANReader(object):
         if type(parts_ix) is int:
             parts_ix = [parts_ix]
         self.partsIx = parts_ix
-        print "Extracting cols"
-        print self.partsIx
         self.host = host
         self.port = port
         self.portBufferSize = port_buffer_size
@@ -405,7 +403,6 @@ class ANReader(object):
                     v = [float(data[0][ix]) for ix in self.partsIx]
             except ValueError:
                     print "%s. Invalid float. Reading port again."%data[1].isoformat()
-        print self.partsIx
         return v,data[1]
 
     def listen_port(self):
