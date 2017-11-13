@@ -7,7 +7,7 @@ from __future__ import division
 import numpy as np
 from scipy.signal import coherence
 from sklearn import gaussian_process
-from sklearn.gaussian_process.kernels import RBF
+from sklearn.gaussian_process.kernels import RBF,ConstantKernel
 from fastdtw import fastdtw
 
 
@@ -610,7 +610,8 @@ class GPR(object):
     Class performs the gpr and writes the new visibility fraction/time to outputFile
     '''
     def __init__(self,
-                 GPRKernel = 1.0 * RBF(length_scale=np.array([.5,.2]), length_scale_bounds=(1e-1, 10.0)),
+                 GPRKernel = ( RBF(length_scale=np.array([.5,.2]), length_scale_bounds=(1e-1, 10.0)) + 
+                               ConstantKernel(constant_value=.1) ),
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=0.9,fstep=0.1):
         '''

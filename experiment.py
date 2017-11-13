@@ -176,10 +176,11 @@ class HandSyncExperiment(object):
         Code waits til when start_time becomes available to read in avatar start time.
         
         The threads that are running:
-        0. reader thread to read velocities from Axis Neuron UDP port.
+        0. reader thread to read velocities from Axis Neuron UDP port rebroadcast 7011.
         1. updateBroadcastThread: assess subject's performance relative to the avatar and
             update performance value
         2. broadcastThread: broadcast subject's performance to port 5001
+        3. recordThread: record AN output from UDP rebroadcast @ 7010
         
         Thread communication happens through members that are updated using thread locks.
         
