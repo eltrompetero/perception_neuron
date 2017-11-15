@@ -57,7 +57,7 @@ class HandSyncExperiment(object):
 
         return v
 
-    def load_avatar(self,return_subject=False):
+    def _load_avatar(self,return_subject=False):
         """
         This loads the correct avatar for comparison of performance. The handedness of the subject is read in
         from left_or_right.txt.
@@ -92,6 +92,33 @@ class HandSyncExperiment(object):
             subject = trial.subjectTrial
             return avatar,subject
         return avatar
+
+    def load_avatar(self,return_subject=False):
+        """
+        This loads the correct avatar for comparison of performance. The handedness of the subject is read in
+        from left_or_right.txt.
+
+        Parameters
+        ----------
+        return_subject : bool,False
+
+        Returns
+        -------
+        avatar : dict
+            Dictionary of avatar interpolation splines.
+        """
+        from pipeline import extract_motionbuilder_model3
+        handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
+        
+        if handedness=='left':
+            v,t = extract_motionbuilder_model3('Right')
+        elif handedness=='right':
+            v,t = extract_motionbuilder_model3('Left')
+        else:
+            print handedness
+            raise Exception
+
+        return v
 
     def wait_for_start(self):
         """
@@ -218,7 +245,7 @@ class HandSyncExperiment(object):
         else:
             self.avPartsIx = left_hand_col_indices(False)
             self.subPartsIx = right_hand_col_indices(False)
-        avatar = self.load_avatar()['avatarV']  # avatar for comparing velocities
+        avatar = self.load_avatar()  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
         
@@ -335,7 +362,7 @@ class HandSyncExperiment(object):
 
         print "Saving GPR."
         pickle.dump({'gprmodel':gprmodel,'performance':performance,'v':v,'t':t},
-                    open('%s/%s'%(DATADR,'temp.p'),'wb'),-1)
+                    open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
 
     def stop(self):
         """Stop all thread that could be running. This does not wait for threads to stop."""

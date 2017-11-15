@@ -755,6 +755,59 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
                                                             window[1])
         return
 
+def extract_motionbuilder_model3(hand):
+    """
+    Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
+    exported. Returned data is put into standard global coordinate frame: x-axis is the axis between the two
+    subjects where positive is towards the front, y is the side to side, and z is up and down such that
+    positive y is determined by following the right hand rule.
+    
+    These are pickled csv files that were exported from Mokka after preprocessing in Motionbuilder. Note that
+    the coordinate system in Motionbuilder and Mokka are different.
+
+    NOTE: Directory where animation data is stored is hard-coded.
+    
+    Parameters
+    ----------
+    hand : str
+        Hand of the model.
+
+    Returns
+    -------
+    mbT
+    mbV
+    """
+    from datetime import datetime,timedelta
+    import cPickle as pickle
+    from scipy.interpolate import interp1d
+    assert hand=='Left' or hand=='Right'
+
+    dr = ( os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/'+
+           'Animations/Eddie_Grid_Model' )
+    fname = 'Eddie_Grid_Model_%s_Anim_Export_Take_001'%hand
+    
+    # Create pickle if it doesn't already exist.
+    if not os.path.exists('%s/%s.p'%(dr,fname)):
+        from axis_neuron import load_csv
+        mbdf = load_csv('%s/%s.csv'%(dr,fname))
+        mbdf.to_pickle('%s/%s.p'%(dr,fname))
+
+    mbdf = pickle.load(open('%s/%s.p'%(dr,fname),'rb'))
+    mbT = mbdf['Time'].values.astype(float)
+    mbT -= mbT[0]
+    mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
+    # Put these in the standard global coordinate system as explained in function description.
+    mbV[:,:] = mbV[:,[1,0,2]]
+    mbV[:,1] *= -1
+
+    # Rotate right hand motion file so that avatar faces same direction as with left.
+    if hand=='Right':
+        mbV[:,0] *= -1
+        mbV[:,1] *= -1
+    
+    mbV = interp1d(mbT,mbV,axis=0,assume_sorted=True,copy=False)
+
+    return mbV,mbT
 
 def extract_motionbuilder_model2(trial_type,visible_start,modelhand,return_time=True):
     """

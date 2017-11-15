@@ -636,8 +636,9 @@ class GPR(object):
         self.coherences = np.zeros(0)
         
         # Create two grids for t and f.
-        self.meshPoints = np.meshgrid(np.arange(self.tmin,self.tmax+self.tstep,self.tstep),
-                                      np.arange(self.fmin,self.fmax+self.fstep,self.fstep))
+        self.tRange = np.arange(self.tmin,self.tmax+self.tstep,self.tstep)
+        self.fRange = np.arange(self.fmin,self.fmax+self.fstep,self.fstep)
+        self.meshPoints = np.meshgrid(self.tRange,self.fRange)
         # Flatten t and f grids and stack them into an Nx2 array.
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
@@ -651,6 +652,38 @@ class GPR(object):
         '''
         self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.coherences )
         self.coherence_pred, self.std_pred = self.gp.predict(self.meshPoints,return_std=True)
+
+    def grad(self,eps=1e-5):
+        '''
+        Estimates the gradient at each point of the mesh.
+
+        Parameters
+        ----------
+        eps : float,1e-5
+
+        Returns
+        -------
+        grad : ndarray
+            Dimensions (n_tRange,n_fRange,2). Last dimension corresponds to the gradient along each diemnsion
+            of the input.
+        '''
+        grad = np.zeros((len(self.meshPoints),2))
+        X1 = self.meshPoints.copy()
+        X0 = self.meshPoints.copy()
+
+        X1[:,0] += eps 
+        X0[:,0] -= eps 
+        grad[:,0] = ( self.gp.predict(X1)-self.gp.predict(X0) )/(2*eps)
+        X1[:,0] -= eps
+        X0[:,0] += eps
+
+        X1[:,1] += eps
+        X0[:,1] -= eps
+        grad[:,1] = ( self.gp.predict(X1)-self.gp.predict(X0) )/(2*eps)
+        
+        shape = len(self.fRange),len(self.tRange)
+        grad = np.concatenate((grad[:,0].reshape(shape)[:,:,None],grad[:,1].reshape(shape)[:,:,None]),2)
+        return grad
         
     def max_uncertainty(self):
         '''
