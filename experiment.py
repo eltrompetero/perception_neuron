@@ -238,6 +238,8 @@ class HandSyncExperiment(object):
 
         with open('%s/next_setting'%DATADR,'w') as f:
             f.write('%1.1f,%1.1f'%(nextDuration,nextFraction))
+        with open('%s/this_setting'%DATADR,'w') as f:
+            f.write('%1.1f,%1.1f'%(0,0))
         with open('%s/left_or_right'%DATADR,'r') as f:
             handedness = f.read().rstrip()
         if handedness=='left':
@@ -295,8 +297,63 @@ class HandSyncExperiment(object):
                 print "updateBroadcastThread stopped"
         self.updateBroadcastEvent = threading.Event()
 
-        # Wait til start_time has been written to start experiment..
+        # Define function that will be run in GPR thread. 
+        def run_gpr_update(reader,gprmodel):
+            """
+            Run GPR updater when run_gpr appears. Read in current window setting from this_setting and write
+            out next window setting to next_setting.
+            """
+            while not os.path.isfile('%s/%s'%(DATADR,'end')):
+                # Run GPR for the next windows setting.
+                if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
+                    print "Running GPR on this trial..."
+                    v,t,tdateHistory = reader.copy_history()
+                    # Put into comparable coordinate system accounting for reflection symmetry.
+                    v[:] = v[:,[1,0,2]]
+                    v[:,2] *= -1
+
+                    tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),zip(self.pause,self.unpause))
+                    avv = fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
+                    # Template avatar motion has been modified to account for reflection symmetry of left
+                    # and right hand motions.
+                    avv[:,1] *= -1
+
+                    # Try to open and read. Sometimes there is a delay in accessibility because
+                    # the file is being written.
+                    success = False 
+                    while not success:
+                        try:
+                            with open('%s/%s'%(DATADR,'this_setting')) as f:
+                                thisDuration,thisFraction = (float(i) for i in f.readline().split(','))
+                            success = True
+                        except IOError:
+                            pass
+                    
+                    # Get subject performance.
+                    perf = gprPerfEval.time_average( avv,v,dt=1/30 )
+
+                    # Update GPR. For initial full visibility trial, update values for all values of fraction.
+                    if thisDuration==0:
+                        for i in np.arange(min_vis_fraction,max_vis_fraction+.01,.1):
+                            nextDuration,nextFraction = gprmodel.update( perf,0,i )
+                    else:
+                        nextDuration,nextFraction = gprmodel.update( perf,thisDuration,thisFraction )
+                    open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
+                                                                            nextFraction))
+
+                    self.delete_file('run_gpr')
+
+                    # Refresh history.
+                    self.broadcast.update_payload('-1.0')
+                    reader.refresh()
+                    while reader.len_history()<(self.duration*30):
+                        if verbose:
+                            print "Waiting to collect more data...(%d)"%reader.len_history()
+                        time.sleep(.5)
+
+        # Wait til start_time has been written to start experiment.
         t0 = self.wait_for_start_time()
+
 
         if verbose:
             print "Starting threads."
@@ -326,36 +383,10 @@ class HandSyncExperiment(object):
             reader.refresh()
             self.delete_file('initial_trial_done')
 
+            self.gprThread = threading.Thread(target=run_gpr_update,args=(reader,gprmodel))
+            self.gprThread.start()
+
             while not os.path.isfile('%s/%s'%(DATADR,'end')):
-                # Run GPR for the next windows setting.
-                if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
-                    print "Running GPR on this trial..."
-                    v,t,tdateHistory = reader.copy_history()
-                    # Put into comparable coordinate system accounting for reflection symmetry.
-                    v[:] = v[:,[1,0,2]]
-                    v[:,2] *= -1
-
-                    tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),zip(self.pause,self.unpause))
-                    avv = fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
-                    # Template avatar motion has been modified to account for reflection symmetry of left
-                    # and right hand motions.
-                    avv[:,1] *= -1
-
-                    perf = gprPerfEval.time_average( avv,v,dt=1/30 )
-                    nextDuration,nextFraction = gprmodel.update( perf,nextDuration,nextFraction )
-                    open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
-                                                                            nextFraction))
-
-                    self.delete_file('run_gpr')
-
-                    # Refresh history.
-                    self.broadcast.update_payload('-1.0')
-                    reader.refresh()
-                    while reader.len_history()<(self.duration*60):
-                        if verbose:
-                            print "Waiting to collect more data...(%d)"%reader.len_history()
-                        time.sleep(1)
-                
                 # If UE4 has been paused
                 if os.path.isfile('%s/%s'%(DATADR,'pause_time')):
                     with open('%s/%s'%(DATADR,'pause_time')) as f:
@@ -364,7 +395,7 @@ class HandSyncExperiment(object):
                     while not os.path.isfile('%s/%s'%(DATADR,'unpause_time')):
                         time.sleep(.01)
                     
-                    # Try to open and read unpause_time. Sometimes there is a delay in accessibility  because
+                    # Try to open and read unpause_time. Sometimes there is a delay in accessibility because
                     # the file is being written.
                     success = False 
                     while not success:
@@ -395,7 +426,7 @@ class HandSyncExperiment(object):
             f.write('')
 
         print "Saving GPR."
-        pickle.dump({'gprmodel':gprmodel,'performance':performance,'v':v,'t':t,
+        pickle.dump({'gprmodel':gprmodel,'performance':performance,
                      'pause':self.pause,'unpause':self.unpause},
                     open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
 
