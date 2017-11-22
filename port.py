@@ -179,11 +179,10 @@ class ANReader(object):
                  always_empty_buffer=True,
                  verbose=False):
         """
-        Class for reading from Axis Neuron UDP port and writing to file. UDP port reading is just
+        Class for reading and keeping track of data from Axis Neuron UDP port. UDP port reading is just
         saved to an array in memory which is fast, but the writing to disk is limited by disk access
         rates (much slower and unreliable).
-        This will also keeping track of history of velocity.
-        
+
         Parameters
         ----------
         duration : float
@@ -207,12 +206,17 @@ class ANReader(object):
         Subfields
         ---------
         v : ndarray
-            Of duration of self.duration. Of dimension (n_time,3).
+            Dimension (n_time,3).
+            Keeps record of self.duration seconds into the past. Only measures elapsed time excluding pauses.
         t : ndarray
-            Of duration of self.duration.
+            Keeps record of self.duration seconds into the past. Only measures elapsed time excluding pauses.
         vHistory : ndarray
-            All history since last refresh.
+            All history since last refresh corresponding to tHistory.
         tHistory : ndarray
+            Elapsed time in seconds.
+        vAsDateHistory : ndarray
+            All history since last refresh corresponding to tAsDateHistory.
+        tAsDateHistory : ndarray
             All history since last refresh.
         lock : threading.Lock
 
@@ -238,7 +242,7 @@ class ANReader(object):
         self.recentBufferSize = recent_buffer_size
         self.alwaysEmptyBuffer = always_empty_buffer
         self.verbose = verbose
-        self.vHistory = []
+        self.vAsDateHistory = []
         self.tAsDateHistory = []
         self.v = []
         self.tAsDate = []
@@ -320,7 +324,7 @@ class ANReader(object):
         return np.array(v),np.array(t),np.array(tAsDate)
 
     def copy_history(self,interpolate=True):
-        v = self.vHistory[:]
+        v = self.vAsDateHistory[:]
         t = self.tAsDateHistory[:]
         
         # Must be careful accessing these arrays because they're being asynchronously updated.
@@ -414,10 +418,10 @@ class ANReader(object):
         while not self.stopEvent.is_set():
             v,t = self.read_velocity()
 
-            if len(self.vHistory)==self.maxBufferSize:
-                self.vHistory.pop(0)
+            if len(self.vAsDateHistory)==self.maxBufferSize:
+                self.vAsDateHistory.pop(0)
                 self.tAsDateHistory.pop(0)
-            self.vHistory.append(v)
+            self.vAsDateHistory.append(v)
             self.tAsDateHistory.append(t)
 
             if len(self.v)==self.recentBufferSize:
@@ -442,11 +446,11 @@ class ANReader(object):
         #while len(self.v)>0:
         #    self.v.pop(0)
         #    self.tAsDate.pop(0)
-        #    self.vHistory.pop(0)
+        #    self.vAsDateHistory.pop(0)
         #    self.tAsDateHistory.pop(0)
         self.v = []
         self.tAsDate = []
-        self.vHistory = []
+        self.vAsDateHistory = []
         self.tAsDateHistory = []
         self.lock.release()
 

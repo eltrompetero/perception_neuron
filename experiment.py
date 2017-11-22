@@ -120,12 +120,12 @@ class HandSyncExperiment(object):
 
         return v
 
-    def wait_for_start(self):
+    def wait_for_start(self,dt=.1):
         """
         Wait til start file is written.
         """
         while not os.path.isfile('%s/%s'%(DATADR,'start')):
-            time.sleep(.5)
+            time.sleep(dt)
 
     def wait_for_start_time(self):
         """
@@ -159,6 +159,7 @@ class HandSyncExperiment(object):
         Parameters
         ----------
         fname : str
+            Just the file name assuming that it is in DATADR.
         max_wait_time : float
         dt : float
             Time to wait in each iteration of while loop.
@@ -207,7 +208,7 @@ class HandSyncExperiment(object):
         1. updateBroadcastThread: assess subject's performance relative to the avatar and
             update performance value
         2. broadcastThread: broadcast subject's performance to port 5001
-        3. recordThread: record AN output from UDP rebroadcast @ 7010
+        3. recordThread: record AN output from UDP rebroadcast @ 7013
         
         Thread communication happens through members that are updated using thread locks.
         
@@ -248,7 +249,11 @@ class HandSyncExperiment(object):
         avatar = self.load_avatar()  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
+        self.pause = []  # times when game was paused
+        self.unpause = []  # times when game was resumed
         
+        self.wait_for_start()
+
         # Open port for communication with UE4 engine. This will send the current coherence value to
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
@@ -258,7 +263,7 @@ class HandSyncExperiment(object):
         broadcastThread.start()
 
         # Setup thread for recording port data.
-        recordThread = threading.Thread(target=record_AN_port,args=('an_port.txt',7010))
+        recordThread = threading.Thread(target=record_AN_port,args=('an_port.txt',7013))
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader to fetch data which is declared later.
@@ -271,7 +276,9 @@ class HandSyncExperiment(object):
                         # Put into standard coordinate system (as in paper). Account for reflection symmetry.
                         v[:] = v[:,[1,0,2]]
                         v[:,2] *= -1
-                        avv = fetch_matching_avatar_vel(avatar,tAsDate,t0)
+
+                        tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
+                        avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
                         # Template avatar motion has been modified to account for reflection symmetry of left
                         # and right hand motions.
                         avv[:,1] *= -1
@@ -281,8 +288,9 @@ class HandSyncExperiment(object):
 
                         # Update performance.
                         self.broadcast.update_payload('%1.2f'%performance[-1])
-                        print "new coherence is %s"%self.broadcast._payload
-                    time.sleep(0.1)
+                        if verbose:
+                            print "new coherence is %s"%self.broadcast._payload
+                    time.sleep(0.2)
             finally:
                 print "updateBroadcastThread stopped"
         self.updateBroadcastEvent = threading.Event()
@@ -293,7 +301,6 @@ class HandSyncExperiment(object):
         if verbose:
             print "Starting threads."
         recordThread.start()
-        print self.subPartsIx
         with ANReader(self.duration,self.subPartsIx,
                       port=7011,
                       verbose=True,
@@ -328,7 +335,8 @@ class HandSyncExperiment(object):
                     v[:] = v[:,[1,0,2]]
                     v[:,2] *= -1
 
-                    avv = fetch_matching_avatar_vel(avatar,tdateHistory,t0)
+                    tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),zip(self.pause,self.unpause))
+                    avv = fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
                     # Template avatar motion has been modified to account for reflection symmetry of left
                     # and right hand motions.
                     avv[:,1] *= -1
@@ -347,7 +355,33 @@ class HandSyncExperiment(object):
                         if verbose:
                             print "Waiting to collect more data...(%d)"%reader.len_history()
                         time.sleep(1)
+                
+                # If UE4 has been paused
+                if os.path.isfile('%s/%s'%(DATADR,'pause_time')):
+                    with open('%s/%s'%(DATADR,'pause_time')) as f:
+                        self.pause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
+                    self.delete_file('pause_time')
+                    while not os.path.isfile('%s/%s'%(DATADR,'unpause_time')):
+                        time.sleep(.01)
                     
+                    # Try to open and read unpause_time. Sometimes there is a delay in accessibility  because
+                    # the file is being written.
+                    success = False 
+                    while not success:
+                        try:
+                            with open('%s/%s'%(DATADR,'unpause_time')) as f:
+                                self.unpause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
+                            success = True
+                        except IOError:
+                            pass
+                    self.delete_file('unpause_time')
+                    
+                    reader.refresh()
+                    while reader.len_history()<(self.duration*30):
+                        if verbose:
+                            print "Waiting to collect more data...(%d)"%reader.len_history()
+                        time.sleep(.5)
+
                 time.sleep(update_delay) 
             
         # Always end thread.
@@ -361,7 +395,8 @@ class HandSyncExperiment(object):
             f.write('')
 
         print "Saving GPR."
-        pickle.dump({'gprmodel':gprmodel,'performance':performance,'v':v,'t':t},
+        pickle.dump({'gprmodel':gprmodel,'performance':performance,'v':v,'t':t,
+                     'pause':self.pause,'unpause':self.unpause},
                     open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
 
     def stop(self):
@@ -400,4 +435,44 @@ def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
     # Return part of avatar's trajectory that agrees with the stipulated time bounds.
     return avatar(t)
 
+def remove_pause_intervals(t,pause_intervals):
+    """
+    Given a list of time points where data was taken and a list of tuples where the data take was paused,
+    return the times at which the data would've been taken if there had been no pause having removed all data
+    points that were taken during the specified pause intervals.
 
+    Parameters
+    ----------
+    t : list
+        datetime.datetime objects of when data was recorded. These should be ordered in time.
+    pause_intervals : list of tuples
+        Each tuple should be (start,end).
+
+    Returns
+    -------
+
+    """
+    t = t[:]
+    pause_intervals = pause_intervals[:]
+
+    for dtix,(t0,t1) in enumerate(pause_intervals):
+        assert t0<t1
+        dt = t1-t0
+        counter = 0
+        t_ = t[counter]
+        while t_<t0 and counter<len(t):
+            t_ = t[counter]
+            counter += 1
+
+        # Remove all data points within the pause interval.
+        if counter>0:
+            while t[counter-1] < t1:
+                t.pop(counter-1)
+        
+        # If none of the pause intervals overlap with the given data.
+        if counter<len(t):
+            for counter in xrange(counter-1,len(t)):
+                t[counter] -= dt
+            for dtix in xrange(dtix+1,len(pause_intervals)):
+                pause_intervals[dtix] = (pause_intervals[dtix][0]-dt,pause_intervals[dtix][1]-dt)
+    return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])])

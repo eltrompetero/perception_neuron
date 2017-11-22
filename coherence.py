@@ -610,13 +610,16 @@ class GPR(object):
     Class performs the gpr and writes the new visibility fraction/time to outputFile
     '''
     def __init__(self,
-                 GPRKernel = ( RBF(length_scale=np.array([.5,.2]), length_scale_bounds=(1e-1, 10.0)) + 
-                               ConstantKernel(constant_value=.1) ),
+                 GPRKernel = RBF(length_scale=np.array([.5,.2]), length_scale_bounds=(1e-1, 10.0)),
+                 alpha = .1,
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=0.9,fstep=0.1):
         '''
         Parameters
         ----------
+        GPRKernel : sklearn.gaussian_processes.kernels.RBF
+        alpha : float
+            Uncertainty in diagonal matrix for GPR kernel.
         tmin : float
             minimum window time
         fmin : float
@@ -642,7 +645,7 @@ class GPR(object):
         # Flatten t and f grids and stack them into an Nx2 array.
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
-        self.gp = gaussian_process.GaussianProcessRegressor(kernel=self.kernel)
+        self.gp = gaussian_process.GaussianProcessRegressor(kernel=self.kernel,alpha=alpha)
         self.coherence_pred = 0
         self.std_pred = 0
    
