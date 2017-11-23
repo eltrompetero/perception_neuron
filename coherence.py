@@ -406,7 +406,11 @@ def max_coh_time_shift(subv,temv,
 # Classes #
 # ======= #
 class DTWPerformance(object):
-    def __init__(self,norm_dv_threshold=.5,dt_threshold=.5,dwt_kwargs={'dist':2}):
+    def __init__(self,inner_prod_threshold=.3,
+                 norm_dv_threshold=.1,
+                 norm_dv_ratio_threshold=np.log2(1.5),
+                 dt_threshold=.5,
+                 dwt_kwargs={'dist':2}):
         """
         Class for using fast DWT to compare two temporal trajectories and return a performance metric.
         Performance is the fraction of time warped trajectories that the individuals remain within some
@@ -414,13 +418,19 @@ class DTWPerformance(object):
         
         Parameters
         ----------
-        norm_dv_threshold : float,1
+        inner_prod_threshold : float,.5
             Max deviation allowed for one minus normalized dot product between vectors.
+        norm_dv_threshold : float,.1
+            Max difference in speeds allowed. Units of m/s.
+        norm_dv_ratio_threshold : float,1
+            Max ratio in speeds allowed in units of log2.
         dt_threshold : float,.5
             Max deviation for time allowed.
         """
         self.dwtSettings = dwt_kwargs
+        self.innerThreshold = inner_prod_threshold
         self.normdvThreshold = norm_dv_threshold
+        self.normdvRatioThreshold = norm_dv_ratio_threshold
         self.dtThreshold = dt_threshold
 
     def time_average(self,x,y,dt=1.,strict=False):
@@ -444,19 +454,28 @@ class DTWPerformance(object):
         dist,path = fastdtw(x,y,**self.dwtSettings)
         path = np.vstack(path)
 
-        # Calculate correlation between the two vectors.
-        inner = ( (x[path[:,0]]*y[path[:,1]]).sum(1) / 
-                  (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)) )
+        normx = norm(x[path[:,0]],axis=1)
+        normy = norm(y[path[:,1]],axis=1)
+        # Dot product between the two vectors.
+        inner = (x[path[:,0]]*y[path[:,1]]).sum(1) / normx / normy
+        # Relative norms.
+        normDiff = np.abs(normx-normy)
+        normRatio = np.abs(np.log2(normx)-np.log2(normy))
         dt = np.diff(path,axis=1) * dt
 
         # Calculate performance metric.
+        # In strict case, dt must be within cutoff at all times to get a nonzero performance value.
+        # Otherwise, we just take the average time during which subject is within all three norm, inner
+        # product, and dt cutoffs.
         if strict:
             if (np.abs(dt)<self.dtThreshold).all():
-                performance = ((1-inner)<self.normdvThreshold).mean()
+                performance = ((1-inner)<self.innerThreshold).mean()
             else:
                 performance = 0.
         else:
-            performance = ( ((1-inner)<self.normdvThreshold) & (np.abs(dt)<self.dtThreshold) ).mean()
+            performance = ( #((normDiff<self.normdvThreshold)|(normRatio<self.normdvRatioThreshold)) &
+                            ((1-inner)<self.innerThreshold) & 
+                            (np.abs(dt)<self.dtThreshold) ).mean()
         
         return performance
 
@@ -481,7 +500,7 @@ class DTWPerformance(object):
         dist,path = fastdtw(x,y,**self.dwtSettings)
         path = np.vstack(path)
 
-        # Calculate correlation between the two vectors.
+        # Calculate dot product between the two vectors.
         inner = ( (x[path[:,0]]*y[path[:,1]]).sum(1) / 
                   (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)) )
         dt = np.diff(path,axis=1) * dt
@@ -611,7 +630,7 @@ class GPR(object):
     Class performs the gpr and writes the new visibility fraction/time to outputFile
     '''
     def __init__(self,
-                 GPRKernel = RBF(length_scale=np.array([.5,.2]), length_scale_bounds=(1e-1, 10.0)),
+                 GPRKernel = RBF(length_scale=np.array([.1,.1])),
                  alpha = .1,
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=0.9,fstep=0.1):

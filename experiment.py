@@ -253,6 +253,9 @@ class HandSyncExperiment(object):
         performance = []  # history of performance
         self.pause = []  # times when game was paused
         self.unpause = []  # times when game was resumed
+        pauseEvent = threading.Event()
+        pauseEvent.set()
+        self.endEvent = threading.Event()  # Event to be set when end file is written
         
         self.wait_for_start()
 
@@ -272,6 +275,7 @@ class HandSyncExperiment(object):
         def update_broadcaster(reader,stopEvent):
             try:
                 while not stopEvent.is_set():
+                    pauseEvent.wait()
                     v,t,tAsDate = reader.copy_recent()
                     
                     if len(v)>=(windowsInIndexUnits):
@@ -303,7 +307,9 @@ class HandSyncExperiment(object):
             Run GPR updater when run_gpr appears. Read in current window setting from this_setting and write
             out next window setting to next_setting.
             """
-            while not os.path.isfile('%s/%s'%(DATADR,'end')):
+            while not self.endEvent.is_set():
+                pauseEvent.wait()
+
                 # Run GPR for the next windows setting.
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
                     print "Running GPR on this trial..."
@@ -334,10 +340,10 @@ class HandSyncExperiment(object):
 
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
-                        for i in np.arange(min_vis_fraction,max_vis_fraction+.01,.1):
-                            nextDuration,nextFraction = gprmodel.update( logistic(perf),0,i )
+                        for i in np.arange(min_window_duration,max_window_duration+.01,.1):
+                            nextDuration,nextFraction = gprmodel.update( ilogistic(perf),i,0 )
                     else:
-                        nextDuration,nextFraction = gprmodel.update( logistic(perf),thisDuration,thisFraction )
+                        nextDuration,nextFraction = gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                             nextFraction))
                     
@@ -351,6 +357,7 @@ class HandSyncExperiment(object):
                         if verbose:
                             print "Waiting to collect more data...(%d)"%reader.len_history()
                         time.sleep(.5)
+                time.sleep(.05)
 
         # Wait til start_time has been written to start experiment.
         t0 = self.wait_for_start_time()
@@ -384,12 +391,14 @@ class HandSyncExperiment(object):
             reader.refresh()
             self.delete_file('initial_trial_done')
 
-            self.gprThread = threading.Thread(target=run_gpr_update,args=(reader,gprmodel))
-            self.gprThread.start()
+            gprThread = threading.Thread(target=run_gpr_update,args=(reader,gprmodel))
+            gprThread.start()
 
             while not os.path.isfile('%s/%s'%(DATADR,'end')):
                 # If UE4 has been paused
                 if os.path.isfile('%s/%s'%(DATADR,'pause_time')):
+                    pauseEvent.clear()
+                    if verbose: print "Paused."
                     with open('%s/%s'%(DATADR,'pause_time')) as f:
                         self.pause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
                     self.delete_file('pause_time')
@@ -404,6 +413,8 @@ class HandSyncExperiment(object):
                             with open('%s/%s'%(DATADR,'unpause_time')) as f:
                                 self.unpause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
                             success = True
+                            pauseEvent.set()
+                            if verbose: print "Unpaused."
                         except IOError:
                             pass
                     self.delete_file('unpause_time')
@@ -413,7 +424,7 @@ class HandSyncExperiment(object):
                         if verbose:
                             print "Waiting to collect more data...(%d)"%reader.len_history()
                         time.sleep(.5)
-
+                
                 time.sleep(update_delay) 
             
         print "Ending threads..."
@@ -421,10 +432,11 @@ class HandSyncExperiment(object):
         updateBroadcastThread.join()
         broadcastThread.join()
         recordThread.join()
+        gprThread.join()
 
         with open('%s/%s'%(DATADR,'end_port_read'),'w') as f:
             f.write('')
-
+        
         print "Saving GPR."
         pickle.dump({'gprmodel':gprmodel,'performance':performance,
                      'pause':self.pause,'unpause':self.unpause},
@@ -434,6 +446,7 @@ class HandSyncExperiment(object):
         """Stop all thread that could be running. This does not wait for threads to stop."""
         self.updateBroadcastEvent.set()
         self.broadcast.stopEvent.set()
+        self.endEvent.set()
         return
 # end HandSyncExperiment
 
