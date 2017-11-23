@@ -261,7 +261,7 @@ class HandSyncExperiment(object):
         self.broadcast = DataBroadcaster(self.broadcastPort)
         self.broadcast.update_payload('-1.0')
         broadcastThread = threading.Thread(target=self.broadcast.broadcast,
-                                           kwargs={'pause':.2,'verbose':verbose})
+                                           kwargs={'pause':.2,'verbose':True if verbose=='detailed' else False})
         broadcastThread.start()
 
         # Setup thread for recording port data.
@@ -290,7 +290,7 @@ class HandSyncExperiment(object):
 
                         # Update performance.
                         self.broadcast.update_payload('%1.2f'%performance[-1])
-                        if verbose:
+                        if verbose=='detailed':
                             print "new coherence is %s"%self.broadcast._payload
                     time.sleep(0.2)
             finally:
@@ -335,12 +335,13 @@ class HandSyncExperiment(object):
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
                         for i in np.arange(min_vis_fraction,max_vis_fraction+.01,.1):
-                            nextDuration,nextFraction = gprmodel.update( perf,0,i )
+                            nextDuration,nextFraction = gprmodel.update( logistic(perf),0,i )
                     else:
-                        nextDuration,nextFraction = gprmodel.update( perf,thisDuration,thisFraction )
+                        nextDuration,nextFraction = gprmodel.update( logistic(perf),thisDuration,thisFraction )
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                             nextFraction))
-
+                    
+                    # Delete signal file.
                     self.delete_file('run_gpr')
 
                     # Refresh history.
@@ -360,7 +361,7 @@ class HandSyncExperiment(object):
         recordThread.start()
         with ANReader(self.duration,self.subPartsIx,
                       port=7011,
-                      verbose=True,
+                      verbose=True if verbose=='detailed' else False,
                       port_buffer_size=8192,
                       recent_buffer_size=self.duration*60) as reader:
             
@@ -415,7 +416,6 @@ class HandSyncExperiment(object):
 
                 time.sleep(update_delay) 
             
-        # Always end thread.
         print "Ending threads..."
         self.stop()
         updateBroadcastThread.join()
@@ -445,8 +445,6 @@ def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
     ----------
     avatar : dict
         This would be the templateTrial loaded in VRTrial.
-    part : str
-        Choose from 'avatar','avatar0','hand','hand0'.
     t : array of floats or datetime objects
         Stretch of time to return data from. If t0 is specified, this needs to be datetime objects.
     t0 : datetime,None
@@ -455,11 +453,12 @@ def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
     Returns
     -------
     v : ndarray
-        Avatar's velocity that matches given time stamps.
+        (n_time,3). Avatar's velocity that matches given time stamps.
     """
     if not t0 is None:
         # Transform dt to time in seconds.
         t = np.array([i.total_seconds() for i in t-t0])
+        assert (t>=0).all()
     if verbose:
         print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
 
@@ -481,7 +480,9 @@ def remove_pause_intervals(t,pause_intervals):
 
     Returns
     -------
-
+    tDate : list of datetime.datetime objects
+    t : ndarray
+        Time is seconds starting from tDate[0]
     """
     t = t[:]
     pause_intervals = pause_intervals[:]
@@ -507,3 +508,9 @@ def remove_pause_intervals(t,pause_intervals):
             for dtix in xrange(dtix+1,len(pause_intervals)):
                 pause_intervals[dtix] = (pause_intervals[dtix][0]-dt,pause_intervals[dtix][1]-dt)
     return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])])
+
+def ilogistic(x):
+    return -np.log(1/x-1)
+
+def logistic(x):
+    return 1/(1+np.exp(-x))

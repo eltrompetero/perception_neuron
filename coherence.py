@@ -426,6 +426,7 @@ class DTWPerformance(object):
     def time_average(self,x,y,dt=1.,strict=False):
         """
         Measure performance as the fraction of time you are within the thresholds.
+
         Parameters
         ----------
         x : ndarray
@@ -651,7 +652,7 @@ class GPR(object):
    
     def predict(self):
         '''
-        Calls the GPR
+        Fits the GPR to all data points and saves the predicted values with errors.
         '''
         self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.coherences )
         self.coherence_pred, self.std_pred = self.gp.predict(self.meshPoints,return_std=True)
