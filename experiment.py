@@ -8,6 +8,7 @@ import time
 from axis_neuron import left_hand_col_indices,right_hand_col_indices
 from port import *
 import dill
+from subprocess import call
 
 class HandSyncExperiment(object):
     def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001,fs=30):
@@ -337,12 +338,16 @@ class HandSyncExperiment(object):
                     
                     # Get subject performance.
                     perf = gprPerfEval.time_average( avv,v,dt=1/30 )
-
+                    
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
                         nextDuration,nextFraction = gprmodel.update( ilogistic(perf),0.,1. )
                     else:
                         nextDuration,nextFraction = gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
+                    if verbose:
+                        print call("ls --time-style='+%d-%m-%Y %H:%M:%S' -l this_setting",shell=True)
+                        print "thisDuration: %1.1f\tthisFraction: %1.1f"%(thisDuration,thisFraction)
+                        print "nextDuration: %1.1f\tnextFraction: %1.1f"%(nextDuration,nextFraction)
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
                                                                             nextFraction))
                     
@@ -382,14 +387,7 @@ class HandSyncExperiment(object):
             #    raise Exception
             updateBroadcastThread.start()
            
-
-            # After initial trial is done, refresh history of GPR.
-            while not os.path.isfile('%s/%s'%(DATADR,'initial_trial_done')):
-                time.sleep(.2)
-            self.broadcast.update_payload('-1.0')
-            reader.refresh()
-            self.delete_file('initial_trial_done')
-
+            # Start GPR thread.
             gprThread = threading.Thread(target=run_gpr_update,args=(reader,gprmodel))
             gprThread.start()
 
