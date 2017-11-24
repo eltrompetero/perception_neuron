@@ -630,7 +630,7 @@ class CoherenceEvaluator(object):
 class GPR(object):
     def __init__(self,
                  GPRKernel = RBF(length_scale=np.array([.5,.1])),
-                 alpha = .2,
+                 alpha = .1,
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=1.,fstep=0.1):
         '''
@@ -661,7 +661,7 @@ class GPR(object):
         self.fmax = fmax
         self.fstep = fstep
         
-        self.kernel = handsync_experiment_kernel(np.array([1.,.2]))
+        self.kernel = handsync_experiment_kernel(np.array([.1,.2]))
         
         self.durations = np.zeros(0)
         self.fractions = np.zeros(0)

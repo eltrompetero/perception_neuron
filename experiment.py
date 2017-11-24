@@ -345,7 +345,7 @@ class HandSyncExperiment(object):
                     else:
                         nextDuration,nextFraction = gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
                     if verbose:
-                        print call("ls --time-style='+%d-%m-%Y %H:%M:%S' -l this_setting",shell=True)
+                        #print call("ls --time-style='+%d-%m-%Y %H:%M:%S' -l this_setting",shell=True)
                         print "thisDuration: %1.1f\tthisFraction: %1.1f"%(thisDuration,thisFraction)
                         print "nextDuration: %1.1f\tnextFraction: %1.1f"%(nextDuration,nextFraction)
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
@@ -361,6 +361,10 @@ class HandSyncExperiment(object):
                         if verbose:
                             print "Waiting to collect more data...(%d)"%reader.len_history()
                         time.sleep(.5)
+                    dill.dump({'gprmodel':gprmodel,'performance':performance,
+                               'pause':self.pause,'unpause':self.unpause},
+                               open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
+
                 time.sleep(.05)
 
         # Wait til start_time has been written to start experiment.
