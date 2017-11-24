@@ -661,7 +661,7 @@ class GPR(object):
         self.fmax = fmax
         self.fstep = fstep
         
-        self.kernel = handsync_experiment_kernel(np.array([.1,.2]))
+        self.kernel = handsync_experiment_kernel(np.array([1.,.2]))
         
         self.durations = np.zeros(0)
         self.fractions = np.zeros(0)
