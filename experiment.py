@@ -7,6 +7,7 @@ from utils import *
 import time
 from axis_neuron import left_hand_col_indices,right_hand_col_indices
 from port import *
+import dill
 
 class HandSyncExperiment(object):
     def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001,fs=30):
@@ -182,7 +183,7 @@ class HandSyncExperiment(object):
               update_delay=.3,
               initial_window_duration=1.0,initial_vis_fraction=0.5,
               min_window_duration=.6,max_window_duration=2,
-              min_vis_fraction=.1,max_vis_fraction=.9,
+              min_vis_fraction=.1,max_vis_fraction=1.,
               verbose=False):
         """
         Run realtime analysis for experiment.
@@ -217,8 +218,7 @@ class HandSyncExperiment(object):
 
         When end is written, experiment ends.
 
-        NOTE:
-        - only calculate coherence along z-axis
+        NOTES:
         """
         from data_access import subject_settings_v3,VRTrial
         from coherence import GPR,DTWPerformance
@@ -340,8 +340,7 @@ class HandSyncExperiment(object):
 
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
-                        for i in np.arange(min_window_duration,max_window_duration+.01,.1):
-                            nextDuration,nextFraction = gprmodel.update( ilogistic(perf),i,0 )
+                        nextDuration,nextFraction = gprmodel.update( ilogistic(perf),0.,1. )
                     else:
                         nextDuration,nextFraction = gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
@@ -438,8 +437,8 @@ class HandSyncExperiment(object):
             f.write('')
         
         print "Saving GPR."
-        pickle.dump({'gprmodel':gprmodel,'performance':performance,
-                     'pause':self.pause,'unpause':self.unpause},
+        dill.dump({'gprmodel':gprmodel,'performance':performance,
+                    'pause':self.pause,'unpause':self.unpause},
                     open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
 
     def stop(self):

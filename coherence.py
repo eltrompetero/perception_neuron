@@ -1,6 +1,7 @@
 # ================================================================================================ # 
 # Functions for calculating coherence measure.
-# Author: Eddie Lee, edl56@cornell.edu
+# Authors: Eddie Lee, edl56@cornell.edu
+#          Ted Esposito
 # ================================================================================================ # 
 
 from __future__ import division
@@ -8,7 +9,6 @@ import numpy as np
 from scipy.signal import coherence
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
-from fastdtw import fastdtw
 
 
 def precompute_coherence_nulls(v,t0,windowDuration,pool,
@@ -450,6 +450,7 @@ class DTWPerformance(object):
             Fraction of the length of given trajectories that are within set thresholds.
         """
         from numpy.linalg import norm
+        from fastdtw import fastdtw
 
         dist,path = fastdtw(x,y,**self.dwtSettings)
         path = np.vstack(path)
@@ -496,6 +497,7 @@ class DTWPerformance(object):
         performance : float
         """
         from numpy.linalg import norm
+        from fastdtw import fastdtw
 
         dist,path = fastdtw(x,y,**self.dwtSettings)
         path = np.vstack(path)
@@ -626,14 +628,11 @@ class CoherenceEvaluator(object):
 
 
 class GPR(object):
-    '''
-    Class performs the gpr and writes the new visibility fraction/time to outputFile
-    '''
     def __init__(self,
-                 GPRKernel = RBF(length_scale=np.array([.1,.1])),
+                 GPRKernel = RBF(length_scale=np.array([.5,.1])),
                  alpha = .1,
                  tmin=0.5,tmax=2,tstep=0.1,
-                 fmin=0.1,fmax=0.9,fstep=0.1):
+                 fmin=0.1,fmax=1.,fstep=0.1):
         '''
         Parameters
         ----------
@@ -644,7 +643,15 @@ class GPR(object):
             minimum window time
         fmin : float
             minimum visibility fraction.
+
+        Members
+        -------
+        fractions : ndarray
+            Fraction of time stimulus is visible.
+        durations : ndarray
+            Duration of window.
         '''
+        from gaussian_process.regressor import GaussianProcessRegressor
         self.tmin = tmin
         self.tmax = tmax
         self.tstep = tstep
@@ -652,7 +659,7 @@ class GPR(object):
         self.fmax = fmax
         self.fstep = fstep
         
-        self.kernel = GPRKernel
+        self.kernel = handsync_experiment_kernel(np.array([.5,.2]))
         
         self.durations = np.zeros(0)
         self.fractions = np.zeros(0)
@@ -665,7 +672,7 @@ class GPR(object):
         # Flatten t and f grids and stack them into an Nx2 array.
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
-        self.gp = gaussian_process.GaussianProcessRegressor(kernel=self.kernel,alpha=alpha)
+        self.gp = GaussianProcessRegressor(self.kernel,alpha**-2)
         self.coherence_pred = 0
         self.std_pred = 0
    
@@ -744,3 +751,16 @@ class GPR(object):
         
         return self.max_uncertainty()
 #end GPR
+
+def handsync_experiment_kernel(length_scales):
+    """
+    Calculates the RBF kernel for one pair of (window_duration,visible_fraction).
+    
+    Custom kernel calculates distance between (0,1) full visibility window and all other windows to be 
+    only the distance between the visibility fractions and doesn't count the window duration.
+    """
+    def kernel(x,y,length_scales=length_scales):
+        if x[1]==1 or y[1]==1:  # if visibility fraction is 1
+            return np.exp(-np.sum( ((x[1]-y[1])/length_scales[1])**2 ))
+        return np.exp(-np.sum( ((x-y)/length_scales)**2 ))
+    return kernel
