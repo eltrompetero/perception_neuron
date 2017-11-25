@@ -631,6 +631,7 @@ class GPR(object):
     def __init__(self,
                  GPRKernel = RBF(length_scale=np.array([.5,.1])),
                  alpha = .1,
+                 mean_performance=np.log(1),
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=1.,fstep=0.1):
         '''
@@ -641,8 +642,16 @@ class GPR(object):
         GPRKernel : sklearn.gaussian_processes.kernels.RBF
         alpha : float
             Uncertainty in diagonal matrix for GPR kernel.
-        tmin : float
+        mean_performance : float,.5
+            By default, the sigmoid is centered around 0, the mean of the Gaussian process, corresponding to
+            perf=0.5. However, we should center the sigmoid around the mean value of y which is specified
+            here. Since the GPR is trained in the logistic space, the offset is given by the logistic offset.
+            The mean is automatically accounted for under the hood, so you don't have to worry about adding or
+            subtracting it in the interface.
+        tmin : float,0.5
             minimum window time
+        tmax : float,2
+        tstep : float,0.1
         fmin : float
             minimum visibility fraction.
 
@@ -666,6 +675,7 @@ class GPR(object):
         self.durations = np.zeros(0)
         self.fractions = np.zeros(0)
         self.coherences = np.zeros(0)
+        self.mean_performance = mean_performance
         
         # Create two grids for t and f.
         self.tRange = np.arange(self.tmin,self.tmax+self.tstep,self.tstep)
@@ -680,10 +690,12 @@ class GPR(object):
    
     def predict(self):
         '''
-        Fits the GPR to all data points and saves the predicted values with errors.
+        Fits the GPR to all data points and saves the predicted values with errors. The mean in the target
+        perf values is accounted for here.
         '''
-        self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.coherences )
+        self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.coherences-self.mean_performance )
         self.coherence_pred, self.std_pred = self.gp.predict(self.meshPoints,return_std=True)
+        self.coherence_pred += self.mean_performance
 
     def grad(self,eps=1e-5):
         '''

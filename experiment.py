@@ -153,6 +153,16 @@ class HandSyncExperiment(object):
         """
         while not os.path.isfile('%s/%s'%(DATADR,'start_gpr')):
             time.sleep(.5)
+
+    def read_pause(self):
+        readFile = False
+        while not readFile:
+            try:
+                with open('%s/%s'%(DATADR,'pause_time')) as f:
+                    self.pause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
+                readFile = True
+            except IOError:
+                time.sleep(.02)
     
     def delete_file(self,fname,max_wait_time=1,dt=.02):
         """
@@ -227,7 +237,8 @@ class HandSyncExperiment(object):
         self.wait_for_start()
         
         # Setup routines for calculating coherence.
-        gprmodel = GPR(tmin=min_window_duration,tmax=max_window_duration,
+        gprmodel = GPR(mean_performance=np.log(.6/.4),
+                       tmin=min_window_duration,tmax=max_window_duration,
                        fmin=min_vis_fraction,fmax=max_vis_fraction)
         realTimePerfEval = DTWPerformance()
         gprPerfEval = DTWPerformance()
@@ -400,8 +411,7 @@ class HandSyncExperiment(object):
                 if os.path.isfile('%s/%s'%(DATADR,'pause_time')):
                     pauseEvent.clear()
                     if verbose: print "Paused."
-                    with open('%s/%s'%(DATADR,'pause_time')) as f:
-                        self.pause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
+                    self.read_pause()
                     self.delete_file('pause_time')
                     while not os.path.isfile('%s/%s'%(DATADR,'unpause_time')):
                         time.sleep(.01)
