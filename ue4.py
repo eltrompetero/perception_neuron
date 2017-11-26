@@ -72,9 +72,9 @@ def load_visibility(fname,dr=''):
 
     Returns
     -------
-    visible : ndarray
+    visible : ndarray of datetime.datetime
         First time is when animation starts.
-    invisible : ndarray
+    invisible : ndarray of datetime.datetime
     """
     from datetime import datetime
 

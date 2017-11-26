@@ -251,7 +251,21 @@ def subject_settings_v3(index,return_list=True):
                   'trials':['avatar0','avatar1','hand0','hand1']}
                 ][index]
     dr = (os.path.expanduser('~')+
-          '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
+      '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
+    if return_list:
+        output = [settings[k] for k in ['person','modelhandedness','rotation']]
+        output.append(dr)
+        return output
+    return settings,dr
+
+def subject_settings_v3_1(index,return_list=True):
+    settings = [{'person':'Eddie3_1',
+                  'modelhandedness':['Left'],
+                  'rotation':[0],
+                  'trials':['avatar']}
+                ][index]
+    dr = (os.path.expanduser('~')+
+      '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
     if return_list:
         output = [settings[k] for k in ['person','modelhandedness','rotation']]
         output.append(dr)
@@ -262,7 +276,615 @@ def subject_settings_v3(index,return_list=True):
 # ------------------ #
 # Class definitions. #
 # ------------------ #
-class VRTrial(object):
+class VRTrial3_1(object):
+    def __init__(self,person,modelhandedness,rotation,dr,fname='trial_dictionaries.p'):
+        """
+        Parameters
+        ----------
+        person : str
+        modelhandedness : list of str
+        rotation : list of float
+        dr : str
+
+        Members
+        -------
+        person
+        modelhandedness
+        rotation
+        dr
+        subjectTrial (dict)
+            Full Axis Neuron trial data labeled by part+'T' part+'V'.
+        templateTrial (dict)
+            Full MotionBuilder trial data labeled by part+'T' part+'V'.
+        timeSplitTrials
+        subjectSplitTrials
+        templateSplitTrials
+
+        Methods
+        -------
+        info
+        subject_by_window_dur
+        subject_by_window_spec
+        pickle_trial_dicts
+        pickle_phase
+        _fetch_windowspec_indices
+        """
+        self.person = person
+        self.modelhandedness = modelhandedness
+        self.rotation = rotation
+        self.dr = dr
+        
+        try:
+            data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
+        except Exception:
+            self.pickle_trial_dicts(1)
+            
+        data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
+        self.templateTrial = data['templateTrial']
+        self.subjectTrial = data['subjectTrial']
+        self.timeSplitTrials = data['timeSplitTrials']
+        self.templateSplitTrials = data['templateSplitTrials']
+        self.subjectSplitTrials = data['subjectSplitTrials']
+        self.windowsByPart = data['windowsByPart']
+
+    def info(self):
+        print "Person %s"%self.person
+        print "Trials available:"
+        for part in ['avatar','avatar0','hand','hand0']:
+            print "%s\tInvisible\tTotal"%part
+            for spec,_ in self.windowsByPart[part]:
+                print "\t%1.2f\t\t%1.2f"%(spec[0],spec[1])
+    
+    def subject_by_window_dur(self,windowDur,part):
+        """
+        Params:
+        -------
+        windowDur (list)
+            Duration of visible/invisible cycle.
+        part (str)
+            Body part to return.
+            
+        Returns:
+        --------
+        selection (list)
+            List of trials that have given window duration. Each tuple in list is a tuple of the 
+            ( (invisible,total window), time, extracted velocity data ).
+        """
+        raise NotImplementedError("Needs to be fixed.")
+        ix = []
+        i=0
+        for spec,_ in self.windowsByPart[part]:
+            if np.isclose(windowDur,spec[1]):
+                ix.append(i)
+            i += 1
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[part][i][0],
+                               self.timeSplitTrials[part][i],
+                               self.subjectSplitTrials[part][i] ))
+        return selection
+    
+    def template_by_window_dur(self,windowDur,part):
+        raise NotImplementedError("Needs to be fixed.")
+        ix = []
+        i=0
+        for spec,_ in self.windowsByPart[part]:
+            if np.isclose(windowDur,spec[1]):
+                ix.append(i)
+            i += 1
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[part][i][0],
+                               self.timeSplitTrials[part][i],
+                               self.templateSplitTrials[part][i] ))
+        return selection
+    
+    def subject_by_invisible_dur(self,windowDur,part):
+        raise NotImplementedError("Needs to be fixed.")
+        ix = []
+        i=0
+        for spec,_ in self.windowsByPart[part]:
+            if np.isclose(windowDur,spec[0]):
+                ix.append(i)
+            i += 1
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[part][i][0],
+                               self.timeSplitTrials[part][i],
+                               self.subjectSplitTrials[part][i] ))
+        return selection
+
+    def subject_by_window_spec(self,windowSpec,trial_type,precision=None):
+        """Automatically search through left and right hand trials."""
+        selection = []
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.subjectSplitTrials[trial_type][ix[0]] ))
+            # Iterate also through hand0 or avatar0, which contains the other hand..
+            if trial_type.isalpha():
+                selection += self.subject_by_window_spec([windowSpec[specix]],
+                                                             trial_type+'0',
+                                                             precision=precision)
+        return selection
+
+    def template_by_window_spec(self,windowSpec,trial_type,precision=None):
+        """Automatically search through left and right hand trials."""
+        selection = []
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.templateSplitTrials[trial_type][ix[0]] ))
+            # Iterate also through hand0 or avatar0, which contains the other hand..
+            if trial_type.isalpha():
+                selection += self.template_by_window_spec([windowSpec[specix]],
+                                                             trial_type+'0',
+                                                             precision=precision)
+        return selection
+
+    def template_by_invisible_dur(self,windowDur,part):
+        raise NotImplementedError("Needs to be fixed.")
+        ix = []
+        i=0
+        for spec,_ in self.windowsByPart[part]:
+            if np.isclose(windowDur,spec[0]):
+                ix.append(i)
+            i += 1
+        
+        selection = []
+        for i in ix:
+            selection.append(( self.windowsByPart[part][i][0],
+                               self.timeSplitTrials[part][i],
+                               self.templateSplitTrials[part][i] ))
+        if trialType.isalpha():
+            return selection + self.template_by_invisible_dur(windowSpec,trialType+'0')
+        return selection
+
+    def visibility_by_window_spec(self,windowSpec,trial_type,precision=None):
+        selection = []
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.templateSplitTrials[trial_type+'visibility'][ix[0]] ))
+            # Iterate also through hand0 or avatar0, which contains the other hand..
+            if trial_type.isalpha():
+                selection += self.visibility_by_window_spec([windowSpec[specix]],
+                                                             trial_type+'0',
+                                                             precision=precision)
+        return selection
+
+    def phase_by_window_dur(self,source,windowDur,trialType):
+        """
+        Return instantaneous phase from bandpass filtered velocities on trial specificied by window
+        duration.
+
+        Params:
+        -------
+        source (str)
+        windowDur (list of floats)
+        trialType (str)
+            'avatar', 'avatar0', 'hand', 'hand0'
+        """
+        raise NotImplementedError("Needs to be fixed.")
+        ix = []
+        i = 0
+        for spec,_ in self.windowsByPart[trialType]:
+            if np.isclose(windowDur,spec[1]):
+                ix.append(i)
+            i += 1
+        
+        selection = []
+        for i in ix:
+            try:
+                if source=='subject' or source=='s':
+                    phases = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),
+                                         'rb'))['phases']
+                elif source=='template' or source=='t':
+                    phases = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),
+                                         'rb'))['phases']
+
+                phases = [np.vstack(p) for p in phases]
+                selection.append(( self.windowsByPart[trialType][i][0],phases ))
+            except IOError:
+                print "Trial %d in trial type %s not found."%(i,trialType)
+        return selection
+
+    def phase_by_window_spec(self,source,windowSpec,trial_type):
+        """
+        Parameters
+        ----------
+        source : str
+        windowSpec : list
+        trial_type : str
+        """
+        selection = []
+        for specix,spec in enumerate(windowSpec):
+            ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
+            
+            if len(ix)>0:
+                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
+                                   self.timeSplitTrials[trial_type][ix[0]],
+                                   self.templateSplitTrials[trial_type][ix[0]] ))
+                try:
+                    if source=='subject' or source=='s':
+                        data = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trial_type,ix[0]),'rb'))
+                        phases,vs = data['phases'],data['vs']
+                    elif source=='template' or source=='t':
+                        data = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trial_type,ix[0]),'rb'))
+                        phases,vs = data['phases'],data['vs']
+                    
+                    phases = [np.vstack(p) for p in phases]
+                    selection.append(( self.windowsByPart[trial_type][ix[0]][0],phases ))
+                except IOError:
+                    print "Trial %d in trial type %s not found."%(ix[0],trial_type)
+
+            # Iterate also through hand0 or avatar0, which contains the other hand.
+            if trial_type.isalpha():
+                selection += self.phase_by_window_spec(source,
+                                                        [windowSpec[specix]],
+                                                        trial_type+'0',
+                                                        precision=precision)
+        return selection
+
+    def filtv_by_window_spec(self,source,windowSpec,trialType,search_all=True):
+        """
+        Returns:
+        --------
+        list of twoples (windowSpec, filtv) where filtv is a list of 3 arrays corresponding to each dimension
+        """
+        raise NotImplementedError()
+        ix = self._fetch_windowspec_indices(windowSpec,trialType,precision=precision)
+        selection = []
+
+        for i in ix:
+            if source=='subject' or source=='s':
+                data = pickle.load(open('%s/subject_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
+                phases,vs = data['phases'],data['vs']
+            elif source=='template' or source=='t':
+                data = pickle.load(open('%s/template_phase_%s_%d.p'%(self.dr,trialType,i),'rb'))
+                phases,vs = data['phases'],data['vs']
+            else:
+                raise Exception
+
+            vs = [np.vstack(p) for p in vs]
+            selection.append(( self.windowsByPart[trialType][i][0],vs ))
+
+        if trialType.isalpha() and search_all:
+            return selection + self.filtv_by_window_spec(source,windowSpec,trialType+'0',False)
+
+        return selection
+
+    def dphase_by_window_dur(self,windowDur,trialType):
+        """
+        Difference in phase between subject and template motion.
+        """
+        raise NotImplementedError
+        from misc.angle import mod_angle
+        
+        subjectPhase = self.phase_by_window_dur('s',windowDur,trialType)
+        templatePhase = self.phase_by_window_dur('t',windowDur,trialType)
+        dphase = []
+        
+        for i in xrange(len(subjectPhase)):
+            dphase.append(( subjectPhase[i][0], 
+                            [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
+        if trialType.isalpha():
+            return dphase + self.dphase_by_window_dur(windowDur,trialType+'0')
+        return dphase
+
+    def dphase_by_window_spec(self,windowSpec,trialType):
+        """
+        Difference in phase between subject and template motion.
+        """
+        from misc.angle import mod_angle
+        
+        subjectPhase = self.phase_by_window_spec('s',windowSpec,trialType)
+        templatePhase = self.phase_by_window_spec('t',windowSpec,trialType)
+        dphase = []
+            
+        for i in xrange(len(subjectPhase)):
+            dphase.append(( subjectPhase[i][0], 
+                            [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
+        return dphase
+
+    def pickle_trial_dicts(self,disp=False):
+        """
+        Put data for analysis into easily accessible pickles. Right now, I extract only visibility and hand
+        velocities for AN port data and avatar's motionbuilder files.
+        
+        Parameters
+        ----------
+        disp : bool,False
+        """
+        from pipeline import extract_motionbuilder_model3,extract_AN_port
+        from utils import match_time
+        from ue4 import load_visibility
+        import dill as pickle
+
+        # Load AN data.
+        df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
+        windowsByPart = self.window_specs(self.person,self.dr)
+        
+        # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial,
+        # hmdTrials. These contain arrays for time that were interpolated in for regular sampling and
+        # functions for velocities.
+        subjectTrial,templateTrial,hmdTrials = {},{},{}
+        timeSplitTrials,subjectSplitTrials,templateSplitTrials = {},{},{}
+
+        for trialno,part in enumerate(['avatar']):
+            if disp:
+                print "Processing %s..."%part
+            # Select time interval during which the trial happened.
+            if part.isalpha():
+                visible,invisible = load_visibility(part+'_visibility',self.dr)
+            else:
+                visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
+            startEnd = [visible[0],visible[-1]]
+            
+            # Extract template.
+            mbV,mbT = extract_motionbuilder_model3(self.modelhandedness[trialno])
+            showIx = mbT < (startEnd[1]-startEnd[0]).total_seconds()
+            templateTrial[part+'T'] = mbT[showIx]
+            templateTrial[part+'V'] = mbV
+            
+            # Extract subject from port file.
+            anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
+                                               rotation_angle=self.rotation[trialno] )
+            showIx = (anT>startEnd[0]) & (anT<startEnd[1])
+            subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
+            
+            # Put trajectories on the same time samples so we can pipeline our regular
+            # computation.
+            # Since the AN trial starts after the mbTrial...the offset is positive.
+            subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
+                   subjectTrial[part+'T'],
+                   1/30,
+                   offset=0,
+                   use_univariate=True)
+            
+            # Separate the different visible trials into separate arrays.
+            # Times for when visible/invisible windows start.
+            start = np.zeros((len(visible)+len(invisible)),dtype=object)
+            start[::2] = visible
+            start[1::2] = invisible
+            # Units of seconds.
+            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.cumsum(start)
+            invisibleStart = start[::2]  # as seconds
+            visibleStart = start[1::2]  # as seconds
+            
+            # When target is invisible, set visibility to 0.
+            visibility = np.ones_like(templateTrial[part+'T'])
+            for i,j in zip(invisibleStart,visibleStart):
+                assert i<j
+                visibility[(templateTrial[part+'T']>=i) & (templateTrial[part+'T']<j)] = 0
+            if len(visible)<len(invisible):
+                visibility[(templateTrial[part+'T']>=invisible[-1])] = 0
+            templateTrial[part+'visibility'] = visibility
+
+            timeSplitTrials[part],subjectSplitTrials[part],templateSplitTrials[part] = [],[],[]
+            templateSplitTrials[part+'visibility'] = []
+            for spec,startendt in windowsByPart[part]:
+                startendt = ((startendt[0]-startEnd[0]).total_seconds(),
+                             (startendt[1]-startEnd[0]).total_seconds())
+
+                # Save time.
+                timeix = (templateTrial[part+'T']<=startendt[1])&(templateTrial[part+'T']>=startendt[0])
+                t = templateTrial[part+'T'][timeix]
+                timeSplitTrials[part].append(t)
+
+                # Save visibility window.
+                templateSplitTrials[part+'visibility'].append( visibility[timeix] )
+                
+                # Save velocities.
+                templateSplitTrials[part].append( templateTrial[part+'V'](t) )
+                # Subject sometimes has cutoff window so must reindex time.
+                timeix = (subjectTrial[part+'T']<=startendt[1])&(subjectTrial[part+'T']>=startendt[0])
+                t = subjectTrial[part+'T'][timeix]
+                subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
+            
+            # Get the beginning fully visible window. Insert this into the beginning of the list.
+            windowsByPart[part].insert(0,((0,0),(0,invisibleStart[0])))
+            timeix = (subjectTrial[part+'T']>=0)&(subjectTrial[part+'T']<=invisibleStart[0])
+            t = subjectTrial[part+'T'][timeix]
+            
+            timeSplitTrials[part].insert(0,t)
+            subjectSplitTrials[part].insert( 0,subjectTrial[part+'V'](t) )
+            templateSplitTrials[part].insert( 0,templateTrial[part+'V'](t) )
+
+            timeix = (templateTrial[part+'T']<=invisibleStart[0])&(templateTrial[part+'T']>=0)
+            templateSplitTrials[part+'visibility'].insert( 0,visibility[timeix] )
+        
+        pickle.dump({'templateTrial':templateTrial,
+                     'subjectTrial':subjectTrial,
+                     'timeSplitTrials':timeSplitTrials,
+                     'templateSplitTrials':templateSplitTrials,
+                     'subjectSplitTrials':subjectSplitTrials,
+                     'windowsByPart':windowsByPart},
+                    open('%s/trial_dictionaries.p'%self.dr,'wb'),-1)
+
+    def pickle_phase(self,trial_types=['avatar','avatar0','hand','hand0']):
+        """
+        Calculate bandpass filtered phase and pickle.
+        """
+        from pipeline import pipeline_phase_calc
+        
+        for part in trial_types:
+            nTrials = len(self.windowsByPart[part])  # number of trials for that part
+
+            # Subject.
+            toProcess = []
+            trialNumbers = []
+            for i in xrange(nTrials):
+                # Only run process if we have data points. Some trials are missing data points.
+                # NOTE: At some point the min length should made to correspond to the min window
+                # size in the windowing function for filtering.
+                if len(self.timeSplitTrials[part][i])>501:
+                    trialNumbers.append(i)
+                    toProcess.append( (self.timeSplitTrials[part][i],
+                                       (self.subjectSplitTrials[part][i][:,0],
+                                        self.subjectSplitTrials[part][i][:,1],
+                                        self.subjectSplitTrials[part][i][:,2])) )
+                else:
+                    print "Ignoring %s trial no %d with windowspec (%1.1f,%1.1f)."%(part,i,
+                        self.windowsByPart[part][i][0][0],self.windowsByPart[part][i][0][1])
+            pipeline_phase_calc(trajs=toProcess,dr=self.dr,
+                                file_names=['subject_phase_%s_%d'%(part,i)
+                                            for i in trialNumbers])
+            # Template.
+            toProcess = []
+            trialNumbers = []
+            for i in xrange(nTrials):
+                if len(self.timeSplitTrials[part][i])>501:
+                    trialNumbers.append(i)
+                    toProcess.append( (self.timeSplitTrials[part][i],
+                                       (self.templateSplitTrials[part][i][:,0],
+                                        self.templateSplitTrials[part][i][:,1],
+                                        self.templateSplitTrials[part][i][:,2])) )
+            pipeline_phase_calc(trajs=toProcess,dr=self.dr,
+                                file_names=['template_phase_%s_%d'%(part,i)
+                                            for i in trialNumbers])
+
+    def _fetch_windowspec_indices(self,specs,trial_type,precision=None):
+        """
+        Given a particular trial type and a window specification, return all the indices within
+        that trial type that match the given specification.  Options for adjusting the
+        precision for matching windows.
+
+        Parameters
+        ----------
+        trial_type : str
+        spec : list of tuples
+        
+        Returns
+        -------
+        ix : list of ints
+        """
+        ix = []
+        trialWindows = np.array([w[0] for w in self.windowsByPart[trial_type]])
+        i = 0  # counter
+
+        if precision is None:
+            for spec in specs:
+                ix_ = (np.array(spec)[None,:]==trialWindows).all(1)
+                if ix_.any():
+                    ix.append( np.where(ix_)[0][0] )
+        elif type(precision) is float:
+            for spec in specs:
+                specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
+                ix_ = (specDiffs<=precision).all(1)
+                if ix_.any():
+                    ix.append(np.where(ix_)[0][0])
+        elif type(precision) is tuple:
+            for spec in specs:
+                specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
+                ix_ = (specDiffs[:,0]<=precision[0])&(specDiffs[:,1]<=precision[1])
+                if ix_.any():
+                    ix.append(np.where(ix_)[0][0])
+        else:
+            raise NotImplementedError("precision type not supported.")
+
+        return ix
+
+    def window_specs(self,person,dr):
+        """
+        Get when the different visible/invisible cycles occur in the given experiment. These data are
+        obtained from visibility text files output from UE4.
+        
+        Parameters
+        ----------
+        person : str
+            Will point to the folder that the data is in.
+        dr : str
+
+        Returns:
+        --------
+        windowsByPart (dict)
+            Keys correspond to trial types. Each dict entry is a list of tuples 
+            ((type of window),(window start, window end))
+        """
+        from ue4 import load_visibility 
+
+        # Load AN subject data.
+        df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
+
+        windowsByPart = {}
+        
+        for trialno,part in enumerate(['avatar']):
+            if part.isalpha():
+                fname = part+'_visibility'
+            else:
+                fname = part[:-1]+'_visibility_0'
+
+            visible,invisible = load_visibility(fname,dr)
+
+            # Array denoting visible (with 1) and invisible (with 0) times.
+            start = np.zeros((len(visible)+len(invisible)),dtype=object)
+            start[::2] = visible
+            start[1::2] = invisible
+            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.cumsum(start)
+            invisibleStart = start[::2]
+            visibleStart = start[1::2]
+
+            # Get the duration of the invisible and visible windows in the time series.
+            mxLen = min([len(visibleStart),len(invisibleStart)])
+            invDur = np.around(visibleStart[:mxLen]-invisibleStart[:mxLen],1)
+            visDur = np.around(invisibleStart[1:][:mxLen-1]-visibleStart[:-1][:mxLen-1],1)
+            windowDur = invDur[:-1]+visDur  # total duration cycle of visible and invisible
+
+            # Identify the different types of windows that we have.
+            windowSpecs = []
+            windowIx = []
+            for ix,i,w in zip(range(len(windowDur)),invDur[:-1],windowDur):
+                if not (i,w) in windowSpecs:
+                    windowSpecs.append((i,w))
+                    windowIx.append([])
+                windowIx[-1].append(ix)
+
+            # Ignore all windows that appear when the flashing duration is changing. These
+            # are identifiable as single appearances of a different visible cycle.
+            ix = 0
+            while ix<len(windowSpecs):
+                if len(windowIx[ix])<3:
+                    windowIx.pop(ix)
+                    windowSpecs.pop(ix)
+                else:
+                    ix += 1
+
+            # Check that all indices are consecutive.
+            for ix in windowIx:
+                assert all(np.diff(ix)==1), ix
+
+            # Identify the times at which these cycles start and end.
+            windowStart,windowEnd = [],[]
+            for ix in range(len(windowSpecs)):
+                windowStart.append(invisible[windowIx[ix][0]])
+                windowEnd.append(visible[windowIx[ix][-1]])
+
+            windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
+
+            # In buggy trials where animation did not stop properly, there is a segment at the end that
+            # needs to be removed, corresponding to when the avatar was flashing very quickly.
+            if windowsByPart[part][-1][0][0]==0:
+                windowsByPart[part] = windowsByPart[part][:-1]
+        return windowsByPart
+
+# end VRTrial3_1
+
+class VRTrial3(object):
     def __init__(self,person,modelhandedness,rotation,dr,fname='trial_dictionaries.p'):
         """
         Params:
@@ -784,7 +1406,7 @@ class VRTrial(object):
             raise NotImplementedError("precision type not supported.")
 
         return ix
-# end VRTrial
+# end VRTrial3
 
 
 class Node(object):

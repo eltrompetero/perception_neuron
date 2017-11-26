@@ -195,6 +195,7 @@ class HandSyncExperiment(object):
               initial_window_duration=1.0,initial_vis_fraction=0.5,
               min_window_duration=.6,max_window_duration=2,
               min_vis_fraction=.1,max_vis_fraction=1.,
+              gpr_mean_prior=np.log(.44/.56),
               verbose=False):
         """
         Run realtime analysis for experiment.
@@ -237,7 +238,7 @@ class HandSyncExperiment(object):
         self.wait_for_start()
         
         # Setup routines for calculating coherence.
-        gprmodel = GPR(mean_performance=np.log(.6/.4),
+        gprmodel = GPR(mean_performance=gpr_mean_prior,
                        tmin=min_window_duration,tmax=max_window_duration,
                        fmin=min_vis_fraction,fmax=max_vis_fraction)
         realTimePerfEval = DTWPerformance()
@@ -326,7 +327,8 @@ class HandSyncExperiment(object):
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
                     print "Running GPR on this trial..."
                     v,t,tdateHistory = reader.copy_history()
-                    # Put into comparable coordinate system accounting for reflection symmetry.
+                    # Put output from Axis Neuron into comparable coordinate system accounting for reflection
+                    # symmetry.
                     v[:] = v[:,[1,0,2]]
                     v[:,2] *= -1
 

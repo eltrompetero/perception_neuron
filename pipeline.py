@@ -774,8 +774,10 @@ def extract_motionbuilder_model3(hand):
 
     Returns
     -------
-    mbT
-    mbV
+    mbV : scipy.interpolate.interp1d
+        Returns (n_samples,3) dimensional matrix.
+    mbT : ndarray of float
+        Number of seconds since the beginning of the avatar motion file.
     """
     from datetime import datetime,timedelta
     import cPickle as pickle
