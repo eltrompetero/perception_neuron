@@ -156,7 +156,7 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_
         fname = '%s/%s'%(dr,fname)
     
     df = pd.read_csv(fname,**read_csv_kwargs)
-    df.iloc[:,0] = df.iloc[:,0].apply(lambda t: datetime.strptime(t, '%Y-%m-%dT%H:%M:%S.%f'))
+    df.iloc[:,0] = df.iloc[:,0].apply(read_in_date)
 
     if time_as_dt:
         # Convert time stamp into time differences in seconds since first measurement.
@@ -164,6 +164,15 @@ def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_
         df['Timestamp'] = df['Timestamp'].apply(pd.to_numeric,errors='coerce')
         df['Timestamp'] = dt
     return df
+
+def read_in_date(t_as_str):
+    """
+    t_as_str : str
+    """
+    try:
+        return datetime.strptime(t_as_str, '%Y-%m-%dT%H:%M:%S.%f')
+    except ValueError:
+        return datetime.strptime(t_as_str, '%Y-%m-%dT%H:%M:%S')
 
 
 

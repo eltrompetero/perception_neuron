@@ -621,7 +621,7 @@ class VRTrial3_1(object):
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
         windowsByPart = self.window_specs(self.person,self.dr)
-        
+
         # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial,
         # hmdTrials. These contain arrays for time that were interpolated in for regular sampling and
         # functions for velocities.
@@ -863,7 +863,7 @@ class VRTrial3_1(object):
             for i in xrange(len(self.gprmodel.fractions)):
                 if i==0:
                     windowSpecs.append((0,0))
-                    windowStart.append(visibleStart[0])
+                    windowStart.append(visible[0])
                     windowEnd.append(trialStartTimes[1])
                 else:
                     invDur = (1-self.gprmodel.fractions[i])*self.gprmodel.durations[i]
@@ -871,10 +871,7 @@ class VRTrial3_1(object):
                     windowSpecs.append((invDur,winDur))
 
                     windowStart.append(trialStartTimes[i+1])
-                    if i<(len(self.gprmodel.fractions)-1):
-                        windowEnd.append(trialEndTimes[i+1])
-                    else:
-                        windowEnd.append(visibleStart[-1])
+                    windowEnd.append(trialEndTimes[i+1])
 
             windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
 
