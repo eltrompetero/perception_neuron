@@ -74,7 +74,7 @@ class HandSyncExperiment(object):
             Dictionary of avatar interpolation splines.
         """
         from data_access import subject_settings_v3 as subject_settings
-        from data_access import VRTrial
+        from data_access import VRTrial3_1 as VRTrial
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
         # NOTE: This relies on the fact that these experiments took data from these avatar trials, but you
@@ -163,6 +163,32 @@ class HandSyncExperiment(object):
                 readFile = True
             except IOError:
                 time.sleep(.02)
+
+    def read_this_setting(self):
+        """
+        Read in window settings and trial start and end times from this_setting file. Times are appended to
+        self.trialStartTimes and self.trialEndTimes.
+
+        Returns
+        -------
+        thisDuration : float
+        thisFraction : float
+        """
+        # Try to open and read. Sometimes there is a delay in accessibility because
+        # the file is being written.
+        success = False 
+        while not success:
+            try:
+                with open('%s/%s'%(DATADR,'this_setting')) as f:
+                    L = f.readline().split(',')
+                    thisDuration,thisFraction = (float(i) for i in L[:2])
+                    # start start times with the first trial after full visibility
+                    self.trialStartTimes.append( datetime.strptime(L[2],'%Y-%m-%dT%H:%M:%S.%f') )
+                    self.trialEndTimes.append( datetime.strptime(L[3],'%Y-%m-%dT%H:%M:%S.%f') )
+                success = True
+            except IOError:
+                pass
+        return thisDuration,thisFraction
     
     def delete_file(self,fname,max_wait_time=1,dt=.02):
         """
@@ -232,9 +258,9 @@ class HandSyncExperiment(object):
 
         NOTES:
         """
-        from data_access import subject_settings_v3,VRTrial
+        from data_access import subject_settings_v3
+        from data_access import VRTrial3_1 as VRTrial
         from coherence import GPR,DTWPerformance
-        import cPickle as pickle
         self.wait_for_start()
         
         # Setup routines for calculating coherence.
@@ -252,7 +278,7 @@ class HandSyncExperiment(object):
         with open('%s/next_setting'%DATADR,'w') as f:
             f.write('%1.1f,%1.1f'%(nextDuration,nextFraction))
         with open('%s/this_setting'%DATADR,'w') as f:
-            f.write('%1.1f,%1.1f'%(0,0))
+            f.write('%1.1f,%1.1f,%s,%s'%(0,0,datetime.now().isoformat(),datetime.now().isoformat()))
         with open('%s/left_or_right'%DATADR,'r') as f:
             handedness = f.read().rstrip()
         if handedness=='left':
@@ -266,6 +292,8 @@ class HandSyncExperiment(object):
         performance = []  # history of performance
         self.pause = []  # times when game was paused
         self.unpause = []  # times when game was resumed
+        self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
+        self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
         pauseEvent = threading.Event()
         pauseEvent.set()
         self.endEvent = threading.Event()  # Event to be set when end file is written
@@ -340,17 +368,10 @@ class HandSyncExperiment(object):
 
                     # Try to open and read. Sometimes there is a delay in accessibility because
                     # the file is being written.
-                    success = False 
-                    while not success:
-                        try:
-                            with open('%s/%s'%(DATADR,'this_setting')) as f:
-                                thisDuration,thisFraction = (float(i) for i in f.readline().split(','))
-                            success = True
-                        except IOError:
-                            pass
+                    thisDuration,thisFraction = self.read_this_setting()
                     
-                    # Get subject performance.
-                    perf = gprPerfEval.time_average( avv,v,dt=1/30 )
+                    # Get subject performance ignoring the first few seconds of performance.
+                    perf = gprPerfEval.time_average( avv[75:],v[75:],dt=1/30 )
                     
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
@@ -375,14 +396,16 @@ class HandSyncExperiment(object):
                             print "Waiting to collect more data...(%d)"%reader.len_history()
                         time.sleep(.5)
                     dill.dump({'gprmodel':gprmodel,'performance':performance,
-                               'pause':self.pause,'unpause':self.unpause},
-                               open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
+                               'pause':self.pause,'unpause':self.unpause,
+                               'trialStartTimes':self.trialStartTimes,
+                               'trialEndTimes':self.trialEndTimes},
+                              open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
 
                 time.sleep(.05)
 
+
         # Wait til start_time has been written to start experiment.
         t0 = self.wait_for_start_time()
-
 
         if verbose:
             print "Starting threads."
@@ -449,11 +472,16 @@ class HandSyncExperiment(object):
 
         with open('%s/%s'%(DATADR,'end_port_read'),'w') as f:
             f.write('')
+
+        # Read in last trial setting.
+        self.read_this_setting() 
         
         print "Saving GPR."
         dill.dump({'gprmodel':gprmodel,'performance':performance,
-                    'pause':self.pause,'unpause':self.unpause},
-                    open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
+                   'pause':self.pause,'unpause':self.unpause,
+                   'trialStartTimes':self.trialStartTimes,
+                   'trialEndTimes':self.trialEndTimes},
+                  open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
 
     def stop(self):
         """Stop all thread that could be running. This does not wait for threads to stop."""

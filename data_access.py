@@ -313,6 +313,9 @@ class VRTrial3_1(object):
         self.modelhandedness = modelhandedness
         self.rotation = rotation
         self.dr = dr
+
+        # Load gpr data points.
+        self.gprmodel = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))['gprmodel']
         
         try:
             data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
@@ -327,10 +330,12 @@ class VRTrial3_1(object):
         self.subjectSplitTrials = data['subjectSplitTrials']
         self.windowsByPart = data['windowsByPart']
 
+        self.trialTypes = ['avatar']
+
     def info(self):
         print "Person %s"%self.person
         print "Trials available:"
-        for part in ['avatar','avatar0','hand','hand0']:
+        for part in self.trialTypes:
             print "%s\tInvisible\tTotal"%part
             for spec,_ in self.windowsByPart[part]:
                 print "\t%1.2f\t\t%1.2f"%(spec[0],spec[1])
@@ -809,11 +814,12 @@ class VRTrial3_1(object):
             Will point to the folder that the data is in.
         dr : str
 
-        Returns:
-        --------
-        windowsByPart (dict)
+        Returns
+        -------
+        windowsByPart : dict
             Keys correspond to trial types. Each dict entry is a list of tuples 
             ((type of window),(window start, window end))
+            Window type is a tuple (inv_duration,window_duration)
         """
         from ue4 import load_visibility 
 
@@ -844,42 +850,34 @@ class VRTrial3_1(object):
             invDur = np.around(visibleStart[:mxLen]-invisibleStart[:mxLen],1)
             visDur = np.around(invisibleStart[1:][:mxLen-1]-visibleStart[:-1][:mxLen-1],1)
             windowDur = invDur[:-1]+visDur  # total duration cycle of visible and invisible
-
-            # Identify the different types of windows that we have.
+            
+            # Load data saved in gpr.p.
+            # The first time point is when the file was written which we can throw out. The second pair of
+            # times are when the trial counter is updated immediately after the first fully visible trial. The
+            # remaining points are the following trials.
+            dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
+            trialStartTimes = dataDict['trialStartTimes']
+            trialEndTimes = dataDict['trialEndTimes']
             windowSpecs = []
-            windowIx = []
-            for ix,i,w in zip(range(len(windowDur)),invDur[:-1],windowDur):
-                if not (i,w) in windowSpecs:
-                    windowSpecs.append((i,w))
-                    windowIx.append([])
-                windowIx[-1].append(ix)
-
-            # Ignore all windows that appear when the flashing duration is changing. These
-            # are identifiable as single appearances of a different visible cycle.
-            ix = 0
-            while ix<len(windowSpecs):
-                if len(windowIx[ix])<3:
-                    windowIx.pop(ix)
-                    windowSpecs.pop(ix)
-                else:
-                    ix += 1
-
-            # Check that all indices are consecutive.
-            for ix in windowIx:
-                assert all(np.diff(ix)==1), ix
-
-            # Identify the times at which these cycles start and end.
             windowStart,windowEnd = [],[]
-            for ix in range(len(windowSpecs)):
-                windowStart.append(invisible[windowIx[ix][0]])
-                windowEnd.append(visible[windowIx[ix][-1]])
+            for i in xrange(len(self.gprmodel.fractions)):
+                if i==0:
+                    windowSpecs.append((0,0))
+                    windowStart.append(visibleStart[0])
+                    windowEnd.append(trialStartTimes[1])
+                else:
+                    invDur = (1-self.gprmodel.fractions[i])*self.gprmodel.durations[i]
+                    winDur = self.gprmodel.durations[i]
+                    windowSpecs.append((invDur,winDur))
+
+                    windowStart.append(trialStartTimes[i+1])
+                    if i<(len(self.gprmodel.fractions)-1):
+                        windowEnd.append(trialEndTimes[i+1])
+                    else:
+                        windowEnd.append(visibleStart[-1])
 
             windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
 
-            # In buggy trials where animation did not stop properly, there is a segment at the end that
-            # needs to be removed, corresponding to when the avatar was flashing very quickly.
-            if windowsByPart[part][-1][0][0]==0:
-                windowsByPart[part] = windowsByPart[part][:-1]
         return windowsByPart
 
 # end VRTrial3_1
