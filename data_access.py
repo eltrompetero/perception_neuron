@@ -316,6 +316,7 @@ class VRTrial3_1(object):
 
         # Load gpr data points.
         self.gprmodel = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))['gprmodel']
+        self.trialTypes = ['avatar']
         
         try:
             data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
@@ -329,8 +330,6 @@ class VRTrial3_1(object):
         self.templateSplitTrials = data['templateSplitTrials']
         self.subjectSplitTrials = data['subjectSplitTrials']
         self.windowsByPart = data['windowsByPart']
-
-        self.trialTypes = ['avatar']
 
     def info(self):
         print "Person %s"%self.person
@@ -464,10 +463,10 @@ class VRTrial3_1(object):
                                    self.timeSplitTrials[trial_type][ix[0]],
                                    self.templateSplitTrials[trial_type+'visibility'][ix[0]] ))
             # Iterate also through hand0 or avatar0, which contains the other hand..
-            if trial_type.isalpha():
-                selection += self.visibility_by_window_spec([windowSpec[specix]],
-                                                             trial_type+'0',
-                                                             precision=precision)
+            #if trial_type.isalpha():
+            #    selection += self.visibility_by_window_spec([windowSpec[specix]],
+            #                                                 trial_type+'0',
+            #                                                 precision=precision)
         return selection
 
     def phase_by_window_dur(self,source,windowDur,trialType):
@@ -620,7 +619,7 @@ class VRTrial3_1(object):
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
-        windowsByPart = self.window_specs(self.person,self.dr)
+        windowsByPart,_,_ = self.window_specs(self.person,self.dr)
 
         # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial,
         # hmdTrials. These contain arrays for time that were interpolated in for regular sampling and
@@ -628,7 +627,7 @@ class VRTrial3_1(object):
         subjectTrial,templateTrial,hmdTrials = {},{},{}
         timeSplitTrials,subjectSplitTrials,templateSplitTrials = {},{},{}
 
-        for trialno,part in enumerate(['avatar']):
+        for trialno,part in enumerate(self.trialTypes):
             if disp:
                 print "Processing %s..."%part
             # Select time interval during which the trial happened.
@@ -636,7 +635,7 @@ class VRTrial3_1(object):
                 visible,invisible = load_visibility(part+'_visibility',self.dr)
             else:
                 visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
-            startEnd = [visible[0],visible[-1]]
+            startEnd = [visible[0],invisible[-1]]
             
             # Extract template.
             mbV,mbT = extract_motionbuilder_model3(self.modelhandedness[trialno])
@@ -650,13 +649,10 @@ class VRTrial3_1(object):
             showIx = (anT>startEnd[0]) & (anT<startEnd[1])
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
             
-            # Put trajectories on the same time samples so we can pipeline our regular
-            # computation.
-            # Since the AN trial starts after the mbTrial...the offset is positive.
+            # Put trajectories on the same time samples so we can pipeline our regular computation.
             subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
                    subjectTrial[part+'T'],
                    1/30,
-                   offset=0,
                    use_univariate=True)
             
             # Separate the different visible trials into separate arrays.
@@ -673,8 +669,8 @@ class VRTrial3_1(object):
             # When target is invisible, set visibility to 0.
             visibility = np.ones_like(templateTrial[part+'T'])
             for i,j in zip(invisibleStart,visibleStart):
-                assert i<j
-                visibility[(templateTrial[part+'T']>=i) & (templateTrial[part+'T']<j)] = 0
+                if i<j:
+                    visibility[(templateTrial[part+'T']>=i) & (templateTrial[part+'T']<j)] = 0
             if len(visible)<len(invisible):
                 visibility[(templateTrial[part+'T']>=invisible[-1])] = 0
             templateTrial[part+'visibility'] = visibility
@@ -701,8 +697,6 @@ class VRTrial3_1(object):
                 t = subjectTrial[part+'T'][timeix]
                 subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
             
-            timeix = (templateTrial[part+'T']<=invisibleStart[0])&(templateTrial[part+'T']>=0)
-            templateSplitTrials[part+'visibility'].insert( 0,visibility[timeix] )
         
         pickle.dump({'templateTrial':templateTrial,
                      'subjectTrial':subjectTrial,
@@ -837,12 +831,6 @@ class VRTrial3_1(object):
             invisibleStart = start[::2]
             visibleStart = start[1::2]
 
-            # Get the duration of the invisible and visible windows in the time series.
-            mxLen = min([len(visibleStart),len(invisibleStart)])
-            invDur = np.around(visibleStart[:mxLen]-invisibleStart[:mxLen],1)
-            visDur = np.around(invisibleStart[1:][:mxLen-1]-visibleStart[:-1][:mxLen-1],1)
-            windowDur = invDur[:-1]+visDur  # total duration cycle of visible and invisible
-            
             # Load data saved in gpr.p.
             # The first time point is when the file was written which we can throw out. The second pair of
             # times are when the trial counter is updated immediately after the first fully visible trial. The
@@ -867,7 +855,12 @@ class VRTrial3_1(object):
 
             windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
 
-        return windowsByPart
+            # Get the duration of the invisible and visible windows in the time series.
+            mxLen = min([len(visibleStart),len(invisibleStart)])
+            invDur = visibleStart[:mxLen]-invisibleStart[:mxLen]
+            visDur = invisibleStart[1:][:mxLen-1]-visibleStart[:-1][:mxLen-1]
+            windowDur = invDur[:-1]+visDur  # total duration cycle of visible and invisible
+        return windowsByPart,invDur,visDur
 
 # end VRTrial3_1
 
@@ -1374,7 +1367,7 @@ class VRTrial3(object):
 
         if precision is None:
             for spec in specs:
-                ix_ = (np.array(spec)[None,:]==trialWindows).all(1)
+                ix_ = np.isclose(np.array(spec)[None,:],trialWindows).all(1)
                 if ix_.any():
                     ix.append( np.where(ix_)[0][0] )
         elif type(precision) is float:

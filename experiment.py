@@ -461,7 +461,7 @@ class HandSyncExperiment(object):
                             print "Waiting to collect more data...(%d)"%reader.len_history()
                         time.sleep(.5)
                 
-                time.sleep(update_delay) 
+                time.sleep(.1)
             
         print "Ending threads..."
         self.stop()
