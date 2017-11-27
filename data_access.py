@@ -262,6 +262,10 @@ def subject_settings_v3_1(index,return_list=True):
     settings = [{'person':'Eddie3_1',
                   'modelhandedness':['Left'],
                   'rotation':[0],
+                  'trials':['avatar']},
+                {'person':'Ben3_1',
+                  'modelhandedness':['Left'],
+                  'rotation':[0],
                   'trials':['avatar']}
                 ][index]
     dr = (os.path.expanduser('~')+
