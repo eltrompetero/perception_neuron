@@ -219,7 +219,7 @@ class HandSyncExperiment(object):
     def start(self,
               update_delay=.3,
               initial_window_duration=1.0,initial_vis_fraction=0.5,
-              min_window_duration=.6,max_window_duration=2,
+              min_window_duration=.5,max_window_duration=2,
               min_vis_fraction=.1,max_vis_fraction=1.,
               gpr_mean_prior=np.log(.44/.56),
               verbose=False):

@@ -259,11 +259,28 @@ def subject_settings_v3(index,return_list=True):
     return settings,dr
 
 def subject_settings_v3_1(index,return_list=True):
+    """
+    Subject info for experiment v3.1.
+
+    Parameters
+    ----------
+    index : int
+    return_list : bool,True
+
+    Returns
+    -------
+    settings : dict
+    dr : str
+    """
     settings = [{'person':'Eddie3_1',
                   'modelhandedness':['Left'],
                   'rotation':[0],
                   'trials':['avatar']},
                 {'person':'Ben3_1',
+                  'modelhandedness':['Left'],
+                  'rotation':[0],
+                  'trials':['avatar']},
+                {'person':'Ted3_1',
                   'modelhandedness':['Left'],
                   'rotation':[0],
                   'trials':['avatar']}
@@ -865,21 +882,22 @@ class VRTrial3_1(object):
             visDur = invisibleStart[1:][:mxLen-1]-visibleStart[:-1][:mxLen-1]
             windowDur = invDur[:-1]+visDur  # total duration cycle of visible and invisible
         return windowsByPart,invDur,visDur
-
 # end VRTrial3_1
+
+
 
 class VRTrial3(object):
     def __init__(self,person,modelhandedness,rotation,dr,fname='trial_dictionaries.p'):
         """
-        Params:
-        -------
+        Parameters
+        ----------
         person (str)
         modelhandedness (list of str)
         rotation (list of float)
         dr (str)
 
-        Attributes:
-        -----------
+        Attributes
+        ----------
         person
         modelhandedness
         rotation
@@ -892,8 +910,8 @@ class VRTrial3(object):
         subjectSplitTrials
         templateSplitTrials
 
-        Methods:
-        --------
+        Methods
+        -------
         info
         subject_by_window_dur
         subject_by_window_spec
@@ -1360,6 +1378,7 @@ class VRTrial3(object):
         ------
         trial_type : str
         spec : list of tuples
+            Each twople is (duration_invisible,window_duration).
         
         Returns
         -------

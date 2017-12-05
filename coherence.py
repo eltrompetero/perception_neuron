@@ -515,6 +515,9 @@ class DTWPerformance(object):
         else:
             performance = 0.
         return performance
+#end DTWPerformance
+
+
 
 class CoherenceEvaluator(object):
     '''
