@@ -272,16 +272,24 @@ def subject_settings_v3_1(index,return_list=True):
     settings : dict
     dr : str
     """
-    settings = [{'person':'Eddie3_1',
+    settings = [{'person':'Subject01_3_1',
                   'modelhandedness':['Left'],
                   'rotation':[0],
                   'trials':['avatar']},
-                {'person':'Ben3_1',
+                {'person':'Subject02_3_1',
                   'modelhandedness':['Left'],
                   'rotation':[0],
                   'trials':['avatar']},
-                {'person':'Ted3_1',
+                {'person':'Subject03_3_1',
                   'modelhandedness':['Left'],
+                  'rotation':[0],
+                  'trials':['avatar']},
+                {'person':'Subject04_3_1',
+                  'modelhandedness':['Right'],
+                  'rotation':[0],
+                  'trials':['avatar']}
+                {'person':'Subject05_3_1',
+                  'modelhandedness':['Right'],
                   'rotation':[0],
                   'trials':['avatar']}
                 ][index]
