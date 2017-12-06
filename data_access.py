@@ -287,7 +287,7 @@ def subject_settings_v3_1(index,return_list=True):
                 {'person':'Subject04_3_1',
                   'modelhandedness':['Right'],
                   'rotation':[0],
-                  'trials':['avatar']}
+                  'trials':['avatar']},
                 {'person':'Subject05_3_1',
                   'modelhandedness':['Right'],
                   'rotation':[0],
