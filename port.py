@@ -113,8 +113,6 @@ def record_AN_port(fname,port,
     start_file : str,'start'
     stop_file : str,'stop'
     """
-    import platform
-
     f = open('%s/%s'%(savedr,fname),'w')
 
     # Write header line.

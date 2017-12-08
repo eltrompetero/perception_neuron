@@ -216,13 +216,13 @@ class HandSyncExperiment(object):
         print "%s deleted."%fname
         return True
 
-    def start(self,
-              update_delay=.3,
-              initial_window_duration=1.0,initial_vis_fraction=0.5,
-              min_window_duration=.5,max_window_duration=2,
-              min_vis_fraction=.1,max_vis_fraction=1.,
-              gpr_mean_prior=np.log(.44/.56),
-              verbose=False):
+    def run_vr(self,
+               update_delay=.3,
+               initial_window_duration=1.0,initial_vis_fraction=0.5,
+               min_window_duration=.5,max_window_duration=2,
+               min_vis_fraction=.1,max_vis_fraction=1.,
+               gpr_mean_prior=np.log(.44/.56),
+               verbose=False):
         """
         Run realtime analysis for experiment.
                 
@@ -482,6 +482,11 @@ class HandSyncExperiment(object):
                    'trialStartTimes':self.trialStartTimes,
                    'trialEndTimes':self.trialEndTimes},
                   open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
+        
+        for f in ['left_or_right','end','initial_trial_done','run_gpr','start','start_time','this_setting',
+                  'next_setting','an_port.txt','end_port_read','gpr.p']:
+            if os.path.isfile(f):
+                os.rename(f,'%s/%s'%(handedness,f))
 
     def stop(self):
         """Stop all thread that could be running. This does not wait for threads to stop."""
@@ -489,7 +494,32 @@ class HandSyncExperiment(object):
         self.broadcast.stopEvent.set()
         self.endEvent.set()
         return
+
+    def run_lf(self,trial_duration):
+        """
+        Run Leader-Follower experiment.
+
+        Parameters
+        ----------
+        trial_duration : float
+            Duration in seconds for which to record data.
+        """
+        suffix = 0
+        while os.path.isfile('an_port_%s.txt'%str(suffix).zfill(2)):
+            suffix += 1
+
+        recordThread = threading.Thread(target=record_AN_port,
+                                        args=('an_port_%s.txt'%str(suffix).zfill(2),7013))
+        recordThread.start()
+
+        time.sleep(trial_duration)
+
+        with open('end','w') as f:
+            f.write('')
+        recordThread.join()
 # end HandSyncExperiment
+
+
 
 def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
     """

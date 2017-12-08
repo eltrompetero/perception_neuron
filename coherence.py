@@ -664,6 +664,8 @@ class GPR(object):
             Fraction of time stimulus is visible.
         durations : ndarray
             Duration of window.
+        meshPoints : ndarray
+            List of grid points (duration,fraction) over which performance was measured.
         '''
         from gaussian_process.regressor import GaussianProcessRegressor
         self.tmin = tmin
@@ -691,14 +693,31 @@ class GPR(object):
         self.coherence_pred = 0
         self.std_pred = 0
    
-    def predict(self):
+    def predict(self,mesh=None):
         '''
         Fits the GPR to all data points and saves the predicted values with errors. The mean in the target
         perf values is accounted for here.
+
+        Parameters
+        ----------
+        mesh : ndarray
+            Points at which to evaluate GPR. Should be (samples,2).
+
+        Returns
+        -------
+        perf : ndarray
+            Performance grid.
+        perfErr : ndarray
+            Performance estimated standard deviation.
         '''
+        if mesh is None:
+            mesh = self.meshPoints
+
         self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.coherences-self.mean_performance )
-        self.coherence_pred, self.std_pred = self.gp.predict(self.meshPoints,return_std=True)
+        self.coherence_pred, self.std_pred = self.gp.predict(mesh,return_std=True)
         self.coherence_pred += self.mean_performance
+
+        return self.coherence_pred.copy(),self.std_pred.copy()
 
     def grad(self,eps=1e-5):
         '''
