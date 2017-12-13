@@ -439,12 +439,12 @@ class VRTrial3_1(object):
             if len(ix)>0:
                 selection.append(( self.windowsByPart[trial_type][ix[0]][0],
                                    self.timeSplitTrials[trial_type][ix[0]],
-                                   self.subjectSplitTrials[trial_type][ix[0]] ))
+                                   self.subjectSplitTrials[trial_type][ix[0]].copy() ))
             # Iterate also through hand0 or avatar0, which contains the other hand..
-            if trial_type.isalpha():
-                selection += self.subject_by_window_spec([windowSpec[specix]],
-                                                             trial_type+'0',
-                                                             precision=precision)
+            #if trial_type.isalpha():
+            #    selection += self.subject_by_window_spec([windowSpec[specix]],
+            #                                                 trial_type+'0',
+            #                                                 precision=precision)
         return selection
 
     def template_by_window_spec(self,windowSpec,trial_type,precision=None):
@@ -456,12 +456,12 @@ class VRTrial3_1(object):
             if len(ix)>0:
                 selection.append(( self.windowsByPart[trial_type][ix[0]][0],
                                    self.timeSplitTrials[trial_type][ix[0]],
-                                   self.templateSplitTrials[trial_type][ix[0]] ))
+                                   self.templateSplitTrials[trial_type][ix[0]].copy() ))
             # Iterate also through hand0 or avatar0, which contains the other hand..
-            if trial_type.isalpha():
-                selection += self.template_by_window_spec([windowSpec[specix]],
-                                                             trial_type+'0',
-                                                             precision=precision)
+            #if trial_type.isalpha():
+            #    selection += self.template_by_window_spec([windowSpec[specix]],
+            #                                                 trial_type+'0',
+            #                                                 precision=precision)
         return selection
 
     def template_by_invisible_dur(self,windowDur,part):
@@ -666,10 +666,10 @@ class VRTrial3_1(object):
                 visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
             startEnd = [visible[0],invisible[-1]]
             
-            # Extract template.
+            # Extract template. Downsample to 30Hz from 60Hz.
             mbV,mbT = extract_motionbuilder_model3(self.modelhandedness[trialno])
             showIx = mbT < (startEnd[1]-startEnd[0]).total_seconds()
-            templateTrial[part+'T'] = mbT[showIx]
+            templateTrial[part+'T'] = mbT[showIx][::2]
             templateTrial[part+'V'] = mbV
             
             # Extract subject from port file.
@@ -680,9 +680,9 @@ class VRTrial3_1(object):
             
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
-                   subjectTrial[part+'T'],
-                   1/30,
-                   use_univariate=True)
+                                                                       subjectTrial[part+'T'],
+                                                                       1/30,
+                                                                       use_univariate=True)
             
             # Separate the different visible trials into separate arrays.
             # Times for when visible/invisible windows start.
@@ -725,7 +725,6 @@ class VRTrial3_1(object):
                 timeix = (subjectTrial[part+'T']<=startendt[1])&(subjectTrial[part+'T']>=startendt[0])
                 t = subjectTrial[part+'T'][timeix]
                 subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
-            
         
         pickle.dump({'templateTrial':templateTrial,
                      'subjectTrial':subjectTrial,
@@ -734,48 +733,6 @@ class VRTrial3_1(object):
                      'subjectSplitTrials':subjectSplitTrials,
                      'windowsByPart':windowsByPart},
                     open('%s/trial_dictionaries.p'%self.dr,'wb'),-1)
-
-    def pickle_phase(self,trial_types=['avatar','avatar0','hand','hand0']):
-        """
-        Calculate bandpass filtered phase and pickle.
-        """
-        from pipeline import pipeline_phase_calc
-        
-        for part in trial_types:
-            nTrials = len(self.windowsByPart[part])  # number of trials for that part
-
-            # Subject.
-            toProcess = []
-            trialNumbers = []
-            for i in xrange(nTrials):
-                # Only run process if we have data points. Some trials are missing data points.
-                # NOTE: At some point the min length should made to correspond to the min window
-                # size in the windowing function for filtering.
-                if len(self.timeSplitTrials[part][i])>501:
-                    trialNumbers.append(i)
-                    toProcess.append( (self.timeSplitTrials[part][i],
-                                       (self.subjectSplitTrials[part][i][:,0],
-                                        self.subjectSplitTrials[part][i][:,1],
-                                        self.subjectSplitTrials[part][i][:,2])) )
-                else:
-                    print "Ignoring %s trial no %d with windowspec (%1.1f,%1.1f)."%(part,i,
-                        self.windowsByPart[part][i][0][0],self.windowsByPart[part][i][0][1])
-            pipeline_phase_calc(trajs=toProcess,dr=self.dr,
-                                file_names=['subject_phase_%s_%d'%(part,i)
-                                            for i in trialNumbers])
-            # Template.
-            toProcess = []
-            trialNumbers = []
-            for i in xrange(nTrials):
-                if len(self.timeSplitTrials[part][i])>501:
-                    trialNumbers.append(i)
-                    toProcess.append( (self.timeSplitTrials[part][i],
-                                       (self.templateSplitTrials[part][i][:,0],
-                                        self.templateSplitTrials[part][i][:,1],
-                                        self.templateSplitTrials[part][i][:,2])) )
-            pipeline_phase_calc(trajs=toProcess,dr=self.dr,
-                                file_names=['template_phase_%s_%d'%(part,i)
-                                            for i in trialNumbers])
 
     def _fetch_windowspec_indices(self,specs,trial_type,precision=None):
         """

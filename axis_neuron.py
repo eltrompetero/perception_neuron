@@ -233,9 +233,8 @@ def group_cols(columns):
 def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
                       leaderdf=None,
                       append=True,
-                      dotruncate=5,
+                      dotruncate=0,
                       remove_hip_drift=True,
-                      usezd=False,
                       read_csv_kwargs={},
                       center_x=False,
                       rotation_angle=False
@@ -260,10 +259,6 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
     dotruncate (float=5)
         Truncate beginning and end of data by this many seconds.
     remove_hip_drift (bool=True)
-    usezd (bool=True)
-        Get initial body orientation from calc file's Zd entry. This seems to not work as well in capturing
-        the 3 dimension of hand movement. I'm not sure why, but I would assume because the orientation between
-        hands and the body is not totally accurate according to Axis Neuron.
     read_csv_kwargs (dict)
         Passed onto pandas.read_csv
     center_x (bool=False)

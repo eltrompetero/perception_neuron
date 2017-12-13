@@ -18,7 +18,7 @@ from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline
 import entropy.entropy as info
 from scipy.signal import fftconvolve
 from misc.utils import unique_rows
-import load,utils
+import data_access,utils
 
 
 

@@ -1,6 +1,6 @@
 # Filtering functions.
 from __future__ import division
-from load import *
+from data_access import *
 import numpy as np
 import multiprocess as mp
 from numpy import fft

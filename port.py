@@ -98,6 +98,7 @@ def _test_forward_timing(nIters=1000):
 def record_AN_port(fname,port,
                    savedr=os.path.expanduser('~')+'/Dropbox/Sync_trials/Data',
                    host=HOST,
+                   buffer_size=8192,
                    start_file='start',
                    stop_file='end'):
     """
@@ -124,7 +125,7 @@ def record_AN_port(fname,port,
         print "Waiting for start..."
         time.sleep(1)
 
-    reader = ANReader(2,range(946),port=port,host=host,port_buffer_size=8000)
+    reader = ANReader(2,range(946),port=port,host=host,port_buffer_size=buffer_size)
     try:
         reader.setup_port()
         while not os.path.isfile('%s/%s'%(savedr,stop_file)):
@@ -136,7 +137,7 @@ def record_AN_port(fname,port,
         reader.sock.close()
         f.close()
 
-def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,fix_file=True,read_csv_kwargs={}):
+def load_AN_port(fname,dr='',time_as_dt=True,n_avatars=1,read_csv_kwargs={}):
     """
     With data from a single individual at this moment.
     
@@ -180,7 +181,7 @@ def read_in_date(t_as_str):
 class ANReader(object):
     def __init__(self,duration,parts_ix,
                  host=HOST,port=PORT,
-                 port_buffer_size=1024,
+                 port_buffer_size=8192,
                  max_buffer_size=1000,
                  recent_buffer_size=180,
                  always_empty_buffer=True,

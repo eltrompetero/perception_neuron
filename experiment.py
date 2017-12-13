@@ -10,8 +10,10 @@ from port import *
 import dill
 from subprocess import call
 
+
+
 class HandSyncExperiment(object):
-    def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001,fs=30):
+    def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001,fs=30,rotation_angle=0):
         """
         Parameters
         ----------
@@ -25,10 +27,13 @@ class HandSyncExperiment(object):
         broadcast_port : int,5001
         fs : int
             Sampling frequency for interpolated velocities.
+        rotation_angle : float
+            Radians by which subject would have to be rotated about z-axis (pointing up) to face along the x-axis.
         """
         self.duration = duration
         self.trialType = trial_type
         self.broadcastPort = broadcast_port
+        self.rotAngle = rotation_angle
 
     def _load_avatar(self):
         """
@@ -216,6 +221,101 @@ class HandSyncExperiment(object):
         print "%s deleted."%fname
         return True
 
+    def run_cal(self,verbose=False):
+        """
+        Run calibration recording. Have subjects stand straight facing direction of motion. Then, have them
+        raise both hands forward while keeping both hands fixed.
+                
+        Parameters
+        ----------
+        verbose : bool,False
+        """
+        from numpy.linalg import norm
+
+        # Setup thread for recording port data.
+        recordThread = threading.Thread(target=record_AN_port,
+                                        args=('an_port_cal.txt',7013),
+                                        kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
+        time.sleep(2)
+        print "Running calibration."
+        recordThread.start()
+
+        # Run calibration for a few seconds to give people a chance to move their hands.
+        with open('start_cal','w') as f:
+            f.write('')
+        time.sleep(5)
+        with open('stop_cal','w') as f:
+            f.write('')
+        
+        time.sleep(.5)
+
+        # Delete signal files.
+        print "Done with calibration."
+        self.delete_file('start_cal')
+        self.delete_file('stop_cal')
+        recordThread.join()
+        time.sleep(2)
+
+        # Run calibration. Load the data and find which direction the user is facing. Extract from that, the
+        # rotation angle needed about the z-axis (pointing up out of the ground) to make the person face the
+        # x-axis.
+        df = load_AN_port('an_port_cal.txt',
+                          time_as_dt=False)
+        # Get xy vector.
+        leftHand = df.iloc[:,left_hand_col_indices()].values[:,:2]
+        rightHand = df.iloc[:,right_hand_col_indices()].values[:,:2]
+        leftSpeed = norm(leftHand,axis=1)
+        rightSpeed = norm(rightHand,axis=1)
+
+        peakSpeedIx = np.argmax(leftSpeed+rightSpeed)
+        peakSpeed = ( leftSpeed+rightSpeed )[peakSpeedIx]
+        # First movement forward should be the first time we cross half of the peak velocity.
+        forwardMovementIx = np.where(np.abs(peakSpeed/2-leftSpeed-rightSpeed)<.4)[0][0]
+
+        # Extract forward motion vector.
+        # First convert velocities into correct coordinate system.
+        leftHand[:,1:] *= -1
+        rightHand[:,1:] *= -1
+        # Angle between vectors and unit x vector.
+        leftVec = leftHand[forwardMovementIx]
+        leftVec /= norm(leftVec)
+        rightVec = rightHand[forwardMovementIx]
+        rightVec /= norm(rightVec)
+
+        avgVec = (leftVec+rightVec)/2
+        avgVec /= norm(avgVec)
+
+        self.rotAngle = -np.arctan2(avgVec[1],avgVec[0])
+        print "Rotation angle to center individual about x-axis is %1.1f degrees."%self.rotAngle
+
+    def run_lf(self,trial_duration):
+        """
+        Run Leader-Follower experiment.
+
+        Parameters
+        ----------
+        trial_duration : float
+            Duration in seconds for which to record data.
+        """
+        suffix = 0
+        while os.path.isfile('an_port_%s.txt'%str(suffix).zfill(2)):
+            suffix += 1
+
+        recordThread = threading.Thread(target=record_AN_port,
+                                        args=('an_port_%s.txt'%str(suffix).zfill(2),7013),
+                                        kwargs={'start_file':'start_lf','stop_file':'end_lf'})
+        with open('start_lf','w') as f:
+            f.write('')
+        recordThread.start()
+
+        time.sleep(trial_duration)
+
+        with open('end_lf','w') as f:
+            f.write('')
+        recordThread.join()
+        self.delete_file('start_lf')
+        self.delete_file('end_lf')
+
     def run_vr(self,
                update_delay=.3,
                initial_window_duration=1.0,initial_vis_fraction=0.5,
@@ -298,8 +398,6 @@ class HandSyncExperiment(object):
         pauseEvent.set()
         self.endEvent = threading.Event()  # Event to be set when end file is written
         
-        self.wait_for_start()
-
         # Open port for communication with UE4 engine. This will send the current coherence value to
         # UE4.
         self.broadcast = DataBroadcaster(self.broadcastPort)
@@ -321,8 +419,8 @@ class HandSyncExperiment(object):
                     
                     if len(v)>=(windowsInIndexUnits):
                         # Put into standard coordinate system (as in paper). Account for reflection symmetry.
-                        v[:] = v[:,[1,0,2]]
-                        v[:,2] *= -1
+                        v[:,1:] *= -1
+                        v[:,:2] = rotate_xy(v[:,:2],self.rotAngle)
 
                         tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
                         avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
@@ -357,8 +455,8 @@ class HandSyncExperiment(object):
                     v,t,tdateHistory = reader.copy_history()
                     # Put output from Axis Neuron into comparable coordinate system accounting for reflection
                     # symmetry.
-                    v[:] = v[:,[1,0,2]]
-                    v[:,2] *= -1
+                    v[:,1:] *= -1
+                    v[:,:2] = rotate_xy(v[:,:2],self.rotAngle)
 
                     tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),zip(self.pause,self.unpause))
                     avv = fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
@@ -480,9 +578,11 @@ class HandSyncExperiment(object):
         dill.dump({'gprmodel':gprmodel,'performance':performance,
                    'pause':self.pause,'unpause':self.unpause,
                    'trialStartTimes':self.trialStartTimes,
-                   'trialEndTimes':self.trialEndTimes},
+                   'trialEndTimes':self.trialEndTimes,
+                   'rotAngle':self.rotAngle},
                   open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
         
+        # Move all files into the left or right directory given by which hand the subject was using.
         for f in ['left_or_right','end','initial_trial_done','run_gpr','start','start_time','this_setting',
                   'next_setting','an_port.txt','end_port_read','gpr.p']:
             if os.path.isfile(f):
@@ -494,29 +594,6 @@ class HandSyncExperiment(object):
         self.broadcast.stopEvent.set()
         self.endEvent.set()
         return
-
-    def run_lf(self,trial_duration):
-        """
-        Run Leader-Follower experiment.
-
-        Parameters
-        ----------
-        trial_duration : float
-            Duration in seconds for which to record data.
-        """
-        suffix = 0
-        while os.path.isfile('an_port_%s.txt'%str(suffix).zfill(2)):
-            suffix += 1
-
-        recordThread = threading.Thread(target=record_AN_port,
-                                        args=('an_port_%s.txt'%str(suffix).zfill(2),7013))
-        recordThread.start()
-
-        time.sleep(trial_duration)
-
-        with open('end','w') as f:
-            f.write('')
-        recordThread.join()
 # end HandSyncExperiment
 
 

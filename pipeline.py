@@ -5,7 +5,7 @@ from __future__ import division
 import pickle
 import numpy as np
 import os
-from load import *
+from data_access import *
 from utils import *
 from filter import *
 from numpy import pi
@@ -755,7 +755,7 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
                                                             window[1])
         return
 
-def extract_motionbuilder_model3(hand):
+def extract_motionbuilder_model3(hand,fname='Eddie_Grid_Model_%s_Anim_Export_Take_001'):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
     exported. Returned data is put into standard global coordinate frame: x-axis is the axis between the two
@@ -771,6 +771,8 @@ def extract_motionbuilder_model3(hand):
     ----------
     hand : str
         Hand of the model.
+    fname : str,'Eddie_Grid_Model_%s_Anim_Export_Take_001'
+        Name of file with %s to replace with handedness.
 
     Returns
     -------
@@ -784,9 +786,9 @@ def extract_motionbuilder_model3(hand):
     from scipy.interpolate import interp1d
     assert hand=='Left' or hand=='Right'
 
-    dr = ( os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/'+
+    dr = ( os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/'+
            'Animations/Eddie_Grid_Model' )
-    fname = 'Eddie_Grid_Model_%s_Anim_Export_Take_001'%hand
+    fname = fname%hand
     
     # Create pickle if it doesn't already exist.
     if not os.path.exists('%s/%s.p'%(dr,fname)):
@@ -798,13 +800,15 @@ def extract_motionbuilder_model3(hand):
     mbT = mbdf['Time'].values.astype(float)
     mbT -= mbT[0]
     mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
-    # Put these in the standard global coordinate system as explained in function description.
     mbV[:,:] = mbV[:,[1,0,2]]
-    mbV[:,1] *= -1
 
-    # Rotate right hand motion file so that avatar faces same direction as with left.
-    if hand=='Right':
+    # Put these in the standard global coordinate system such that avatars are facing +x direction. See Tango
+    # III pg 45.
+    if hand=='Left':
         mbV[:,0] *= -1
+    else:
+        # With right hand, the avatar starts facing the opposite direction so she is already facing the
+        # same direction as the original y-axis.
         mbV[:,1] *= -1
     
     mbV = interp1d(mbT,mbV,axis=0,assume_sorted=True,copy=False)
@@ -887,15 +891,15 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     """
     Take dataframe created from load_AN_port() and pull out the X, V, A data.
 
-    Params:
-    -------
-    df (pd.DataFrame)
-    modelhand (str)
-    rotation_angle (float=0)
+    Parameters
+    ----------
+    df : pd.DataFrame
+    modelhand : str
+    rotation_angle : float,0
         Rotation of raw data about [0,0,1] local z-axis which is pointing into the ground.
 
-    Returns:
-    --------
+    Returns
+    -------
     T,X,V,A
     """
     from datetime import datetime
@@ -913,15 +917,11 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
                                           dotruncate=0,
                                           rotation_angle=rotation_angle)
 
-
     # Put these in the standard global coordinate system.
     for x,v,a in zip(anX,anV,anA):
-        x[:,:] = x[:,[1,0,2]]
-        x[:,2] *= -1
-        v[:,:] = v[:,[1,0,2]]
-        v[:,2] *= -1
-        a[:,:] = a[:,[1,0,2]]
-        a[:,2] *= -1
+        x[:,1:] *= -1
+        v[:,1:] *= -1
+        a[:,1:] *= -1
         
     return anT,anX,anV,anA
 

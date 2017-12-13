@@ -92,6 +92,26 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def rotate_xy(xy,theta):
+    """
+    Apply rotation to xy-vector.
+
+    Parameters
+    ----------
+    xy : ndarray
+        (n_samples,2)
+    theta : float
+        Angle to rotate by in the CCW direction.
+
+    Returns
+    -------
+
+    """
+    return np.array([[np.cos(theta),-np.sin(theta)],
+                    [np.sin(theta),np.cos(theta)]]).dot(xy.T).T
+
+
+
 def window_mutual_info(vel,vis,dt0,dt1,vel1=None,select_vis_start=True):
     """
     Mutual information between visible and invisible portions of window. Right now, this only looks
@@ -1451,3 +1471,13 @@ def train_cal_noise(leaderW,followerW,dv,nTrainSamples=None):
     gpr.fit(trainX,trainY)
     
     return gpr,np.corrcoef(gpr.predict(testX).ravel(),testY.ravel())[0,1]
+
+
+
+# ===== #
+# Tests #
+# ===== #
+def test_rotate_xy():
+    assert np.isclose( rotate_xy(np.array([[0,1],[1,0],[0,-1],[-1,0]]),np.pi/2),
+                       np.array([[-1,0],[0,1],[1,0],[0,-1]]) ).all()
+
