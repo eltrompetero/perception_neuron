@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 import os
 from data_access import *
+from axis_neuron import *
 from utils import *
 from filter import *
 from numpy import pi
@@ -755,7 +756,9 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
                                                             window[1])
         return
 
-def extract_motionbuilder_model3(hand,fname='Eddie_Grid_Model_%s_Anim_Export_Take_001'):
+def extract_motionbuilder_model3(hand,
+                                 fname='Eddie_Grid_Model_%s_Anim_Export_Take_001',
+                                 reverse=False):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
     exported. Returned data is put into standard global coordinate frame: x-axis is the axis between the two
@@ -773,6 +776,8 @@ def extract_motionbuilder_model3(hand,fname='Eddie_Grid_Model_%s_Anim_Export_Tak
         Hand of the model.
     fname : str,'Eddie_Grid_Model_%s_Anim_Export_Take_001'
         Name of file with %s to replace with handedness.
+    reverse : bool,False
+        Read data backwards from end.
 
     Returns
     -------
@@ -801,6 +806,9 @@ def extract_motionbuilder_model3(hand,fname='Eddie_Grid_Model_%s_Anim_Export_Tak
     mbT -= mbT[0]
     mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
     mbV[:,:] = mbV[:,[1,0,2]]
+
+    if reverse:
+        mbV = mbV[::-1]
 
     # Put these in the standard global coordinate system such that avatars are facing +x direction. See Tango
     # III pg 45.
@@ -907,7 +915,7 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     anT = np.array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
     
     # Extract only necessary body part from the dataframe.
-    df = load_calc('',cols='XVA',zd=False,df=df.iloc[:,1:])
+    df = load_calc('',cols='XVA',return_zd=False,df=df.iloc[:,1:])
     if modelhand=='Right':
         _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],
                                           dotruncate=0,

@@ -600,7 +600,7 @@ def match_time(x,t,dt,spline_kwargs={},offset=0,use_univariate=False,
     """
     t = t-t[0]
     t = np.array([t_.total_seconds() for t_ in t])+offset
-    tLin = np.arange(t[-1]/dt)*dt+offset
+    tLin = np.arange((t[-1]-offset)/dt)*dt+offset
     
     if x.ndim==1:
         if use_univariate:

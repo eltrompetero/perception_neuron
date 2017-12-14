@@ -301,12 +301,42 @@ def subject_settings_v3_1(index,return_list=True):
         return output
     return settings,dr
 
+def subject_settings_v3_2(index,return_list=True):
+    """
+    Subject info for experiment v3.2.
+
+    Parameters
+    ----------
+    index : int
+    return_list : bool,True
+
+    Returns
+    -------
+    settings : dict
+    dr : str
+    """
+    settings = [{'person':'Subject01_3_2',
+                 'rotation':[0],
+                 'trials':['avatar']},
+                {'person':'Subject02_3_2',
+                 'rotation':[0],
+                 'trials':['avatar']}
+                ][index]
+    dr = (os.path.expanduser('~')+
+      '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
+    if return_list:
+        output = [settings[k] for k in ['person','rotation']]
+        output.append(dr)
+        return output
+    return settings,dr
+
+
 
 # ------------------ #
 # Class definitions. #
 # ------------------ #
 class VRTrial3_1(object):
-    def __init__(self,person,modelhandedness,rotation,dr,fname='trial_dictionaries.p'):
+    def __init__(self,person,modelhandedness,rotation,dr,fname='trial_dictionaries.p',reverse=False):
         """
         Parameters
         ----------
@@ -342,9 +372,12 @@ class VRTrial3_1(object):
         self.modelhandedness = modelhandedness
         self.rotation = rotation
         self.dr = dr
+        self.reverse = reverse
 
         # Load gpr data points.
-        self.gprmodel = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))['gprmodel']
+        savedData = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
+        self.gprmodel = savedData['gprmodel']
+        self.rotAngle = savedData['rotAngle']
         self.trialTypes = ['avatar']
         
         try:
@@ -664,26 +697,29 @@ class VRTrial3_1(object):
                 visible,invisible = load_visibility(part+'_visibility',self.dr)
             else:
                 visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
-            startEnd = [visible[0],invisible[-1]]
+            exptStartEnd = [visible[0],invisible[-1]]
             
             # Extract template. Downsample to 30Hz from 60Hz.
-            mbV,mbT = extract_motionbuilder_model3(self.modelhandedness[trialno])
-            showIx = mbT < (startEnd[1]-startEnd[0]).total_seconds()
+            mbV,mbT = extract_motionbuilder_model3( self.modelhandedness[trialno],
+                                                    reverse=self.reverse )
+            showIx = mbT < (exptStartEnd[1]-exptStartEnd[0]).total_seconds()
             templateTrial[part+'T'] = mbT[showIx][::2]
             templateTrial[part+'V'] = mbV
             
             # Extract subject from port file.
             anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
-                                               rotation_angle=self.rotation[trialno] )
-            showIx = (anT>startEnd[0]) & (anT<startEnd[1])
+                                               rotation_angle=self.rotAngle )
+            showIx = (anT>exptStartEnd[0]) & (anT<exptStartEnd[1])
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
             
             # Put trajectories on the same time samples so we can pipeline our regular computation.
+            offset = (subjectTrial[part+'T'][0]-exptStartEnd[0]).total_seconds()
             subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
                                                                        subjectTrial[part+'T'],
                                                                        1/30,
+                                                                       offset=offset,
                                                                        use_univariate=True)
-            
+
             # Separate the different visible trials into separate arrays.
             # Times for when visible/invisible windows start.
             start = np.zeros((len(visible)+len(invisible)),dtype=object)
@@ -708,8 +744,8 @@ class VRTrial3_1(object):
             timeSplitTrials[part],subjectSplitTrials[part],templateSplitTrials[part] = [],[],[]
             templateSplitTrials[part+'visibility'] = []
             for spec,startendt in windowsByPart[part]:
-                startendt = ((startendt[0]-startEnd[0]).total_seconds(),
-                             (startendt[1]-startEnd[0]).total_seconds())
+                startendt = ((startendt[0]-exptStartEnd[0]).total_seconds(),
+                             (startendt[1]-exptStartEnd[0]).total_seconds())
 
                 # Save time.
                 timeix = (templateTrial[part+'T']<=startendt[1])&(templateTrial[part+'T']>=startendt[0])
@@ -721,9 +757,6 @@ class VRTrial3_1(object):
                 
                 # Save velocities.
                 templateSplitTrials[part].append( templateTrial[part+'V'](t) )
-                # Subject sometimes has cutoff window so must reindex time.
-                timeix = (subjectTrial[part+'T']<=startendt[1])&(subjectTrial[part+'T']>=startendt[0])
-                t = subjectTrial[part+'T'][timeix]
                 subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
         
         pickle.dump({'templateTrial':templateTrial,

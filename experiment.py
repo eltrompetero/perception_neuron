@@ -100,7 +100,7 @@ class HandSyncExperiment(object):
             return avatar,subject
         return avatar
 
-    def load_avatar(self,return_subject=False):
+    def load_avatar(self,reverse_avatar=False,return_subject=False):
         """
         This loads the correct avatar for comparison of performance. The handedness of the subject is read in
         from left_or_right.txt.
@@ -118,9 +118,9 @@ class HandSyncExperiment(object):
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
         if handedness=='left':
-            v,t = extract_motionbuilder_model3('Right')
+            v,t = extract_motionbuilder_model3('Right',reverse=reverse_avatar)
         elif handedness=='right':
-            v,t = extract_motionbuilder_model3('Left')
+            v,t = extract_motionbuilder_model3('Left',reverse=reverse_avatar)
         else:
             print handedness
             raise Exception
@@ -231,6 +231,7 @@ class HandSyncExperiment(object):
         verbose : bool,False
         """
         from numpy.linalg import norm
+        raw_input("Press Enter to continue...")
 
         # Setup thread for recording port data.
         recordThread = threading.Thread(target=record_AN_port,
@@ -322,6 +323,7 @@ class HandSyncExperiment(object):
                min_window_duration=.5,max_window_duration=2,
                min_vis_fraction=.1,max_vis_fraction=1.,
                gpr_mean_prior=np.log(.44/.56),
+               reverse_avatar=False,
                verbose=False):
         """
         Run realtime analysis for experiment.
@@ -387,7 +389,7 @@ class HandSyncExperiment(object):
         else:
             self.avPartsIx = left_hand_col_indices(False)
             self.subPartsIx = right_hand_col_indices(False)
-        avatar = self.load_avatar()  # avatar for comparing velocities
+        avatar = self.load_avatar(reverse_avatar)  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
         self.pause = []  # times when game was paused
@@ -584,7 +586,7 @@ class HandSyncExperiment(object):
         
         # Move all files into the left or right directory given by which hand the subject was using.
         for f in ['left_or_right','end','initial_trial_done','run_gpr','start','start_time','this_setting',
-                  'next_setting','an_port.txt','end_port_read','gpr.p']:
+                  'next_setting','an_port.txt','end_port_read','gpr.p','an_port_cal.txt']:
             if os.path.isfile(f):
                 os.rename(f,'%s/%s'%(handedness,f))
 

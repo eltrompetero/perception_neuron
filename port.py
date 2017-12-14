@@ -559,6 +559,8 @@ class DataBroadcaster(object):
                 if verbose: print '%d bytes sent, %s'%(nBytesSent,self._payload)
                 time.sleep(pause)  # if this pause goes immediately after connect, data transmission
                                    # is interrupted
+        except:
+            print "Connection closed unexpectedly."
         finally:
             sock.close()
         
