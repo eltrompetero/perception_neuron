@@ -377,7 +377,7 @@ class VRTrial3_1(object):
         # Load gpr data points.
         savedData = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
         self.gprmodel = savedData['gprmodel']
-        self.rotAngle = savedData['rotAngle']
+        self.rotAngle = savedData.get('rotAngle',0)
         self.trialTypes = ['avatar']
         
         try:
@@ -714,6 +714,8 @@ class VRTrial3_1(object):
             
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             offset = (subjectTrial[part+'T'][0]-exptStartEnd[0]).total_seconds()
+            if offset>0:
+                print offset
             subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
                                                                        subjectTrial[part+'T'],
                                                                        1/30,
