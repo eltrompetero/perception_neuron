@@ -10,6 +10,43 @@ from utils import *
 import cPickle as pickle
 import os
 
+def extract_AN_port(df,modelhand,rotation_angle=0):
+    """
+    Take dataframe created from load_AN_port() and pull out the X, V, A data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    modelhand : str
+    rotation_angle : float,0
+        Rotation of raw data about [0,0,1] local z-axis which is pointing into the ground.
+
+    Returns
+    -------
+    T,X,V,A
+    """
+    from datetime import datetime
+
+    anT = np.array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
+    
+    # Extract only necessary body part from the dataframe.
+    df = load_calc('',cols='XVA',return_zd=False,df=df.iloc[:,1:])
+    if modelhand=='Right':
+        _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],
+                                          dotruncate=0,
+                                          rotation_angle=rotation_angle)
+    else:
+        _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['RightHand'],
+                                          dotruncate=0,
+                                          rotation_angle=rotation_angle)
+
+    # Put these in the standard global coordinate system.
+    for x,v,a in zip(anX,anV,anA):
+        x[:,1:] *= -1
+        v[:,1:] *= -1
+        a[:,1:] *= -1
+        
+    return anT,anX,anV,anA
 
 def left_hand_col_indices(add_one=True):
     """
@@ -271,7 +308,6 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
     --------
     T,X,V,A
     """
-    from ising.heisenberg import rotate
     skeleton = calc_file_body_parts()
     
     if leaderdf is None:
@@ -309,9 +345,9 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
                 
     if rotation_angle:
         for x,v,a in zip(leaderX,leaderV,leaderA):
-            x[:,:] = rotate(x,np.array([0,0,1.]),rotation_angle)
-            v[:,:] = rotate(v,np.array([0,0,1.]),rotation_angle)
-            a[:,:] = rotate(a,np.array([0,0,1.]),rotation_angle)
+            x[:,:2] = rotate_xy(x[:,:2],rotation_angle)
+            v[:,:2] = rotate_xy(v[:,:2],rotation_angle)
+            a[:,:2] = rotate_xy(a[:,:2],rotation_angle)
 
     # Truncate beginning and ends of data set.
     if dotruncate:

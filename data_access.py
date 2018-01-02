@@ -674,7 +674,8 @@ class VRTrial3_1(object):
         ----------
         disp : bool,False
         """
-        from pipeline import extract_motionbuilder_model3,extract_AN_port
+        from axis_neuron import extract_AN_port
+        from pipeline import extract_motionbuilder_model3
         from utils import match_time
         from ue4 import load_visibility
         import dill as pickle
@@ -709,13 +710,14 @@ class VRTrial3_1(object):
             # Extract subject from port file.
             anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
                                                rotation_angle=self.rotAngle )
-            showIx = (anT>exptStartEnd[0]) & (anT<exptStartEnd[1])
+            showIx = (anT>=exptStartEnd[0]) & (anT<=exptStartEnd[1])
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
             
             # Put trajectories on the same time samples so we can pipeline our regular computation.
+            print subjectTrial[part+'T'][0]
+            print exptStartEnd[0]
             offset = (subjectTrial[part+'T'][0]-exptStartEnd[0]).total_seconds()
-            if offset>0:
-                print offset
+            print offset
             subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
                                                                        subjectTrial[part+'T'],
                                                                        1/30,

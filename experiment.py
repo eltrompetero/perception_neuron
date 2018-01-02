@@ -221,21 +221,30 @@ class HandSyncExperiment(object):
         print "%s deleted."%fname
         return True
 
-    def run_cal(self,verbose=False):
+    def run_cal(self,verbose=False,min_v=0.3):
         """
         Run calibration recording. Have subjects stand straight facing direction of motion. Then, have them
-        raise both hands forward while keeping both hands fixed.
+        jerk both hands forward in parallel lines. Then the respective angles for rotating the vector to be
+        along the x-axis will be calculated for the left and right hands and put into self.rotAngle.
                 
         Parameters
         ----------
         verbose : bool,False
+        min_v : float,0.3
+            Subject must be moving at least this fast (m/s) along the xy-plane for the calibration to
+            register.
         """
         from numpy.linalg import norm
-        raw_input("Press Enter to continue...")
+        counter = 0
+        fname = 'an_port_cal.txt'
+        while os.path.isfile(fname):
+            fname = 'an_port_cal_%s.txt'%(str(counter).zfill(2))
+
+        raw_input("Press Enter to calibrate...")
 
         # Setup thread for recording port data.
         recordThread = threading.Thread(target=record_AN_port,
-                                        args=('an_port_cal.txt',7013),
+                                        args=(fname,7013),
                                         kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
         time.sleep(2)
         print "Running calibration."
@@ -257,37 +266,30 @@ class HandSyncExperiment(object):
         recordThread.join()
         time.sleep(2)
 
-        # Run calibration. Load the data and find which direction the user is facing. Extract from that, the
+        # Load the data and find which direction the user is facing. Extract from that, the
         # rotation angle needed about the z-axis (pointing up out of the ground) to make the person face the
         # x-axis.
-        df = load_AN_port('an_port_cal.txt',
-                          time_as_dt=False)
+        df = load_AN_port(fname,time_as_dt=False)
+
         # Get xy vector.
-        leftHand = df.iloc[:,left_hand_col_indices()].values[:,:2]
-        rightHand = df.iloc[:,right_hand_col_indices()].values[:,:2]
-        leftSpeed = norm(leftHand,axis=1)
-        rightSpeed = norm(rightHand,axis=1)
+        vright = df.iloc[:,right_hand_col_indices()].values[:,:2]
+        vleft = df.iloc[:,left_hand_col_indices()].values[:,:2]
+	vright[:,1] *= -1
+	vleft[:,1] *= -1
+	sright = np.linalg.norm(vright,axis=1)
+	sleft = np.linalg.norm(vleft,axis=1)
 
-        peakSpeedIx = np.argmax(leftSpeed+rightSpeed)
-        peakSpeed = ( leftSpeed+rightSpeed )[peakSpeedIx]
-        # First movement forward should be the first time we cross half of the peak velocity.
-        forwardMovementIx = np.where(np.abs(peakSpeed/2-leftSpeed-rightSpeed)<.4)[0][0]
+	# Extract 80 percentile of speed for analysis (as long as it is at least min_v).
+	ix = (sright>=np.percentile(sright,80)) & (sright>min_v)
+	angleRight = extract_rot_angle(vright[ix])
+	ix = (sleft>=np.percentile(sleft,80)) & (sleft>min_v)
+	angleLeft = extract_rot_angle(vleft[ix])
 
-        # Extract forward motion vector.
-        # First convert velocities into correct coordinate system.
-        leftHand[:,1:] *= -1
-        rightHand[:,1:] *= -1
-        # Angle between vectors and unit x vector.
-        leftVec = leftHand[forwardMovementIx]
-        leftVec /= norm(leftVec)
-        rightVec = rightHand[forwardMovementIx]
-        rightVec /= norm(rightVec)
-
-        avgVec = (leftVec+rightVec)/2
-        avgVec /= norm(avgVec)
-
-        self.rotAngle = -np.arctan2(avgVec[1],avgVec[0])
-        print "Rotation angle to center individual about x-axis is %1.1f degrees."%self.rotAngle
+        self.rotAngle = [-angleLeft,-angleRight]
+        print "Rotation angle to center left hand about x-axis is %1.1f degrees."%(
+                self.rotAngle[0]*180/np.pi)
+        print "Rotation angle to center right hand about x-axis is %1.1f degrees."%(
+                self.rotAngle[1]*180/np.pi)
 
     def run_lf(self,trial_duration):
         """
@@ -382,13 +384,15 @@ class HandSyncExperiment(object):
         with open('%s/this_setting'%DATADR,'w') as f:
             f.write('%1.1f,%1.1f,%s,%s'%(0,0,datetime.now().isoformat(),datetime.now().isoformat()))
         with open('%s/left_or_right'%DATADR,'r') as f:
-            handedness = f.read().rstrip()
+            handedness = f.read().rstrip()  # of subject
         if handedness=='left':
             self.subPartsIx = left_hand_col_indices(False)
             self.avPartsIx = right_hand_col_indices(False)
+            rotAngle = self.rotAngle[0]
         else:
             self.avPartsIx = left_hand_col_indices(False)
             self.subPartsIx = right_hand_col_indices(False)
+            rotAngle = self.rotAngle[1]
         avatar = self.load_avatar(reverse_avatar)  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
@@ -422,7 +426,7 @@ class HandSyncExperiment(object):
                     if len(v)>=(windowsInIndexUnits):
                         # Put into standard coordinate system (as in paper). Account for reflection symmetry.
                         v[:,1:] *= -1
-                        v[:,:2] = rotate_xy(v[:,:2],self.rotAngle)
+                        v[:,:2] = rotate_xy(v[:,:2],rotAngle)
 
                         tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
                         avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
@@ -458,7 +462,7 @@ class HandSyncExperiment(object):
                     # Put output from Axis Neuron into comparable coordinate system accounting for reflection
                     # symmetry.
                     v[:,1:] *= -1
-                    v[:,:2] = rotate_xy(v[:,:2],self.rotAngle)
+                    v[:,:2] = rotate_xy(v[:,:2],rotAngle)
 
                     tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),zip(self.pause,self.unpause))
                     avv = fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
@@ -581,7 +585,7 @@ class HandSyncExperiment(object):
                    'pause':self.pause,'unpause':self.unpause,
                    'trialStartTimes':self.trialStartTimes,
                    'trialEndTimes':self.trialEndTimes,
-                   'rotAngle':self.rotAngle},
+                   'rotAngle':rotAngle},
                   open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
         
         # Move all files into the left or right directory given by which hand the subject was using.
@@ -677,3 +681,42 @@ def ilogistic(x):
 
 def logistic(x):
     return 1/(1+np.exp(-x))
+
+def extract_rot_angle(v,noise_threshold=.4,min_points=10):
+    """
+    Take average normalized vector and use that to calculate rotation angle of vector.  There can be a set of
+    velocities for forward and then backwards movement.  Rotation angle is along direction of initial
+    movement.
+
+    This needs to be negated to get the angle that we need to rotate about the z-axis to get the vector to
+    point along the x-axis.
+    
+    Parameters
+    ----------
+    v : ndarray
+        2d velocity measurements. (n_samples,2)
+    noise_threshold : float,0.4
+        Allowed noise in fluctuation of angle amongst given time points. If it is too 
+        large, an error is thrown.
+    """
+    from misc.angle import mod_angle
+    assert len(v)>min_points
+    vnorm = np.linalg.norm(v,axis=1)[:,None]
+    assert (vnorm>0).all(),"Zero velocities are present."
+    v = v/vnorm
+    
+    # Orient velocities such that velocity vectors when hands are moving back are facing 
+    # in the same direction as when moving forwards.
+    angle = np.arctan2(v[:,1],v[:,0])
+    ix = (abs(mod_angle(angle[0]-angle))>(.5*np.pi)) & (abs(mod_angle(angle[0]-angle))<(1.5*np.pi))
+    assert ix.any(), "Failed to get both forward and backward directions."
+    assert np.diff(ix).sum()==1, "All vectors should point in same direction before and after switch in direction."
+    
+    v[ix] = rotate_xy(v[ix],np.pi)
+    angle = np.arctan2(v[:,1],v[:,0])
+    assert mod_angle(angle[0]-angle[1:]).std()<noise_threshold, "Angle measurements are noisy."
+    
+    v = v.mean(0)
+    v /= np.linalg.norm(v)
+    
+    return np.arctan2(v[1],v[0])

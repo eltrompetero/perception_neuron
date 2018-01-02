@@ -455,8 +455,8 @@ class DTWPerformance(object):
         dist,path = fastdtw(x,y,**self.dwtSettings)
         path = np.vstack(path)
 
-        normx = norm(x[path[:,0]],axis=1)
-        normy = norm(y[path[:,1]],axis=1)
+        normx = norm(x[path[:,0]],axis=1)+np.nextafter(0,1)
+        normy = norm(y[path[:,1]],axis=1)+np.nextafter(0,1)
         # Dot product between the two vectors.
         inner = (x[path[:,0]]*y[path[:,1]]).sum(1) / normx / normy
         # Relative norms.
@@ -504,7 +504,7 @@ class DTWPerformance(object):
 
         # Calculate dot product between the two vectors.
         inner = ( (x[path[:,0]]*y[path[:,1]]).sum(1) / 
-                  (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)) )
+                  (norm(x[path[:,0]],axis=1)*norm(y[path[:,1]],axis=1)+np.nextafter(0,1)) )
         dt = np.diff(path,axis=1) * dt
 
         # Calculate performance metric.
@@ -701,7 +701,8 @@ class GPR(object):
         Parameters
         ----------
         mesh : ndarray
-            Points at which to evaluate GPR. Should be (samples,2).
+            Points at which to evaluate GPR. Should be (samples,2) with first column durations and the second
+            fraction of visible window.
 
         Returns
         -------

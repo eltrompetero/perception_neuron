@@ -894,44 +894,6 @@ def extract_motionbuilder_model(trial_type,visible_start,modelhand):
     mbV[:,:] = mbV[:,[1,0,2]]
     mbV[:,1] *= -1
     return mbT,mbV
-    
-def extract_AN_port(df,modelhand,rotation_angle=0):
-    """
-    Take dataframe created from load_AN_port() and pull out the X, V, A data.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-    modelhand : str
-    rotation_angle : float,0
-        Rotation of raw data about [0,0,1] local z-axis which is pointing into the ground.
-
-    Returns
-    -------
-    T,X,V,A
-    """
-    from datetime import datetime
-
-    anT = np.array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
-    
-    # Extract only necessary body part from the dataframe.
-    df = load_calc('',cols='XVA',return_zd=False,df=df.iloc[:,1:])
-    if modelhand=='Right':
-        _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],
-                                          dotruncate=0,
-                                          rotation_angle=rotation_angle)
-    else:
-        _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['RightHand'],
-                                          dotruncate=0,
-                                          rotation_angle=rotation_angle)
-
-    # Put these in the standard global coordinate system.
-    for x,v,a in zip(anX,anV,anA):
-        x[:,1:] *= -1
-        v[:,1:] *= -1
-        a[:,1:] *= -1
-        
-    return anT,anX,anV,anA
 
 def quick_load(fileix,dt=1/120,negate_x=False,negate_y=False,disp=True):
     """
