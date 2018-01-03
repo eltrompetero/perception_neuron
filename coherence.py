@@ -635,6 +635,7 @@ class GPR(object):
                  GPRKernel = RBF(length_scale=np.array([.5,.1])),
                  alpha = .2,
                  mean_performance=np.log(1),
+                 length_scales=np.array([1.,.2]),
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=1.,fstep=0.1):
         '''
@@ -651,6 +652,10 @@ class GPR(object):
             here. Since the GPR is trained in the logistic space, the offset is given by the logistic offset.
             The mean is automatically accounted for under the hood, so you don't have to worry about adding or
             subtracting it in the interface.
+        length_scales : ndarray
+            (duration_scale,fraction_scale) Remember that duration is the angle about the origin restricted to
+            be between [0,pi] and fraction is the radius. The GPR learns once (r,theta) has been mapped to the
+            Cartesian coordinate system.
         tmin : float,0.5
             minimum window time
         tmax : float,2
@@ -667,6 +672,8 @@ class GPR(object):
         meshPoints : ndarray
             List of grid points (duration,fraction) over which performance was measured.
         '''
+        assert (type(length_scales) is np.ndarray) and len(length_scales)==2
+
         from gaussian_process.regressor import GaussianProcessRegressor
         self.tmin = tmin
         self.tmax = tmax
@@ -675,7 +682,8 @@ class GPR(object):
         self.fmax = fmax
         self.fstep = fstep
         
-        self.kernel = handsync_experiment_kernel(np.array([1.,.2]))
+        self.kernel = self.handsync_experiment_kernel(length_scales)
+        self.alpha = alpha
         
         self.durations = np.zeros(0)
         self.fractions = np.zeros(0)
@@ -690,7 +698,7 @@ class GPR(object):
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
         self.gp = GaussianProcessRegressor(self.kernel,alpha**-2)
-        self.coherence_pred = 0
+        self.coherence_pred = 0  # [-inf,inf]
         self.std_pred = 0
    
     def predict(self,mesh=None):
@@ -770,6 +778,28 @@ class GPR(object):
         
         return next_duration,next_fraction
         
+    def select_contour(self,pstar):
+        """
+        Select the point in the field with mean closest to desired value.
+
+        Parameters
+        ----------
+        pstar : float
+            Performance value around which to choose points. This is in the [-inf,inf] stretched space.
+
+        Returns
+        -------
+        duration : float
+        fraction : float
+        """
+        ix = [np.argmin(np.abs(p-pstar_)) for pstar_ in pstar]
+        return self.durations[ix],self.fractions[ix]
+    
+    @staticmethod
+    def _scale_erf(x,mu,std):
+        from scipy.special import erf
+        return .5 + erf( (x-mu)/std/np.sqrt(2) )/std/2
+
     def update(self,new_coherence,window_dur,vis_fraction):
         '''
         This is called to add new data point to prediction.
@@ -787,17 +817,62 @@ class GPR(object):
         self.predict()
         
         return self.max_uncertainty()
+    
+    @staticmethod
+    def ilogistic(x):
+        return -np.log(1/x-1)
+    
+    @staticmethod
+    def logistic(x):
+        return 1/(1+np.exp(-x))
+
+    def handsync_experiment_kernel(self,length_scales):
+        """
+        Calculates the RBF kernel for one pair of (window_duration,visible_fraction). Specifically for the
+        handsync experiment.
+        
+        Custom kernel converts (duration,fraction) radial coordinate system pair into Cartesian coordinates
+        and then calculates distance to calculate GPR in this space.
+
+        Parameters
+        ----------
+        length_scales : ndarray
+            2 element vector specifying (duration,fraction)
+
+        Returns
+        -------
+        kernel : function
+        """
+        from numpy.linalg import norm
+        assert length_scales[0]>=(self.tmax/np.pi)
+        delta = define_delta(1,width=.00)
+        
+        def kernel(tf0,tf1,length_scales=length_scales):
+            xy0 = np.array([ norm(1-tf0[1])/length_scales[1]*np.cos(tf0[0]/length_scales[0]),
+                             norm(1-tf0[1])/length_scales[1]*np.sin(tf0[0]/length_scales[0]) ])
+            xy1 = np.array([ norm(1-tf1[1])/length_scales[1]*np.cos(tf1[0]/length_scales[0]),
+                             norm(1-tf1[1])/length_scales[1]*np.sin(tf1[0]/length_scales[0]) ])
+
+            return np.exp( -((xy0-xy1)**2).sum() )
+        return kernel
 #end GPR
 
-def handsync_experiment_kernel(length_scales):
+
+
+def define_delta(x,width=0.):
     """
-    Calculates the RBF kernel for one pair of (window_duration,visible_fraction).
-    
-    Custom kernel calculates distance between (0,1) full visibility window and all other windows to be 
-    only the distance between the visibility fractions and doesn't count the window duration.
+    Return delta function or Gaussian approximation with given width.
+
+    Parameters
+    ----------
+    x : float
+        delta(x-y)
+    width : float,0.
+
+    Returns
+    -------
+    function
     """
-    def kernel(x,y,length_scales=length_scales):
-        if x[1]==1 or y[1]==1:  # if visibility fraction is 1
-            return np.exp(-np.sum( ((x[1]-y[1])/length_scales[1])**2 ))
-        return np.exp(-np.sum( ((x-y)/length_scales)**2 ))
-    return kernel
+    if width>0:
+        return lambda xp:np.exp(-(xp-x)**2/2/width**2)
+    return lambda xp:0. if xp!=x else 1.

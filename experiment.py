@@ -236,54 +236,62 @@ class HandSyncExperiment(object):
         """
         from numpy.linalg import norm
         counter = 0
+        calSuccess = False
         fname = 'an_port_cal.txt'
-        while os.path.isfile(fname):
-            fname = 'an_port_cal_%s.txt'%(str(counter).zfill(2))
 
-        raw_input("Press Enter to calibrate...")
+        while not calSuccess:
+            while os.path.isfile(fname):
+                fname = 'an_port_cal_%s.txt'%(str(counter).zfill(2))
+            
+            raw_input("Press Enter to calibrate...")
 
-        # Setup thread for recording port data.
-        recordThread = threading.Thread(target=record_AN_port,
-                                        args=(fname,7013),
-                                        kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
-        time.sleep(2)
-        print "Running calibration."
-        recordThread.start()
+            # Setup thread for recording port data.
+            recordThread = threading.Thread(target=record_AN_port,
+                                            args=(fname,7013),
+                                            kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
+            time.sleep(2)
+            print "Running calibration."
+            recordThread.start()
 
-        # Run calibration for a few seconds to give people a chance to move their hands.
-        with open('start_cal','w') as f:
-            f.write('')
-        time.sleep(5)
-        with open('stop_cal','w') as f:
-            f.write('')
-        
-        time.sleep(.5)
+            # Run calibration for a few seconds to give people a chance to move their hands.
+            with open('start_cal','w') as f:
+                f.write('')
+            time.sleep(5)
+            with open('stop_cal','w') as f:
+                f.write('')
+            
+            time.sleep(.5)
 
-        # Delete signal files.
-        print "Done with calibration."
-        self.delete_file('start_cal')
-        self.delete_file('stop_cal')
-        recordThread.join()
-        time.sleep(2)
+            # Delete signal files.
+            print "Done with calibration."
+            self.delete_file('start_cal')
+            self.delete_file('stop_cal')
+            recordThread.join()
+            time.sleep(2)
 
-        # Load the data and find which direction the user is facing. Extract from that, the
-        # rotation angle needed about the z-axis (pointing up out of the ground) to make the person face the
-        # x-axis.
-        df = load_AN_port(fname,time_as_dt=False)
+            # Load the data and find which direction the user is facing. Extract from that, the
+            # rotation angle needed about the z-axis (pointing up out of the ground) to make the person face the
+            # x-axis.
+            df = load_AN_port(fname,time_as_dt=False)
 
-        # Get xy vector.
-        vright = df.iloc[:,right_hand_col_indices()].values[:,:2]
-        vleft = df.iloc[:,left_hand_col_indices()].values[:,:2]
-	vright[:,1] *= -1
-	vleft[:,1] *= -1
-	sright = np.linalg.norm(vright,axis=1)
-	sleft = np.linalg.norm(vleft,axis=1)
+            # Get xy vector.
+            vright = df.iloc[:,right_hand_col_indices()].values[:,:2]
+            vleft = df.iloc[:,left_hand_col_indices()].values[:,:2]
+            vright[:,1] *= -1
+            vleft[:,1] *= -1
+            sright = np.linalg.norm(vright,axis=1)
+            sleft = np.linalg.norm(vleft,axis=1)
+            
+            try:
+                # Extract 80 percentile of speed for analysis (as long as it is at least min_v).
+                ix = (sright>=np.percentile(sright,80)) & (sright>min_v)
+                angleRight = extract_rot_angle(vright[ix])
+                ix = (sleft>=np.percentile(sleft,80)) & (sleft>min_v)
+                angleLeft = extract_rot_angle(vleft[ix])
 
-	# Extract 80 percentile of speed for analysis (as long as it is at least min_v).
-	ix = (sright>=np.percentile(sright,80)) & (sright>min_v)
-	angleRight = extract_rot_angle(vright[ix])
-	ix = (sleft>=np.percentile(sleft,80)) & (sleft>min_v)
-	angleLeft = extract_rot_angle(vleft[ix])
+                calSuccess = True
+            except AssertionError:
+                print "Retry calibration."
 
         self.rotAngle = [-angleLeft,-angleRight]
         print "Rotation angle to center left hand about x-axis is %1.1f degrees."%(
