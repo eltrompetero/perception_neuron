@@ -9,6 +9,8 @@ import numpy as np
 from scipy.signal import coherence
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
+from warnings import warn
+
 
 
 def precompute_coherence_nulls(v,t0,windowDuration,pool,
@@ -632,10 +634,10 @@ class CoherenceEvaluator(object):
 
 class GPR(object):
     def __init__(self,
-                 GPRKernel = RBF(length_scale=np.array([.5,.1])),
+                 GPRKernel = RBF(length_scale=np.array([1.,1.])),
                  alpha = .2,
                  mean_performance=np.log(1),
-                 length_scales=np.array([1.,.2]),
+                 length_scale=np.array([1.,.2]),
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=1.,fstep=0.1):
         '''
@@ -652,7 +654,7 @@ class GPR(object):
             here. Since the GPR is trained in the logistic space, the offset is given by the logistic offset.
             The mean is automatically accounted for under the hood, so you don't have to worry about adding or
             subtracting it in the interface.
-        length_scales : ndarray
+        length_scale : ndarray
             (duration_scale,fraction_scale) Remember that duration is the angle about the origin restricted to
             be between [0,pi] and fraction is the radius. The GPR learns once (r,theta) has been mapped to the
             Cartesian coordinate system.
@@ -672,7 +674,7 @@ class GPR(object):
         meshPoints : ndarray
             List of grid points (duration,fraction) over which performance was measured.
         '''
-        assert (type(length_scales) is np.ndarray) and len(length_scales)==2
+        assert (type(length_scale) is np.ndarray) and len(length_scale)==2
 
         from gaussian_process.regressor import GaussianProcessRegressor
         self.tmin = tmin
@@ -682,7 +684,8 @@ class GPR(object):
         self.fmax = fmax
         self.fstep = fstep
         
-        self.kernel = self.handsync_experiment_kernel(length_scales)
+        self.length_scale = length_scale
+        self.kernel = self.handsync_experiment_kernel(length_scale)
         self.alpha = alpha
         
         self.durations = np.zeros(0)
@@ -845,13 +848,13 @@ class GPR(object):
         """
         from numpy.linalg import norm
         assert length_scales[0]>=(self.tmax/np.pi)
-        delta = define_delta(1,width=.00)
+        delta = define_delta(1,width=.0)
         
         def kernel(tf0,tf1,length_scales=length_scales):
-            xy0 = np.array([ norm(1-tf0[1])/length_scales[1]*np.cos(tf0[0]/length_scales[0]),
-                             norm(1-tf0[1])/length_scales[1]*np.sin(tf0[0]/length_scales[0]) ])
-            xy1 = np.array([ norm(1-tf1[1])/length_scales[1]*np.cos(tf1[0]/length_scales[0]),
-                             norm(1-tf1[1])/length_scales[1]*np.sin(tf1[0]/length_scales[0]) ])
+            xy0 = np.array([ (1-tf0[1])/length_scales[1]*np.cos(tf0[0]/length_scales[0]),
+                             (1-tf0[1])/length_scales[1]*np.sin(tf0[0]/length_scales[0]) ])
+            xy1 = np.array([ (1-tf1[1])/length_scales[1]*np.cos(tf1[0]/length_scales[0]),
+                             (1-tf1[1])/length_scales[1]*np.sin(tf1[0]/length_scales[0]) ])
 
             return np.exp( -((xy0-xy1)**2).sum() )
         return kernel
@@ -876,3 +879,21 @@ def define_delta(x,width=0.):
     if width>0:
         return lambda xp:np.exp(-(xp-x)**2/2/width**2)
     return lambda xp:0. if xp!=x else 1.
+
+def handsync_experiment_kernel(self,length_scales):
+        """
+        For backwards compatibility. See GPR. 
+        """
+        warn("Only for backwards compatibility.")
+        from numpy.linalg import norm
+        delta = define_delta(1,width=.00)
+        
+        def kernel(tf0,tf1,length_scales=length_scales):
+            xy0 = np.array([ (1-tf0[1])/length_scales[1]*np.cos(tf0[0]/length_scales[0]),
+                             (1-tf0[1])/length_scales[1]*np.sin(tf0[0]/length_scales[0]) ])
+            xy1 = np.array([ (1-tf1[1])/length_scales[1]*np.cos(tf1[0]/length_scales[0]),
+                             (1-tf1[1])/length_scales[1]*np.sin(tf1[0]/length_scales[0]) ])
+
+            return np.exp( -((xy0-xy1)**2).sum() )
+        return kernel
+
