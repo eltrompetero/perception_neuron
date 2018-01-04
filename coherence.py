@@ -783,7 +783,7 @@ class GPR(object):
         
         return next_duration,next_fraction
         
-    def select_contour(self,pstar,avoid_points=False):
+    def select_contour(self,pstar,choose_algo='',algo_kwargs={}):
         """
         Select the point in the field with mean closest to desired performance value in the [0,1] space.
 
@@ -793,8 +793,14 @@ class GPR(object):
         ----------
         pstar : ndarray
             Performance value around which to choose points. This is in the [-inf,inf] stretched space.
-        avoid_points : bool,False
-            Do not sample points in self.pointsToAvoid.
+        choose_algo : str,''
+            If 'avoid', do not sample points in self.pointsToAvoid. Typically, this will be a stored list of
+            points already sampled.
+            If 'err', weight choice by the uncertainty. Choose the point that minimize the distance to pstar
+            with max error. First, thresholds points by distance to pstar. Must specify 'threshold' and
+            'std_scale'.
+        algo_kwargs : dict,{}
+            Any keyword args needed by algorithm for choosing the next point.
 
         Returns
         -------
@@ -806,10 +812,10 @@ class GPR(object):
         if type(pstar) is float:
             pstar = np.array([pstar])
         
-        if avoid_points:
+        if choose_algo=='avoid':
             ix = []
             for pstar_ in pstar:
-                sortix = np.argsort(np.abs(self.logistic(self.coherence_pred)-pstar_))
+                sortix = np.argsort( np.abs(self.logistic(self.coherence_pred)-pstar_) )
                 counter = 0
                 while counter<len(sortix):
                     if not any(np.array_equal(self.meshPoints[sortix[counter]],x)
@@ -817,6 +823,17 @@ class GPR(object):
                         ix.append(sortix[counter])
                         counter = len(sortix)
                     counter += 1
+        elif choose_algo=='err':
+            assert not algo_kwargs.get('threshold',None) is None
+            assert not algo_kwargs.get('std_scale',None) is None
+
+            ix = []
+            for pstar_ in pstar:
+                dist = np.abs(self.logistic(self.coherence_pred)-pstar_)
+                thresholdIx = dist<algo_kwargs['threshold']
+                print thresholdIx.sum()
+                dist[thresholdIx==0] += 1e30
+                ix.append( np.argmin(dist-algo_kwargs['std_scale']*self.std_pred) )
         else:
             ix = [np.argmin(np.abs(self.coherence_pred-pstar_)) for pstar_ in pstar]
         return self.meshPoints[ix,0],self.meshPoints[ix,1]
