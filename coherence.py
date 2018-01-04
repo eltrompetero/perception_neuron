@@ -703,6 +703,8 @@ class GPR(object):
         self.gp = GaussianProcessRegressor(self.kernel,alpha**-2)
         self.coherence_pred = 0  # [-inf,inf]
         self.std_pred = 0
+
+        self.pointsToAvoid = []
    
     def predict(self,mesh=None):
         '''
@@ -781,22 +783,43 @@ class GPR(object):
         
         return next_duration,next_fraction
         
-    def select_contour(self,pstar):
+    def select_contour(self,pstar,avoid_points=False):
         """
-        Select the point in the field with mean closest to desired value.
+        Select the point in the field with mean closest to desired performance value in the [0,1] space.
+
+        Option to avoid points so that we don't pick the same points over and over again.
 
         Parameters
         ----------
-        pstar : float
+        pstar : ndarray
             Performance value around which to choose points. This is in the [-inf,inf] stretched space.
+        avoid_points : bool,False
+            Do not sample points in self.pointsToAvoid.
 
         Returns
         -------
         duration : float
         fraction : float
         """
-        ix = [np.argmin(np.abs(p-pstar_)) for pstar_ in pstar]
-        return self.durations[ix],self.fractions[ix]
+        if type(pstar) is int:
+            pstar = float(pstar)
+        if type(pstar) is float:
+            pstar = np.array([pstar])
+        
+        if avoid_points:
+            ix = []
+            for pstar_ in pstar:
+                sortix = np.argsort(np.abs(self.logistic(self.coherence_pred)-pstar_))
+                counter = 0
+                while counter<len(sortix):
+                    if not any(np.array_equal(self.meshPoints[sortix[counter]],x)
+                               for x in self.pointsToAvoid):
+                        ix.append(sortix[counter])
+                        counter = len(sortix)
+                    counter += 1
+        else:
+            ix = [np.argmin(np.abs(self.coherence_pred-pstar_)) for pstar_ in pstar]
+        return self.meshPoints[ix,0],self.meshPoints[ix,1]
     
     @staticmethod
     def _scale_erf(x,mu,std):
@@ -818,8 +841,6 @@ class GPR(object):
         self.durations = np.append(self.durations,window_dur)
         
         self.predict()
-        
-        return self.max_uncertainty()
     
     @staticmethod
     def ilogistic(x):
