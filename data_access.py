@@ -10,204 +10,6 @@ from utils import *
 import os
 import cPickle as pickle
 
-def get_fnames():
-    return ['Eddie L Caeli F March',
-          'Eddie F Caeli L March',
-          'Eddie J Caeli J Tango',
-          'Eddie F Caeli L Tango',
-          'Eddie L Caeli F Tango',
-          'Caeli (L) Vincent (F) March',
-          'Caeli (F) Vincent (L) March',
-          'Caeli (L) Vincent (F) Tango',
-          'Caeli (F) Vincent (L) Tango',
-          'Caeli (J) Vincent (J) Tango',
-          'Caeli (L) Vincent (F) Hands',
-          'Caeli (F) Vincent (L) Hands',
-          'Caeli (J) Vincent (J) Hands',
-          'Itai (L) Anja (F) March',
-          'Itai (F) Anja (L) March',
-          'Itai (L) Anja (F) Tango',
-          'Itai (F) Anja (L) Tango',
-          'Itai (J) Anja (J) Tango',
-          'Itai (L) Anja (F) Hands',
-          'Itai (F) Anja (L) Hands',
-          'Itai (J) Anja (J) Hands',
-          'Itai (J) Anja (J) Hands_1',
-          'Caeli (J) Eddie (J) Hands Cal',
-          'Caeli (L) Eddie (F) Hands',
-          'Caeli (F) Eddie (L) Hands',
-          'Caeli (J) Eddie (J) Hands',
-          'Caeli (J) Eddie (J) Hands Cal After',
-          'Caeli (J) Eddie (J) Hands Cal1 Blind',
-          'Caeli (L) Eddie (F) Hands Blind',
-          'Caeli (F) Eddie (L) Hands Blind',
-          'Caeli (J) Eddie (J) Hands Cal2 Blind',
-          'Caeli (J) Sam (J) Hands Cal1',
-          'Caeli (L) Sam (F) Hands',
-          'Caeli (F) Sam (L) Hands',
-          'Caeli (J) Sam (J) Hands Cal2',
-          'Caeli (J) Sam (J) Hands',
-          'Caeli (J) Eddie (J) Fine Cal 1',
-          'Caeli (J) Eddie (J) Fine Cal 2',
-          'Caeli (J) Eddie (J) Fine',
-          'Caeli (J) Eddie (J) Fine Cal 3',
-          'Caeli (J) Eddie (J) Fine Cal 4',
-          'Caeli (J) Yunus (J) Cal 1',
-          'Caeli (J) Yunus (J) Cal 2',
-          'Caeli (L) Yunus (F)',
-          'Caeli (J) Yunus (J) Cal 3',
-          'Caeli (J) Yunus (J) Cal 4',
-          'Caeli (F) Yunus (L)',
-          'Caeli (J) Yunus (J) Cal 5',
-          'Caeli (J) Yunus (J) Cal 6',
-          'Caeli (J) Yunus (J)',
-          'Caeli (J) Yunus (J) Cal 7',
-          ('Caeli (J) Eddie (J) Half Occlusion','20170307'),
-          ('Caeli (J) Eddie (J) Full Occlusion','20170307'),
-          ('Caeli (J) Eddie (J) Low Light','20170307'),
-          ('Caeli (L) Eddie (F) Hands Startup Timer','20170310'),
-          ('Caeli (F) Eddie (L) Hands Startup Timer','20170310'),
-          ('Caeli (L) Eddie (F) Hands','20170317'),
-          ('Caeli (F) Eddie (L) Hands','20170317'),
-          ('Caeli (J) Eddie (J) Hands','20170317'),
-          ('Caeli (J) Eddie (J) Hands Half Occlusion','20170317'),
-          ('Caeli (J) Eddie (J) Hands Full Occlusion','20170317'),
-          ('Caeli (J) Eddie (J) Hands Low Light','20170317'),
-          ('Caeli (L) Eddie (F)','20170418'),
-          ('Caeli (F) Eddie (L)','20170418'),
-          ('Caeli (J) Eddie (J)','20170418'),
-          ('Caeli (J) Eddie (J) Right Left Eye Closed','20170418'),
-          ('Caeli (J) Eddie (J) Left Right Eye Closed','20170418'),
-          ('Caeli (J) Eddie (J) Half Occlusion','20170418'),
-          ('Henry (L) Winnie (F)','20170420'),
-          ('Henry (F) Winnie (L)','20170420'),
-          ('Henry (J) Winnie (J)','20170420'),
-          ('Henry (J) Winnie (J) 2','20170420'),
-          ('Henry (J) Winnie (J) Low Light','20170420'),
-          ('Eddie (L) Freya (F)','20170424'),
-          ('Eddie (F) Freya (L)','20170424'),
-          ('Eddie (J) Freya (J)','20170424'),
-          ('Eddie (J) Freya (J) Low Light','20170424')
-          ]
-
-def hand_ix(fileix):
-    """
-    Return the hand that was used for the trial given the trial number. This is returned as the index to
-    bodyparts defined as 
-    bodyparts  = [['RightHand','LeftHand'],
-                  ['LeftHand','RightHand']]
-
-    Params:
-    -------
-    fileix (int)
-    """
-    if type(fileix) is int:
-        fileix = str(fileix)
-    
-    return {'18':1,
-            '19':1,
-            '20':1,
-            '21':1,
-            '23':0,
-            '24':1,
-            '32':0,
-            '33':1,
-            '35':0,
-            '43':0,
-            '46':1,
-            '49':1,
-            '51':1,
-            '52':1,
-            '53':1,
-            '56':0,
-            '57':1,
-            '58':1,
-            '59':1,
-            '60':0,
-            '61':1,
-            '62':1,
-            '63':0,
-            '64':0,
-            '65':1,
-            '68':0,
-            '69':1,
-            '70':1,
-            '71':0,
-            '72':1,
-            '73':0,
-            '74':1,
-            '75':1}.get(fileix,None)
-
-def global_rotation(fileix):
-    """
-    Return the angle that the individuals should be rotated by such that they are facing each other across the
-    x-axis.
-
-    Params:
-    -------
-    fileix (int)
-    """
-    if type(fileix) is int:
-        fileix = str(fileix)
-    
-    return {'43':np.pi/2,
-            '46':np.pi/2,
-            '49':np.pi/2}.get(fileix,0)
-
-
-def get_dr(fname,date=None):
-    """Return directory where files are saved."""
-    from os.path import expanduser
-    homedr = expanduser('~')
-    datadr = 'Dropbox/Documents/Noitom/Axis Neuron/Motion Files'
-
-    if not date is None:
-        return {'20170307':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Occlusion'),
-                '20170310':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie_Startup'),
-                '20170317':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie'),
-                '20170418':'%s/%s/%s_%s'%(homedr,datadr,date,'Caeli_Eddie'),
-                '20170420':'%s/%s/%s_%s'%(homedr,datadr,date,'Henry_Winnie'),
-                '20170424':'%s/%s/%s_%s'%(homedr,datadr,date,'Eddie_Freya')}[date]
-
-    if 'Itai' in fname and 'Anja' in fname:
-        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161205_Itai_Anja/'
-    elif 'Caeli' in fname and 'Vincent' in fname:
-        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20161130_Caeli_Vincent/'
-    elif 'Caeli' in fname and 'Eddie' in fname and 'Startup' in fname:
-        return (expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion '+
-                'Files/20170310_Caeli_Eddie_Startup/')
-    elif 'Caeli' in fname and 'Eddie' in fname and ('Occlusion' in fname or 'Low' in fname):
-        return ( expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion '+
-                 'Files/20170307_Caeli_Eddie_Occlusion/' )
-    elif 'Caeli' in fname and 'Eddie' in fname and 'Blind' in fname:
-        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Eddie/'
-    elif 'Caeli' in fname and 'Eddie' in fname and not 'Fine' in fname:
-        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170124_Caeli_Eddie/'
-    elif 'Caeli' in fname and 'Sam' in fname:
-        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170127_Caeli_Sam/'
-    elif 'Caeli' in fname and 'Eddie' in fname and 'Fine' in fname:
-        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170202_Caeli_Eddie/'
-    elif 'Caeli' in fname and 'Yunus' in fname:
-        return expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/20170203_Caeli_Yunus/'
-    else:
-        raise Exception("Invalid file name.")
-
-def print_files(ix0=0,ix1=None):
-    """
-    Print list of available file names with their indices to make it easy to load them.
-    2017-01-18
-
-    Params:
-    -------
-    ix0 (int=0)
-    ix1 (int=None)
-    """
-    fnames=get_fnames()
-    ix1 = ix1 or len(fnames)
-    fnames = fnames[ix0:ix1]
-    for i,f in enumerate(fnames):
-        print "%d\t%s"%(i+ix0,f)
-
 def subject_settings_v3(index,return_list=True):
     settings = [{'person':'Zimu3',
                   'modelhandedness':['Left','Right','Left','Right'],
@@ -250,8 +52,7 @@ def subject_settings_v3(index,return_list=True):
                   'rotation':[0,0,0,0],
                   'trials':['avatar0','avatar1','hand0','hand1']}
                 ][index]
-    dr = (os.path.expanduser('~')+
-      '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
+    dr = '../data/UE4_Experiments/%s'%settings['person']
     if return_list:
         output = [settings[k] for k in ['person','modelhandedness','rotation']]
         output.append(dr)
@@ -293,8 +94,7 @@ def subject_settings_v3_1(index,return_list=True):
                   'rotation':[0],
                   'trials':['avatar']}
                 ][index]
-    dr = (os.path.expanduser('~')+
-      '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
+    dr = '../data/UE4_Experiments/%s'%settings['person']
     if return_list:
         output = [settings[k] for k in ['person','modelhandedness','rotation']]
         output.append(dr)
@@ -322,8 +122,7 @@ def subject_settings_v3_2(index,return_list=True):
                  'rotation':[0],
                  'trials':['avatar']}
                 ][index]
-    dr = (os.path.expanduser('~')+
-      '/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/%s'%settings['person'])
+    dr = '../data/UE4_Experiments/%s'%settings['person']
     if return_list:
         output = [settings[k] for k in ['person','rotation']]
         output.append(dr)
