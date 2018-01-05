@@ -1,7 +1,7 @@
 # ================================================================================================ # 
 # Module for loading and extracting data from Axis Neuron calculation and UE4 data files.
 #
-# Author: Eddie Lee
+# Author: Edward D. Lee
 # Email: edl56@cornell.edu
 # ================================================================================================ # 
 
@@ -12,7 +12,8 @@ import os
 
 def extract_AN_port(df,modelhand,rotation_angle=0):
     """
-    Take dataframe created from load_AN_port() and pull out the X, V, A data.
+    Take dataframe created from load_AN_port() and pull out the X, V, A data in the standard
+    coordinate system.
 
     Parameters
     ----------
