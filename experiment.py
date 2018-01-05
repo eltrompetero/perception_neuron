@@ -693,8 +693,8 @@ def logistic(x):
 def extract_rot_angle(v,noise_threshold=.4,min_points=10):
     """
     Take average normalized vector and use that to calculate rotation angle of vector.  There can be a set of
-    velocities for forward and then backwards movement.  Rotation angle is along direction of initial
-    movement.
+    velocities for forward and then backwards movement that are both used to get a better approximation of the
+    direction of motion  Rotation angle is along direction of initial movement.
 
     This needs to be negated to get the angle that we need to rotate about the z-axis to get the vector to
     point along the x-axis.
@@ -706,24 +706,31 @@ def extract_rot_angle(v,noise_threshold=.4,min_points=10):
     noise_threshold : float,0.4
         Allowed noise in fluctuation of angle amongst given time points. If it is too 
         large, an error is thrown.
+
+    Returns
+    -------
+    rotAngle : float
+        Angle of initial velocity.
     """
     from misc.angle import mod_angle
     assert len(v)>min_points
     vnorm = np.linalg.norm(v,axis=1)[:,None]
-    assert (vnorm>0).all(),"Zero velocities are present."
+    assert (vnorm>0).all(),"Zero velocities not allowed."
     v = v/vnorm
     
     # Orient velocities such that velocity vectors when hands are moving back are facing 
     # in the same direction as when moving forwards.
     angle = np.arctan2(v[:,1],v[:,0])
-    ix = (abs(mod_angle(angle[0]-angle))>(.5*np.pi)) & (abs(mod_angle(angle[0]-angle))<(1.5*np.pi))
+    ix = np.abs(mod_angle(angle[0]-angle)) > (.5*np.pi)
     assert ix.any(), "Failed to get both forward and backward directions."
     assert np.diff(ix).sum()==1, "All vectors should point in same direction before and after switch in direction."
     
+    # Check noise by looking at spread of angle.
     v[ix] = rotate_xy(v[ix],np.pi)
     angle = np.arctan2(v[:,1],v[:,0])
     assert mod_angle(angle[0]-angle[1:]).std()<noise_threshold, "Angle measurements are noisy."
     
+    # Calculate final value by averaging across vectors.
     v = v.mean(0)
     v /= np.linalg.norm(v)
     
