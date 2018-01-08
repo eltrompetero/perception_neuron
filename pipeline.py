@@ -791,7 +791,7 @@ def extract_motionbuilder_model3(hand,
     from scipy.interpolate import interp1d
     assert hand=='Left' or hand=='Right'
 
-    dr = ( os.path.expanduser('~')+'/Dropbox/Documents/Noitom/Axis Neuron/Motion Files/UE4_Experiments/'+
+    dr = ( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
            'Animations/Eddie_Grid_Model' )
     fname = fname%hand
     

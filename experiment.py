@@ -446,7 +446,7 @@ class HandSyncExperiment(object):
                         avv[:,1] *= -1
                         
                         # Calculate performance metric.
-                        performance.append( realTimePerfEval.raw(v,avv,dt=1/30) )
+                        performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
 
                         # Update performance.
                         self.broadcast.update_payload('%1.2f'%performance[-1])
@@ -486,13 +486,15 @@ class HandSyncExperiment(object):
                     thisDuration,thisFraction = self.read_this_setting()
                     
                     # Get subject performance ignoring the first few seconds of performance.
-                    perf = gprPerfEval.time_average( avv[75:],v[75:],dt=1/30 )
+                    perf = gprPerfEval.time_average( avv[75:,1:],v[75:,1:],dt=1/30 )
                     
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
-                        nextDuration,nextFraction = gprmodel.update( ilogistic(perf),0.,1. )
+                        gprmodel.update( ilogistic(perf),0.,1. )
+                        nextDuration,nextFraction = gprmodel.max_uncertainty()
                     else:
-                        nextDuration,nextFraction = gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
+                        gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
+                        nextDuration,nextFraction = gprmodel.max_uncertainty()
                     if verbose:
                         #print call("ls --time-style='+%d-%m-%Y %H:%M:%S' -l this_setting",shell=True)
                         print "thisDuration: %1.1f\tthisFraction: %1.1f"%(thisDuration,thisFraction)
