@@ -221,7 +221,7 @@ class HandSyncExperiment(object):
         print "%s deleted."%fname
         return True
 
-    def run_cal(self,verbose=False,min_v=0.3):
+    def run_cal(self,verbose=False,min_v=0.3,pause_before_run=0.):
         """
         Run calibration recording. Have subjects stand straight facing direction of motion. Then, have them
         jerk both hands forward in parallel lines. Then the respective angles for rotating the vector to be
@@ -233,6 +233,8 @@ class HandSyncExperiment(object):
         min_v : float,0.3
             Subject must be moving at least this fast (m/s) along the xy-plane for the calibration to
             register.
+        pause_before_run: float,0.
+            Number of seconds to wait before running. Used for debugging.
         """
         from numpy.linalg import norm
         counter = 0
@@ -249,7 +251,8 @@ class HandSyncExperiment(object):
             recordThread = threading.Thread(target=record_AN_port,
                                             args=(fname,7013),
                                             kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
-            time.sleep(2)
+            time.sleep(pause_before_run)
+
             print "Running calibration."
             recordThread.start()
 
