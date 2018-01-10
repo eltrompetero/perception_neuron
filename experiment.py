@@ -401,8 +401,8 @@ class HandSyncExperiment(object):
             self.avPartsIx = right_hand_col_indices(False)
             rotAngle = self.rotAngle[0]
         else:
-            self.avPartsIx = left_hand_col_indices(False)
             self.subPartsIx = right_hand_col_indices(False)
+            self.avPartsIx = left_hand_col_indices(False)
             rotAngle = self.rotAngle[1]
         avatar = self.load_avatar(reverse_avatar)  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
@@ -443,7 +443,7 @@ class HandSyncExperiment(object):
                         avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
                         # Template avatar motion has been modified to account for reflection symmetry of left
                         # and right hand motions.
-                        avv[:,1] *= -1
+                        #avv[:,1] *= -1
                         
                         # Calculate performance metric.
                         performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
@@ -475,11 +475,12 @@ class HandSyncExperiment(object):
                     v[:,1:] *= -1
                     v[:,:2] = rotate_xy(v[:,:2],rotAngle)
 
-                    tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),zip(self.pause,self.unpause))
+                    tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),
+                                                            zip(self.pause,self.unpause))
                     avv = fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
-                    # Template avatar motion has been modified to account for reflection symmetry of left
-                    # and right hand motions.
-                    avv[:,1] *= -1
+                    # Template avatar motion has been modified to account for reflection symmetry of left and
+                    # right hand motions.
+                    #avv[:,1] *= -1
 
                     # Try to open and read. Sometimes there is a delay in accessibility because
                     # the file is being written.
@@ -531,7 +532,7 @@ class HandSyncExperiment(object):
                       port=7011,
                       verbose=True if verbose=='detailed' else False,
                       port_buffer_size=8192,
-                      recent_buffer_size=self.duration*60) as reader:
+                      recent_buffer_size=self.duration*30) as reader:
             
             updateBroadcastThread = threading.Thread(target=update_broadcaster,
                                                      args=(reader,self.updateBroadcastEvent))

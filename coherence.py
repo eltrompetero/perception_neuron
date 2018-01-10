@@ -831,7 +831,6 @@ class GPR(object):
             for pstar_ in pstar:
                 dist = np.abs(self.logistic(self.coherence_pred)-pstar_)
                 thresholdIx = dist<algo_kwargs['threshold']
-                print thresholdIx.sum()
                 dist[thresholdIx==0] += 1e30
                 ix.append( np.argmin(dist-algo_kwargs['std_scale']*self.std_pred) )
         else:

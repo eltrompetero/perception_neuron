@@ -129,6 +129,36 @@ def subject_settings_v3_2(index,return_list=True):
         return output
     return settings,dr
 
+def subject_settings_v3_3(index,hand,return_list=True):
+    """
+    Subject info for experiment v3.3.
+    2018-01-10
+
+    Parameters
+    ----------
+    index : int
+    hand : str
+        Subject hand used.
+    return_list : bool,True
+
+    Returns
+    -------
+    settings : dict
+    dr : str
+    """
+    settings = [{'person':'Subject01_3_3',
+                 'trials':['avatar']},
+                {'person':'Subject02_3_3',
+                 'trials':['avatar']}
+                ][index]
+    dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
+    rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+
+    if return_list:
+        output = [settings['person'],dr,rotAngle]
+        return output
+    return settings,dr
+
 
 
 # ------------------ #
@@ -146,13 +176,13 @@ class VRTrial3_1(object):
 
         Members
         -------
-        person
-        modelhandedness
-        rotation
-        dr
-        subjectTrial (dict)
+        person : str
+        modelhandedness : list of str
+        rotation : float
+        dr : str
+        subjectTrial : dict
             Full Axis Neuron trial data labeled by part+'T' part+'V'.
-        templateTrial (dict)
+        templateTrial : dict
             Full MotionBuilder trial data labeled by part+'T' part+'V'.
         timeSplitTrials
         subjectSplitTrials
@@ -176,7 +206,6 @@ class VRTrial3_1(object):
         # Load gpr data points.
         savedData = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
         self.gprmodel = savedData['gprmodel']
-        self.rotAngle = savedData.get('rotAngle',0)
         self.trialTypes = ['avatar']
         
         try:
@@ -508,7 +537,7 @@ class VRTrial3_1(object):
             
             # Extract subject from port file.
             anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
-                                               rotation_angle=self.rotAngle )
+                                               rotation_angle=self.rotation )
             showIx = (anT>=exptStartEnd[0]) & (anT<=exptStartEnd[1])
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
             
