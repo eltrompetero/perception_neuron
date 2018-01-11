@@ -30,6 +30,8 @@ class HandSyncExperiment(object):
         rotation_angle : float
             Radians by which subject would have to be rotated about z-axis (pointing up) to face along the x-axis.
         """
+        from shutil import rmtree
+
         self.duration = duration
         self.trialType = trial_type
         self.broadcastPort = broadcast_port
@@ -45,7 +47,7 @@ class HandSyncExperiment(object):
                     try:
                         os.remove(f)
                     except OSError:
-                        os.removedirs(f)
+                        rmtree(f)
             else:
                 raise Exception("There are files in current directory.")
 
@@ -435,7 +437,7 @@ class HandSyncExperiment(object):
         self.broadcast = DataBroadcaster(self.broadcastPort)
         self.broadcast.update_payload('-1.0')
         broadcastThread = threading.Thread(target=self.broadcast.broadcast,
-                                           kwargs={'pause':.2,'verbose':True if verbose=='detailed' else False})
+                   kwargs={'pause':.2,'verbose':True if verbose=='detailed' else False})
         broadcastThread.start()
 
         # Setup thread for recording port data.
@@ -541,7 +543,7 @@ class HandSyncExperiment(object):
                       port=7011,
                       verbose=True if verbose=='detailed' else False,
                       port_buffer_size=8192,
-                      recent_buffer_size=self.duration*60) as reader:
+                      recent_buffer_size=(self.duration+1)*30) as reader:
             
             updateBroadcastThread = threading.Thread(target=update_broadcaster,
                                                      args=(reader,self.updateBroadcastEvent))
