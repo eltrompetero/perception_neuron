@@ -116,7 +116,7 @@ class HandSyncExperiment(object):
             return avatar,subject
         return avatar
 
-    def load_avatar(self,reverse_avatar=False,return_subject=False):
+    def load_avatar(self,reverse_time=False,return_subject=False):
         """
         This loads the correct avatar for comparison of performance. The handedness of the subject is read in
         from left_or_right.txt.
@@ -134,9 +134,9 @@ class HandSyncExperiment(object):
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
         if handedness=='left':
-            v,t = extract_motionbuilder_model3('Right',reverse_time=reverse_avatar)
+            v,t = extract_motionbuilder_model3('Right',reverse_time=reverse_time)
         elif handedness=='right':
-            v,t = extract_motionbuilder_model3('Left',reverse_time=reverse_avatar)
+            v,t = extract_motionbuilder_model3('Left',reverse_time=reverse_time)
         else:
             print handedness
             raise Exception
@@ -353,7 +353,7 @@ class HandSyncExperiment(object):
                min_window_duration=.5,max_window_duration=2,
                min_vis_fraction=.1,max_vis_fraction=1.,
                gpr_mean_prior=np.log(.44/.56),
-               reverse_avatar=False,
+               reverse_time=False,
                verbose=False):
         """
         Run realtime analysis for experiment.
@@ -421,7 +421,7 @@ class HandSyncExperiment(object):
             self.subPartsIx = right_hand_col_indices(False)
             self.avPartsIx = left_hand_col_indices(False)
             rotAngle = self.rotAngle[1]
-        avatar = self.load_avatar(reverse_avatar)  # avatar for comparing velocities
+        avatar = self.load_avatar(reverse_time)  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
         self.pause = []  # times when game was paused
