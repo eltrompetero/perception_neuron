@@ -118,9 +118,9 @@ class HandSyncExperiment(object):
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
         if handedness=='left':
-            v,t = extract_motionbuilder_model3('Right',reverse=reverse_avatar)
+            v,t = extract_motionbuilder_model3('Right',reverse_time=reverse_avatar)
         elif handedness=='right':
-            v,t = extract_motionbuilder_model3('Left',reverse=reverse_avatar)
+            v,t = extract_motionbuilder_model3('Left',reverse_time=reverse_avatar)
         else:
             print handedness
             raise Exception
@@ -441,9 +441,6 @@ class HandSyncExperiment(object):
 
                         tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
                         avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
-                        # Template avatar motion has been modified to account for reflection symmetry of left
-                        # and right hand motions.
-                        #avv[:,1] *= -1
                         
                         # Calculate performance metric.
                         performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
@@ -478,9 +475,6 @@ class HandSyncExperiment(object):
                     tdateHistory,_ = remove_pause_intervals(tdateHistory.tolist(),
                                                             zip(self.pause,self.unpause))
                     avv = fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
-                    # Template avatar motion has been modified to account for reflection symmetry of left and
-                    # right hand motions.
-                    #avv[:,1] *= -1
 
                     # Try to open and read. Sometimes there is a delay in accessibility because
                     # the file is being written.
@@ -603,6 +597,8 @@ class HandSyncExperiment(object):
                   open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
         
         # Move all files into the left or right directory given by which hand the subject was using.
+        if not os.path.isdir(handedness):
+            os.mkdir(handedness)
         for f in ['left_or_right','end','initial_trial_done','run_gpr','start','start_time','this_setting',
                   'next_setting','an_port.txt','end_port_read','gpr.p','an_port_cal.txt']:
             if os.path.isfile(f):

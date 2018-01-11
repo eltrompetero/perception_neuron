@@ -31,6 +31,8 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     anT = np.array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
     
     # Extract only necessary body part from the dataframe.
+    # extract_calc_solo handles reorientation of axes into standard coordinate system and rotation
+    # about xy plane
     df = load_calc('',cols='XVA',return_zd=False,df=df.iloc[:,1:])
     if modelhand=='Right':
         _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],
@@ -41,12 +43,6 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
                                           dotruncate=0,
                                           rotation_angle=rotation_angle)
 
-    # Put these in the standard global coordinate system.
-    for x,v,a in zip(anX,anV,anA):
-        x[:,1:] *= -1
-        v[:,1:] *= -1
-        a[:,1:] *= -1
-        
     return anT,anX,anV,anA
 
 def left_hand_col_indices(add_one=True):
@@ -179,7 +175,7 @@ def calc_file_headers():
 
 def load_calc(fname,cols='V',read_csv_kwargs={},return_zd=True,df=None):
     """
-    Load calculation file output by Axis Neuron. 
+    Load calculation file output by Axis Neuron with cols renamed to be user friendly. 
     Note that z-axis points into the ground by default.
     2016-12-05
 
@@ -268,21 +264,25 @@ def group_cols(columns):
     bodyparts = [c.split('-')[0] for c in columns[::3]]
     return pd.MultiIndex.from_product((bodyparts,['x','y','z'])) 
 
-def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
+def extract_calc_solo(fname='',
+                      dr='',
+                      bodyparts=[],
+                      dt=1/120,
                       leaderdf=None,
                       append=True,
                       dotruncate=0,
                       remove_hip_drift=True,
                       read_csv_kwargs={},
                       center_x=False,
+                      orient_before_rotation=True,
                       rotation_angle=False
                       ):
     """
     Extract specific set of body parts from calculation file with one individual. This is modification of
     extract_calc(). 
 
-    Params:
-    -------
+    Parameters
+    ----------
     fname (str)
     dr (str)
     bodyparts (list of strings)
@@ -291,9 +291,9 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
     leaderdf (pandas.DataFrame=None)
         If given, this will be the data array used to extract data.
     append (bool=True)
-        If true, keep list of data from bodyparts else add all the velocities and acceleration together. This
-        is useful if we're looking at the motion of the feet and want to look at the sum of the motion of the
-        feet (because we don't care about stationary feet).
+        If true, keep list of data from bodyparts else add all the velocities and acceleration
+        together. This is useful if we're looking at the motion of the feet and want to look at the
+        sum of the motion of the feet (because we don't care about stationary feet).
     dotruncate (float=5)
         Truncate beginning and end of data by this many seconds.
     remove_hip_drift (bool=True)
@@ -301,12 +301,15 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
         Passed onto pandas.read_csv
     center_x (bool=False)
         Subtract mean from the mean of each body parts' displacement.
+    orient_before_rotation : bool,True
+        Orient into standard coordinate system before rotating. This means negating the YX axes
+        for PN data.
     rotation_angle (int=False)
         If an integer or float, X, V, A will be rotated about the local [0,0,1] z-axis. Note that this z-axis
         points into the ground.
 
-    Returns:
-    --------
+    Returns
+    -------
     T,X,V,A
     """
     skeleton = calc_file_body_parts()
@@ -343,9 +346,14 @@ def extract_calc_solo(fname='',dr='',bodyparts=[],dt=1/120,
             else:
                 leaderV[0] += leaderdf.values[:,iloc*9+3:iloc*9+6]
                 leaderA[0] += leaderdf.values[:,iloc*9+6:iloc*9+9]
-                
+          
     if rotation_angle:
         for x,v,a in zip(leaderX,leaderV,leaderA):
+            if orient_before_rotation:
+                x[:,1:] *= -1
+                v[:,1:] *= -1
+                a[:,1:] *= -1
+
             x[:,:2] = rotate_xy(x[:,:2],rotation_angle)
             v[:,:2] = rotate_xy(v[:,:2],rotation_angle)
             a[:,:2] = rotate_xy(a[:,:2],rotation_angle)

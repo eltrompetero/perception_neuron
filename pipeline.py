@@ -758,7 +758,7 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
 
 def extract_motionbuilder_model3(hand,
                                  fname='Eddie_Grid_Model_%s_Anim_Export_Take_001',
-                                 reverse=False):
+                                 reverse_time=False):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
     exported. Returned data is put into standard global coordinate frame: x-axis is the axis between the two
@@ -776,7 +776,7 @@ def extract_motionbuilder_model3(hand,
         Hand of the model.
     fname : str,'Eddie_Grid_Model_%s_Anim_Export_Take_001'
         Name of file with %s to replace with handedness.
-    reverse : bool,False
+    reverse_time : bool,False
         Read data backwards from end.
 
     Returns
@@ -807,7 +807,7 @@ def extract_motionbuilder_model3(hand,
     mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
     mbV[:,:] = mbV[:,[1,0,2]]
 
-    if reverse:
+    if reverse_time:
         mbV = mbV[::-1]
 
     # Put these in the standard global coordinate system such that avatars are facing +x direction. See Tango
@@ -818,6 +818,9 @@ def extract_motionbuilder_model3(hand,
         # With right hand, the avatar starts facing the opposite direction so she is already facing the
         # same direction as the original y-axis.
         mbV[:,1] *= -1
+
+    # y-axis needs to be reflected to put into same chirality
+    mbV[:,1] *= -1
     
     mbV = interp1d(mbT,mbV,axis=0,assume_sorted=True,copy=False)
 

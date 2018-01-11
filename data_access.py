@@ -530,7 +530,7 @@ class VRTrial3_1(object):
             
             # Extract template. Downsample to 30Hz from 60Hz.
             mbV,mbT = extract_motionbuilder_model3( self.modelhandedness[trialno],
-                                                    reverse=self.reverse )
+                                                    reverse_time=self.reverse )
             showIx = mbT < (exptStartEnd[1]-exptStartEnd[0]).total_seconds()
             templateTrial[part+'T'] = mbT[showIx][::2]
             templateTrial[part+'V'] = mbV
