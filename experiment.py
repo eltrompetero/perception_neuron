@@ -244,6 +244,7 @@ class HandSyncExperiment(object):
         while not calSuccess:
             while os.path.isfile(fname):
                 fname = 'an_port_cal_%s.txt'%(str(counter).zfill(2))
+                counter+=1
             
             raw_input("Press Enter to calibrate...")
 

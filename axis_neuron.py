@@ -37,11 +37,13 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     if modelhand=='Right':
         _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],
                                           dotruncate=0,
-                                          rotation_angle=rotation_angle)
+                                          rotation_angle=rotation_angle,
+                                          remove_hip_drift=False)
     else:
         _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['RightHand'],
                                           dotruncate=0,
-                                          rotation_angle=rotation_angle)
+                                          rotation_angle=rotation_angle,
+                                          remove_hip_drift=False)
 
     return anT,anX,anV,anA
 
@@ -346,14 +348,15 @@ def extract_calc_solo(fname='',
             else:
                 leaderV[0] += leaderdf.values[:,iloc*9+3:iloc*9+6]
                 leaderA[0] += leaderdf.values[:,iloc*9+6:iloc*9+9]
-          
+
+    if orient_before_rotation:
+         for x,v,a in zip(leaderX,leaderV,leaderA):
+            x[:,1:] *= -1
+            v[:,1:] *= -1
+            a[:,1:] *= -1
+
     if rotation_angle:
         for x,v,a in zip(leaderX,leaderV,leaderA):
-            if orient_before_rotation:
-                x[:,1:] *= -1
-                v[:,1:] *= -1
-                a[:,1:] *= -1
-
             x[:,:2] = rotate_xy(x[:,:2],rotation_angle)
             v[:,:2] = rotate_xy(v[:,:2],rotation_angle)
             a[:,:2] = rotate_xy(a[:,:2],rotation_angle)
