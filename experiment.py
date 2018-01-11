@@ -35,6 +35,20 @@ class HandSyncExperiment(object):
         self.broadcastPort = broadcast_port
         self.rotAngle = rotation_angle
 
+        # Clear current directory.
+        if len(os.listdir('./'))>0:
+            affirm='x'
+            while not affirm in 'yn':
+                affirm=raw_input("Directory is not empty. Delete files? y/[n]")
+            if affirm=='y':
+                for f in os.listdir('./'):
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        os.removedirs(f)
+            else:
+                raise Exception("There are files in current directory.")
+
     def _load_avatar(self):
         """
         This loads the correct avatar for comparison of performance. The handedness of the subject is
@@ -527,7 +541,7 @@ class HandSyncExperiment(object):
                       port=7011,
                       verbose=True if verbose=='detailed' else False,
                       port_buffer_size=8192,
-                      recent_buffer_size=self.duration*30) as reader:
+                      recent_buffer_size=self.duration*60) as reader:
             
             updateBroadcastThread = threading.Thread(target=update_broadcaster,
                                                      args=(reader,self.updateBroadcastEvent))
@@ -537,7 +551,6 @@ class HandSyncExperiment(object):
                     print "Waiting to collect more data...(%d)"%reader.len_history()
                 self.broadcast.update_payload('-1.0')
                 time.sleep(1)
-            #    raise Exception
             updateBroadcastThread.start()
            
             # Start GPR thread.
