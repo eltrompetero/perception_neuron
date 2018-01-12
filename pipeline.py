@@ -819,7 +819,7 @@ def extract_motionbuilder_model3(hand,
         # same direction as the original y-axis.
         mbV[:,1] *= -1
 
-    # y-axis needs to be reflected to put into same chirality
+    # y-axis needs to be reflected to put into same chirality as subject
     mbV[:,1] *= -1
     
     mbV = interp1d(mbT,mbV,axis=0,assume_sorted=True,copy=False)

@@ -123,6 +123,8 @@ class HandSyncExperiment(object):
 
         Parameters
         ----------
+        reverse_time : bool,False
+            If True, play avatar motion backwards in time.
         return_subject : bool,False
 
         Returns
@@ -354,7 +356,8 @@ class HandSyncExperiment(object):
                min_vis_fraction=.1,max_vis_fraction=1.,
                gpr_mean_prior=np.log(.44/.56),
                reverse_time=False,
-               verbose=False):
+               verbose=False,
+               export_realtime_velocities=False):
         """
         Run realtime analysis for experiment.
                 
@@ -369,6 +372,8 @@ class HandSyncExperiment(object):
         min_vis_fraction : float,.1
         max_vis_fraction : float,.9
         verbose : bool,False
+        export_realtime_velocities : bool,False
+            For debugging.
         
         Notes
         -----
@@ -445,7 +450,7 @@ class HandSyncExperiment(object):
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader to fetch data which is declared later.
-        def update_broadcaster(reader,stopEvent):
+        def update_broadcaster(reader,stopEvent,export=export_realtime_velocities):
             try:
                 while not stopEvent.is_set():
                     pauseEvent.wait()
@@ -466,6 +471,13 @@ class HandSyncExperiment(object):
                         self.broadcast.update_payload('%1.2f'%performance[-1])
                         if verbose=='detailed':
                             print "new coherence is %s"%self.broadcast._payload
+
+                        if export:
+                            if not os.path.isdir('realtime_velocities'):
+                                os.mkdir('realtime_velocities')
+                            dill.dump({'v':v,'avv':avv},open('realtime_velocities/%s.p'%str(export).zfill(4),
+                                                             'wb'),-1)
+                            export+=1
                     time.sleep(0.2)
             finally:
                 print "updateBroadcastThread stopped"
@@ -636,7 +648,7 @@ def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
 
     Parameters
     ----------
-    avatar : dict
+    avatar : Interpolation
         This would be the templateTrial loaded in VRTrial.
     t : array of floats or datetime objects
         Stretch of time to return data from. If t0 is specified, this needs to be datetime objects.
@@ -646,7 +658,8 @@ def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
     Returns
     -------
     v : ndarray
-        (n_time,3). Avatar's velocity that matches given time stamps.
+        (n_time,3). Avatar's velocity that matches given time stamps relative to the starting time
+        t0.
     """
     if not t0 is None:
         # Transform dt to time in seconds.

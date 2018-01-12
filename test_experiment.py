@@ -37,3 +37,9 @@ def test_extract_rot_angle():
     v[2:,1] += (np.random.rand(2)*2-1)/10
     angle = extract_rot_angle(v,min_points=0)
     assert np.isclose(angle,-np.pi/2,atol=.1)
+
+def test_logistic():
+    """Test logistic and inverse logistic functions."""
+    r=np.random.normal(size=20)
+    assert np.isclose( ilogistic(logistic(r)),r ).all()
+
