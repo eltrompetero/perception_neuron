@@ -1,5 +1,7 @@
 from __future__ import division
 from experiment import *
+from coherence import DTWPerformance
+
 
 def test_extract_rot_angle():
     """
@@ -43,3 +45,45 @@ def test_logistic():
     r=np.random.normal(size=20)
     assert np.isclose( ilogistic(logistic(r)),r ).all()
 
+def test_remove_pause_intervals():
+    remove_pause_intervals([datetime.now()],[])
+
+def test_update_broadcast():
+    r=np.random.rand(10,3)
+
+    class VirtualReader(object):
+        def copy_recent(self):
+            # Account for coordinate system transform.
+            r_=r.copy()
+            r_[:,1:]*=-1
+            return r_,np.linspace(0,1,10),np.array([datetime.now()]*10)
+        
+    class VirtualBroadcaster(object):
+        def __init__(self):
+            self._payload=0.
+            
+        def update_payload(self,x):
+            return
+        
+    reader=VirtualReader()
+    pauseEvent=threading.Event()
+    pauseEvent.set()
+    stopEvent=threading.Event()
+    perfEval=DTWPerformance()
+    broadcast=VirtualBroadcaster()
+    rotAngle=0.
+    avatar=lambda x: r
+    t0=datetime.now()
+    performance=[]
+
+    experiment=HandSyncExperiment(2,'avatar',check_directory=False)
+    updateBroadcaster=experiment.define_update_broadcaster(reader,stopEvent,pauseEvent,
+                                                           5,perfEval,broadcast,
+                                                           rotAngle,avatar,t0)
+    testThread=threading.Thread(target=updateBroadcaster,args=(performance,))
+
+    testThread.start()
+    time.sleep(1)
+
+    stopEvent.set()
+    assert (np.array(performance)==1).all()

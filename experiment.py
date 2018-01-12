@@ -13,7 +13,13 @@ from subprocess import call
 
 
 class HandSyncExperiment(object):
-    def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001,fs=30,rotation_angle=0):
+    def __init__(self,duration,trial_type,
+                 parts_ix=None,
+                 broadcast_port=5001,
+                 fs=30,
+                 rotation_angle=0,
+                 check_directory=True,
+                 verbose=False):
         """
         Parameters
         ----------
@@ -29,6 +35,7 @@ class HandSyncExperiment(object):
             Sampling frequency for interpolated velocities.
         rotation_angle : float
             Radians by which subject would have to be rotated about z-axis (pointing up) to face along the x-axis.
+        check_directory : bool,True
         """
         from shutil import rmtree
 
@@ -36,9 +43,15 @@ class HandSyncExperiment(object):
         self.trialType = trial_type
         self.broadcastPort = broadcast_port
         self.rotAngle = rotation_angle
+        self.verbose=verbose
+
+        self.pause = []  # times when game was paused
+        self.unpause = []  # times when game was resumed
+        self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
+        self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
 
         # Clear current directory.
-        if len(os.listdir('./'))>0:
+        if len(os.listdir('./'))>0 and check_directory:
             affirm='x'
             while not affirm in 'yn':
                 affirm=raw_input("Directory is not empty. Delete files? y/[n]")
@@ -238,6 +251,56 @@ class HandSyncExperiment(object):
                 time.sleep(dt)
         print "%s deleted."%fname
         return True
+    
+    def define_update_broadcaster(self,reader,stopEvent,pauseEvent,
+                                  windowsInIndexUnits,realTimePerfEval,broadcast,
+                                  rotAngle,avatar,t0):
+        """Define function for real time performance assessment.
+
+        Parameters
+        ----------
+        reader : ANReader
+        stopEvent : threading.Event
+        pauseEvent : threading.Event
+        windowsInIndexUnits : int,
+        realTimePerfEval : DTWPerformance
+        broadcast : DataBroadcaster
+        rotAngle : float
+        avatar : Interpolation
+        t0 : datetime.datetime
+        """
+        def update_broadcaster(performance,export=False):
+            try:
+                while not stopEvent.is_set():
+                    pauseEvent.wait()
+                    v,t,tAsDate = reader.copy_recent()
+                    
+                    if len(v)>=(windowsInIndexUnits):
+                        # Put into standard coordinate system (as in paper). Account for reflection symmetry.
+                        v[:,1:] *= -1
+                        v[:,:2] = rotate_xy(v[:,:2],rotAngle)
+
+                        tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
+                        avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
+                        
+                        # Calculate performance metric.
+                        performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
+
+                        # Update performance.
+                        broadcast.update_payload('%1.2f'%performance[-1])
+                        if self.verbose=='detailed':
+                            print "new coherence is %s"%broadcast._payload
+
+                        if export:
+                            if not os.path.isdir('realtime_velocities'):
+                                os.mkdir('realtime_velocities')
+                            dill.dump({'v':v,'avv':avv},open('realtime_velocities/%s.p'%str(export).zfill(4),
+                                                             'wb'),-1)
+                            export+=1
+                    time.sleep(0.2)
+            finally:
+                print "updateBroadcastThread stopped"
+        return update_broadcaster
 
     def run_cal(self,verbose=False,min_v=0.3,pause_before_run=0.):
         """
@@ -429,10 +492,7 @@ class HandSyncExperiment(object):
         avatar = self.load_avatar(reverse_time)  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
-        self.pause = []  # times when game was paused
-        self.unpause = []  # times when game was resumed
-        self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
-        self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
+        
         pauseEvent = threading.Event()
         pauseEvent.set()
         self.endEvent = threading.Event()  # Event to be set when end file is written
@@ -450,37 +510,6 @@ class HandSyncExperiment(object):
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader to fetch data which is declared later.
-        def update_broadcaster(reader,stopEvent,export=export_realtime_velocities):
-            try:
-                while not stopEvent.is_set():
-                    pauseEvent.wait()
-                    v,t,tAsDate = reader.copy_recent()
-                    
-                    if len(v)>=(windowsInIndexUnits):
-                        # Put into standard coordinate system (as in paper). Account for reflection symmetry.
-                        v[:,1:] *= -1
-                        v[:,:2] = rotate_xy(v[:,:2],rotAngle)
-
-                        tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
-                        avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
-                        
-                        # Calculate performance metric.
-                        performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
-
-                        # Update performance.
-                        self.broadcast.update_payload('%1.2f'%performance[-1])
-                        if verbose=='detailed':
-                            print "new coherence is %s"%self.broadcast._payload
-
-                        if export:
-                            if not os.path.isdir('realtime_velocities'):
-                                os.mkdir('realtime_velocities')
-                            dill.dump({'v':v,'avv':avv},open('realtime_velocities/%s.p'%str(export).zfill(4),
-                                                             'wb'),-1)
-                            export+=1
-                    time.sleep(0.2)
-            finally:
-                print "updateBroadcastThread stopped"
         self.updateBroadcastEvent = threading.Event()
 
         # Define function that will be run in GPR thread. 
@@ -557,8 +586,10 @@ class HandSyncExperiment(object):
                       port_buffer_size=8192,
                       recent_buffer_size=(self.duration+1)*30) as reader:
             
-            updateBroadcastThread = threading.Thread(target=update_broadcaster,
-                                                     args=(reader,self.updateBroadcastEvent))
+            updateBroadcastThread = threading.Thread(
+                    target=self.define_update_broadcaster(reader,self.updateBroadcastEvent,pauseEvent,
+                                                          windowsInIndexUnits,rotAngle,avatar,t0),
+                    args=(performance,export_realtime_velocities,) )
 
             while reader.len_history()<windowsInIndexUnits:
                 if verbose:
@@ -637,7 +668,6 @@ class HandSyncExperiment(object):
         self.updateBroadcastEvent.set()
         self.broadcast.stopEvent.set()
         self.endEvent.set()
-        return
 # end HandSyncExperiment
 
 
