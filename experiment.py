@@ -282,7 +282,6 @@ class HandSyncExperiment(object):
 
                         tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
                         avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
-                        print v[:2],avv[:2]
                         
                         # Calculate performance metric.
                         performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
