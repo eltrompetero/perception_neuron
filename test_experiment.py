@@ -49,14 +49,25 @@ def test_remove_pause_intervals():
     remove_pause_intervals([datetime.now()],[])
 
 def test_update_broadcast():
-    r=np.random.rand(10,3)
+    """Generate fake velocity data set. Check that performance evaluation is able to match up the avatar and
+    subject velocities and do the evaluation. Since the trajectories are the same, performance should be 1
+    within numerical precision.
+    """
+    t=np.arange(100)/30
+    r=interp1d(t,np.vstack((np.zeros((10,3)),
+                 np.random.rand(10,3),
+                 np.zeros((80,3)))),axis=0)
+    t0=datetime.now()
 
     class VirtualReader(object):
         def copy_recent(self):
             # Account for coordinate system transform.
-            r_=r.copy()
+            r_=r(np.arange(10,20)/30)
             r_[:,1:]*=-1
-            return r_,np.linspace(0,1,10),np.array([datetime.now()]*10)
+            t=t0
+            return ( r_,
+                    np.linspace(0,1,10),
+                    np.array([t0+timedelta(seconds=(i+10)/30) for i in range(10)]) )
         
     class VirtualBroadcaster(object):
         def __init__(self):
@@ -72,8 +83,7 @@ def test_update_broadcast():
     perfEval=DTWPerformance()
     broadcast=VirtualBroadcaster()
     rotAngle=0.
-    avatar=lambda x: r
-    t0=datetime.now()
+    avatar=lambda x: r(x)
     performance=[]
 
     experiment=HandSyncExperiment(2,'avatar',check_directory=False)
@@ -86,4 +96,4 @@ def test_update_broadcast():
     time.sleep(1)
 
     stopEvent.set()
-    assert (np.array(performance)==1).all()
+    assert (np.array(performance)>.99).all()
