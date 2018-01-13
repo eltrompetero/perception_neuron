@@ -53,6 +53,7 @@ def test_update_broadcast():
     subject velocities and do the evaluation. Since the trajectories are the same, performance should be 1
     within numerical precision.
     """
+    # Generate trajecotry.
     t=np.arange(100)/30
     r=interp1d(t,np.vstack((np.zeros((10,3)),
                  np.random.rand(10,3),
@@ -85,7 +86,8 @@ def test_update_broadcast():
     rotAngle=0.
     avatar=lambda x: r(x)
     performance=[]
-
+    
+    # Run in experiment.
     experiment=HandSyncExperiment(2,'avatar',check_directory=False)
     updateBroadcaster=experiment.define_update_broadcaster(reader,stopEvent,pauseEvent,
                                                            5,perfEval,broadcast,
