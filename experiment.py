@@ -37,8 +37,6 @@ class HandSyncExperiment(object):
             Radians by which subject would have to be rotated about z-axis (pointing up) to face along the x-axis.
         check_directory : bool,True
         """
-        from shutil import rmtree
-
         self.duration = duration
         self.trialType = trial_type
         self.broadcastPort = broadcast_port
@@ -50,19 +48,41 @@ class HandSyncExperiment(object):
         self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
         self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
 
+        self.anPort=7013  # port at which to received AN calculation broadcast
+
+        # Check that data is being broadcast on anPort.
+        self._check_an_port() 
+
         # Clear current directory.
         if len(os.listdir('./'))>0 and check_directory:
-            affirm='x'
-            while not affirm in 'yn':
-                affirm=raw_input("Directory is not empty. Delete files? y/[n]")
-            if affirm=='y':
-                for f in os.listdir('./'):
-                    try:
-                        os.remove(f)
-                    except OSError:
-                        rmtree(f)
-            else:
-                raise Exception("There are files in current directory.")
+            self._clear_cd()
+
+    def _clear_cd(self):
+        from shutil import rmtree
+        affirm='x'
+        while not affirm in 'yn':
+            affirm=raw_input("Directory is not empty. Delete files? y/[n]")
+        if affirm=='y':
+            for f in os.listdir('./'):
+                try:
+                    os.remove(f)
+                except OSError:
+                    rmtree(f)
+        else:
+            raise Exception("There are files in current directory.")
+    
+    def _check_an_port(self):
+        import socket
+        import select
+        try:
+            listenSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            listenSock.setblocking(0)
+            listenSock.bind(('127.0.0.1',self.anPort))
+            ready = select.select([listenSock], [], [], 1)
+            if not ready[0]:
+                raise Exception("No data is being broadcast on port.")
+        finally:
+            listenSock.close()
 
     def _load_avatar(self):
         """
@@ -331,7 +351,7 @@ class HandSyncExperiment(object):
 
             # Setup thread for recording port data.
             recordThread = threading.Thread(target=record_AN_port,
-                                            args=(fname,7013),
+                                            args=(fname,self.anPort),
                                             kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
             time.sleep(pause_before_run)
 
@@ -398,7 +418,7 @@ class HandSyncExperiment(object):
             suffix += 1
 
         recordThread = threading.Thread(target=record_AN_port,
-                                        args=('an_port_%s.txt'%str(suffix).zfill(2),7013),
+                                        args=('an_port_%s.txt'%str(suffix).zfill(2),self.anPort),
                                         kwargs={'start_file':'start_lf','stop_file':'end_lf'})
         with open('start_lf','w') as f:
             f.write('')
@@ -447,7 +467,7 @@ class HandSyncExperiment(object):
         1. updateBroadcastThread: assess subject's performance relative to the avatar and
             update performance value
         2. broadcastThread: broadcast subject's performance to port 5001
-        3. recordThread: record AN output from UDP rebroadcast @ 7013
+        3. recordThread: record AN output from UDP rebroadcast @ self.anPort
         
         Thread communication happens through members that are updated using thread locks.
         
@@ -506,7 +526,7 @@ class HandSyncExperiment(object):
         broadcastThread.start()
 
         # Setup thread for recording port data.
-        recordThread = threading.Thread(target=record_AN_port,args=('an_port.txt',7013))
+        recordThread = threading.Thread(target=record_AN_port,args=('an_port.txt',self.anPort))
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader to fetch data which is declared later.
@@ -588,7 +608,8 @@ class HandSyncExperiment(object):
             
             updateBroadcastThread = threading.Thread(
                     target=self.define_update_broadcaster(reader,self.updateBroadcastEvent,pauseEvent,
-                                                          windowsInIndexUnits,rotAngle,avatar,t0),
+                                                      windowsInIndexUnits,realTimePerfEval,self.broadcast,
+                                                      rotAngle,avatar,t0),
                     args=(performance,export_realtime_velocities,) )
 
             while reader.len_history()<windowsInIndexUnits:
