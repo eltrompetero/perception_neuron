@@ -1,5 +1,7 @@
 from __future__ import division
 from experiment import *
+from coherence import DTWPerformance
+
 
 def test_extract_rot_angle():
     """
@@ -43,3 +45,57 @@ def test_logistic():
     r=np.random.normal(size=20)
     assert np.isclose( ilogistic(logistic(r)),r ).all()
 
+def test_remove_pause_intervals():
+    remove_pause_intervals([datetime.now()],[])
+
+def test_update_broadcast():
+    """Generate fake velocity data set. Check that performance evaluation is able to match up the avatar and
+    subject velocities and do the evaluation. Since the trajectories are the same, performance should be 1
+    within numerical precision.
+    """
+    # Generate trajecotry.
+    t=np.arange(100)/30
+    r=interp1d(t,np.vstack((np.zeros((10,3)),
+                 np.random.rand(10,3),
+                 np.zeros((80,3)))),axis=0)
+    t0=datetime.now()
+
+    class VirtualReader(object):
+        def copy_recent(self):
+            # Account for coordinate system transform.
+            r_=r(np.arange(10,20)/30)
+            r_[:,1:]*=-1
+            t=t0
+            return ( r_,
+                    np.linspace(0,1,10),
+                    np.array([t0+timedelta(seconds=(i+10)/30) for i in range(10)]) )
+        
+    class VirtualBroadcaster(object):
+        def __init__(self):
+            self._payload=0.
+            
+        def update_payload(self,x):
+            return
+        
+    reader=VirtualReader()
+    pauseEvent=threading.Event()
+    pauseEvent.set()
+    stopEvent=threading.Event()
+    perfEval=DTWPerformance()
+    broadcast=VirtualBroadcaster()
+    rotAngle=0.
+    avatar=lambda x: r(x)
+    performance=[]
+    
+    # Run in experiment.
+    experiment=HandSyncExperiment(2,'avatar',check_directory=False)
+    updateBroadcaster=experiment.define_update_broadcaster(reader,stopEvent,pauseEvent,
+                                                           5,perfEval,broadcast,
+                                                           rotAngle,avatar,t0)
+    testThread=threading.Thread(target=updateBroadcaster,args=(performance,))
+
+    testThread.start()
+    time.sleep(1)
+
+    stopEvent.set()
+    assert (np.array(performance)>.99).all()

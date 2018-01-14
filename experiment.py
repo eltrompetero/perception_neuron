@@ -13,7 +13,13 @@ from subprocess import call
 
 
 class HandSyncExperiment(object):
-    def __init__(self,duration,trial_type,parts_ix=None,broadcast_port=5001,fs=30,rotation_angle=0):
+    def __init__(self,duration,trial_type,
+                 parts_ix=None,
+                 broadcast_port=5001,
+                 fs=30,
+                 rotation_angle=0,
+                 check_directory=True,
+                 verbose=False):
         """
         Parameters
         ----------
@@ -29,27 +35,54 @@ class HandSyncExperiment(object):
             Sampling frequency for interpolated velocities.
         rotation_angle : float
             Radians by which subject would have to be rotated about z-axis (pointing up) to face along the x-axis.
+        check_directory : bool,True
         """
-        from shutil import rmtree
-
         self.duration = duration
         self.trialType = trial_type
         self.broadcastPort = broadcast_port
         self.rotAngle = rotation_angle
+        self.verbose=verbose
+
+        self.pause = []  # times when game was paused
+        self.unpause = []  # times when game was resumed
+        self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
+        self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
+
+        self.anPort=7013  # port at which to receive AN calculation broadcast
+
+        # Check that data is being broadcast on anPort.
+        self._check_an_port() 
 
         # Clear current directory.
-        if len(os.listdir('./'))>0:
-            affirm='x'
-            while not affirm in 'yn':
-                affirm=raw_input("Directory is not empty. Delete files? y/[n]")
-            if affirm=='y':
-                for f in os.listdir('./'):
-                    try:
-                        os.remove(f)
-                    except OSError:
-                        rmtree(f)
-            else:
-                raise Exception("There are files in current directory.")
+        if len(os.listdir('./'))>0 and check_directory:
+            self._clear_cd()
+
+    def _clear_cd(self):
+        from shutil import rmtree
+        affirm='x'
+        while not affirm in 'yn':
+            affirm=raw_input("Directory is not empty. Delete files? y/[n]")
+        if affirm=='y':
+            for f in os.listdir('./'):
+                try:
+                    os.remove(f)
+                except OSError:
+                    rmtree(f)
+        else:
+            raise Exception("There are files in current directory.")
+    
+    def _check_an_port(self):
+        import socket
+        import select
+        try:
+            listenSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            listenSock.setblocking(0)
+            listenSock.bind(('127.0.0.1',self.anPort))
+            ready = select.select([listenSock], [], [], 1)
+            if not ready[0]:
+                raise Exception("No data is being broadcast on port.")
+        finally:
+            listenSock.close()
 
     def _load_avatar(self):
         """
@@ -238,6 +271,56 @@ class HandSyncExperiment(object):
                 time.sleep(dt)
         print "%s deleted."%fname
         return True
+    
+    def define_update_broadcaster(self,reader,stopEvent,pauseEvent,
+                                  windowsInIndexUnits,realTimePerfEval,broadcast,
+                                  rotAngle,avatar,t0):
+        """Define function for real time performance assessment.
+
+        Parameters
+        ----------
+        reader : ANReader
+        stopEvent : threading.Event
+        pauseEvent : threading.Event
+        windowsInIndexUnits : int,
+        realTimePerfEval : DTWPerformance
+        broadcast : DataBroadcaster
+        rotAngle : float
+        avatar : Interpolation
+        t0 : datetime.datetime
+        """
+        def update_broadcaster(performance,export=False):
+            try:
+                while not stopEvent.is_set():
+                    pauseEvent.wait()
+                    v,t,tAsDate = reader.copy_recent()
+                    
+                    if len(v)>=(windowsInIndexUnits):
+                        # Put into standard coordinate system (as in paper). Account for reflection symmetry.
+                        v[:,1:] *= -1
+                        v[:,:2] = rotate_xy(v[:,:2],rotAngle)
+
+                        tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
+                        avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
+                        
+                        # Calculate performance metric.
+                        performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
+
+                        # Update performance.
+                        broadcast.update_payload('%1.2f'%performance[-1])
+                        if self.verbose=='detailed':
+                            print "new coherence is %s"%broadcast._payload
+
+                        if export:
+                            if not os.path.isdir('realtime_velocities'):
+                                os.mkdir('realtime_velocities')
+                            dill.dump({'v':v,'avv':avv},open('realtime_velocities/%s.p'%str(export).zfill(4),
+                                                             'wb'),-1)
+                            export+=1
+                    time.sleep(0.2)
+            finally:
+                print "updateBroadcastThread stopped"
+        return update_broadcaster
 
     def run_cal(self,verbose=False,min_v=0.3,pause_before_run=0.):
         """
@@ -268,7 +351,7 @@ class HandSyncExperiment(object):
 
             # Setup thread for recording port data.
             recordThread = threading.Thread(target=record_AN_port,
-                                            args=(fname,7013),
+                                            args=(fname,self.anPort),
                                             kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
             time.sleep(pause_before_run)
 
@@ -335,7 +418,7 @@ class HandSyncExperiment(object):
             suffix += 1
 
         recordThread = threading.Thread(target=record_AN_port,
-                                        args=('an_port_%s.txt'%str(suffix).zfill(2),7013),
+                                        args=('an_port_%s.txt'%str(suffix).zfill(2),self.anPort),
                                         kwargs={'start_file':'start_lf','stop_file':'end_lf'})
         with open('start_lf','w') as f:
             f.write('')
@@ -371,9 +454,12 @@ class HandSyncExperiment(object):
         max_window_duration : float,2
         min_vis_fraction : float,.1
         max_vis_fraction : float,.9
+        gpr_mean_prior : float,np.log(.44/.56)
+        reverse_time : bool,False
         verbose : bool,False
         export_realtime_velocities : bool,False
-            For debugging.
+            For debugging. On every iteration of the real time performace evaluation, save the
+            subject and avatar velocities in the folder realtime_velocities.
         
         Notes
         -----
@@ -384,7 +470,7 @@ class HandSyncExperiment(object):
         1. updateBroadcastThread: assess subject's performance relative to the avatar and
             update performance value
         2. broadcastThread: broadcast subject's performance to port 5001
-        3. recordThread: record AN output from UDP rebroadcast @ 7013
+        3. recordThread: record AN output from UDP rebroadcast @ self.anPort
         
         Thread communication happens through members that are updated using thread locks.
         
@@ -392,8 +478,6 @@ class HandSyncExperiment(object):
         fraction to file. Waiting for run_gpr and writing to next_setting.
 
         When end is written, experiment ends.
-
-        NOTES:
         """
         from data_access import subject_settings_v3
         from data_access import VRTrial3_1 as VRTrial
@@ -429,10 +513,7 @@ class HandSyncExperiment(object):
         avatar = self.load_avatar(reverse_time)  # avatar for comparing velocities
         windowsInIndexUnits = int(30*self.duration)
         performance = []  # history of performance
-        self.pause = []  # times when game was paused
-        self.unpause = []  # times when game was resumed
-        self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
-        self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
+        
         pauseEvent = threading.Event()
         pauseEvent.set()
         self.endEvent = threading.Event()  # Event to be set when end file is written
@@ -446,41 +527,10 @@ class HandSyncExperiment(object):
         broadcastThread.start()
 
         # Setup thread for recording port data.
-        recordThread = threading.Thread(target=record_AN_port,args=('an_port.txt',7013))
+        recordThread = threading.Thread(target=record_AN_port,args=('an_port.txt',self.anPort))
 
         # Set up thread for updating value of streaming broadcast of coherence.
         # This relies on reader to fetch data which is declared later.
-        def update_broadcaster(reader,stopEvent,export=export_realtime_velocities):
-            try:
-                while not stopEvent.is_set():
-                    pauseEvent.wait()
-                    v,t,tAsDate = reader.copy_recent()
-                    
-                    if len(v)>=(windowsInIndexUnits):
-                        # Put into standard coordinate system (as in paper). Account for reflection symmetry.
-                        v[:,1:] *= -1
-                        v[:,:2] = rotate_xy(v[:,:2],rotAngle)
-
-                        tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
-                        avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
-                        
-                        # Calculate performance metric.
-                        performance.append( realTimePerfEval.raw(v[:,1:],avv[:,1:],dt=1/30) )
-
-                        # Update performance.
-                        self.broadcast.update_payload('%1.2f'%performance[-1])
-                        if verbose=='detailed':
-                            print "new coherence is %s"%self.broadcast._payload
-
-                        if export:
-                            if not os.path.isdir('realtime_velocities'):
-                                os.mkdir('realtime_velocities')
-                            dill.dump({'v':v,'avv':avv},open('realtime_velocities/%s.p'%str(export).zfill(4),
-                                                             'wb'),-1)
-                            export+=1
-                    time.sleep(0.2)
-            finally:
-                print "updateBroadcastThread stopped"
         self.updateBroadcastEvent = threading.Event()
 
         # Define function that will be run in GPR thread. 
@@ -557,8 +607,11 @@ class HandSyncExperiment(object):
                       port_buffer_size=8192,
                       recent_buffer_size=(self.duration+1)*30) as reader:
             
-            updateBroadcastThread = threading.Thread(target=update_broadcaster,
-                                                     args=(reader,self.updateBroadcastEvent))
+            updateBroadcastThread = threading.Thread(
+                    target=self.define_update_broadcaster(reader,self.updateBroadcastEvent,pauseEvent,
+                                                      windowsInIndexUnits,realTimePerfEval,self.broadcast,
+                                                      rotAngle,avatar,t0),
+                    args=(performance,export_realtime_velocities,) )
 
             while reader.len_history()<windowsInIndexUnits:
                 if verbose:
@@ -627,8 +680,7 @@ class HandSyncExperiment(object):
         # Move all files into the left or right directory given by which hand the subject was using.
         if not os.path.isdir(handedness):
             os.mkdir(handedness)
-        for f in ['left_or_right','end','initial_trial_done','run_gpr','start','start_time','this_setting',
-                  'next_setting','an_port.txt','end_port_read','gpr.p','an_port_cal.txt']:
+        for f in os.listdir('./'):
             if os.path.isfile(f):
                 os.rename(f,'%s/%s'%(handedness,f))
 
@@ -637,7 +689,6 @@ class HandSyncExperiment(object):
         self.updateBroadcastEvent.set()
         self.broadcast.stopEvent.set()
         self.endEvent.set()
-        return
 # end HandSyncExperiment
 
 
