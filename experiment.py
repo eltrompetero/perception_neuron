@@ -48,7 +48,7 @@ class HandSyncExperiment(object):
         self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
         self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
 
-        self.anPort=7013  # port at which to received AN calculation broadcast
+        self.anPort=7013  # port at which to receive AN calculation broadcast
 
         # Check that data is being broadcast on anPort.
         self._check_an_port() 
@@ -454,9 +454,12 @@ class HandSyncExperiment(object):
         max_window_duration : float,2
         min_vis_fraction : float,.1
         max_vis_fraction : float,.9
+        gpr_mean_prior : float,np.log(.44/.56)
+        reverse_time : bool,False
         verbose : bool,False
         export_realtime_velocities : bool,False
-            For debugging.
+            For debugging. On every iteration of the real time performace evaluation, save the
+            subject and avatar velocities in the folder realtime_velocities.
         
         Notes
         -----
@@ -475,8 +478,6 @@ class HandSyncExperiment(object):
         fraction to file. Waiting for run_gpr and writing to next_setting.
 
         When end is written, experiment ends.
-
-        NOTES:
         """
         from data_access import subject_settings_v3
         from data_access import VRTrial3_1 as VRTrial
@@ -679,8 +680,7 @@ class HandSyncExperiment(object):
         # Move all files into the left or right directory given by which hand the subject was using.
         if not os.path.isdir(handedness):
             os.mkdir(handedness)
-        for f in ['left_or_right','end','initial_trial_done','run_gpr','start','start_time','this_setting',
-                  'next_setting','an_port.txt','end_port_read','gpr.p','an_port_cal.txt']:
+        for f in os.listdir('./'):
             if os.path.isfile(f):
                 os.rename(f,'%s/%s'%(handedness,f))
 
