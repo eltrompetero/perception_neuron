@@ -499,6 +499,7 @@ class VRTrial3_1(object):
 
         Parameters
         ----------
+        **gpr_kwargs
         """
         from coherence import DTWPerformance,GPR
         perfEval=DTWPerformance()
@@ -507,20 +508,16 @@ class VRTrial3_1(object):
                      mean_performance=self.gprmodel.mean_performance,
                      **gpr_kwargs)
         p=np.zeros_like(self.gprmodel.coherences)
-
+        
+        # Update GPR on performance data points calculated again.
         for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
                                           self.subjectSplitTrials['avatar'],
                                           self.templateSplitTrials['avatar'])):
-            p[i]=perfEval.time_average(avv[75:-60,1:],sv[75:-60,1:],dt=1/30)
+            p[i]=perfEval.time_average(avv[75:,1:],sv[75:,1:],dt=1/30)
             
             f=self.gprmodel.fractions[i]
             dur=self.gprmodel.durations[i]
             gprmodel.update(self.gprmodel.ilogistic(p[i]),dur,f)
-            #gprmodel.update(self.gprmodel.coherences[i],dur,f)
-
-            print '%1.1f, %1.1f, %1.2f, %1.2f'%( dur,f,
-                    gprmodel.coherences[-1],
-                    self.gprmodel.coherences[i] )
         self.gprmodel=gprmodel
 
     def pickle_trial_dicts(self,disp=False):
@@ -764,7 +761,6 @@ class VRTrial3_1(object):
             return x
         x,_=remove_pause_intervals(x.tolist(),zip(*self.pause))
         return np.array(x)
-
 # end VRTrial3_1
 
 
