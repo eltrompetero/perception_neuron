@@ -814,6 +814,76 @@ def extract_motionbuilder_test(hand,
 
     return mbV,mbT
 
+def extract_motionbuilder_model3_3(hand,
+                                   fname='Eddie_Grid_Model_%s_Anim_Export_Truncate_Take_001',
+                                   reverse_time=False):
+    """
+    Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
+    exported. Returned data is put into standard global coordinate frame: x-axis is the axis between the two
+    subjects where positive is towards the front, y is the side to side, and z is up and down such that
+    positive y is determined by following the right hand rule.
+    
+    These are pickled csv files that were exported from Mokka after preprocessing in Motionbuilder. Note that
+    the coordinate system in Motionbuilder and Mokka are different.
+
+    NOTE: Directory where animation data is stored is hard-coded.
+    
+    Parameters
+    ----------
+    hand : str
+        Hand of the model.
+    fname : str,'Eddie_Grid_Model_%s_Anim_Export_Take_001'
+        Name of file with %s to replace with handedness.
+    reverse_time : bool,False
+        Read data backwards from end.
+
+    Returns
+    -------
+    mbV : scipy.interpolate.interp1d
+        Returns (n_samples,3) dimensional matrix.
+    mbT : ndarray of float
+        Number of seconds since the beginning of the avatar motion file.
+    """
+    from datetime import datetime,timedelta
+    import cPickle as pickle
+    from scipy.interpolate import interp1d
+    assert hand=='Left' or hand=='Right'
+
+    dr = ( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
+           'Animations/Eddie_Grid_Model' )
+    fname = fname%hand
+    
+    # Create pickle if it doesn't already exist.
+    if not os.path.exists('%s/%s.p'%(dr,fname)):
+        from axis_neuron import load_csv
+        mbdf = load_csv('%s/%s.csv'%(dr,fname))
+        mbdf.to_pickle('%s/%s.p'%(dr,fname))
+
+    mbdf = pickle.load(open('%s/%s.p'%(dr,fname),'rb'))
+    mbT = mbdf['Time'].values.astype(float)
+    mbT -= mbT[0]
+    mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
+    mbV[:,:] = mbV[:,[1,0,2]]
+
+    if reverse_time:
+        mbV = -mbV[::-1]
+
+    # Put these in the standard global coordinate system such that avatars are facing +x direction. See Tango
+    # III pg 45.
+    if hand=='Left':
+        mbV[:,0] *= -1
+    else:
+        # With right hand, the avatar starts facing the opposite direction so she is already facing the
+        # same direction as the original y-axis.
+        mbV[:,1] *= -1
+
+    # y-axis needs to be reflected to put into same chirality as subject
+    mbV[:,1] *= -1
+    
+    mbV = interp1d(mbT,mbV,axis=0,assume_sorted=True,copy=False)
+
+    return mbV,mbT
+
 def extract_motionbuilder_model3(hand,
                                  fname='Eddie_Grid_Model_%s_Anim_Export_Take_001',
                                  reverse_time=False):

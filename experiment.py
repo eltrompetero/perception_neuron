@@ -165,13 +165,13 @@ class HandSyncExperiment(object):
         avatar : dict
             Dictionary of avatar interpolation splines.
         """
-        from pipeline import extract_motionbuilder_model3
+        from pipeline import extract_motionbuilder_model3_3
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
         if handedness=='left':
-            v,t = extract_motionbuilder_model3('Right',reverse_time=reverse_time)
+            v,t = extract_motionbuilder_model3_3('Right',reverse_time=reverse_time)
         elif handedness=='right':
-            v,t = extract_motionbuilder_model3('Left',reverse_time=reverse_time)
+            v,t = extract_motionbuilder_model3_3('Left',reverse_time=reverse_time)
         else:
             print handedness
             raise Exception
