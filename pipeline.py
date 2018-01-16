@@ -866,7 +866,7 @@ def extract_motionbuilder_model3(hand,
     mbV[:,:] = mbV[:,[1,0,2]]
 
     if reverse_time:
-        mbV = mbV[::-1]
+        mbV = -mbV[::-1]
 
     # Put these in the standard global coordinate system such that avatars are facing +x direction. See Tango
     # III pg 45.
