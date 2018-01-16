@@ -32,7 +32,7 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     
     # Extract only necessary body part from the dataframe.
     # extract_calc_solo handles reorientation of axes into standard coordinate system and rotation
-    # about xy plane
+    # about xy plane. This all happens in extract_calc_solo().
     df = load_calc('',cols='XVA',return_zd=False,df=df.iloc[:,1:])
     if modelhand=='Right':
         _,anX,anV,anA = extract_calc_solo(leaderdf=df,bodyparts=['LeftHand'],
@@ -312,7 +312,7 @@ def extract_calc_solo(fname='',
 
     Returns
     -------
-    T,X,V,A
+    T,X,V,A : list of DataFrames
     """
     skeleton = calc_file_body_parts()
     

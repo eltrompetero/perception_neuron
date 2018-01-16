@@ -155,8 +155,7 @@ def subject_settings_v3_3(index,hand,return_list=True):
     rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
 
     if return_list:
-        output = [settings['person'],dr,rotAngle]
-        return output
+        return settings['person'],dr,rotAngle
     return settings,dr
 
 
@@ -206,6 +205,7 @@ class VRTrial3_1(object):
         # Load gpr data points.
         savedData = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
         self.gprmodel = savedData['gprmodel']
+        self.pause=savedData['pause'],savedData['unpause']
         self.trialTypes = ['avatar']
         
         try:
@@ -297,10 +297,10 @@ class VRTrial3_1(object):
         for specix,spec in enumerate(windowSpec):
             ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
             
-            if len(ix)>0:
-                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
-                                   self.timeSplitTrials[trial_type][ix[0]],
-                                   self.subjectSplitTrials[trial_type][ix[0]].copy() ))
+            for ix_ in ix:
+                selection.append(( self.windowsByPart[trial_type][ix_][0],
+                                   self.timeSplitTrials[trial_type][ix_],
+                                   self.subjectSplitTrials[trial_type][ix_].copy() ))
             # Iterate also through hand0 or avatar0, which contains the other hand..
             #if trial_type.isalpha():
             #    selection += self.subject_by_window_spec([windowSpec[specix]],
@@ -314,10 +314,10 @@ class VRTrial3_1(object):
         for specix,spec in enumerate(windowSpec):
             ix = self._fetch_windowspec_indices([spec],trial_type,precision=precision)
             
-            if len(ix)>0:
-                selection.append(( self.windowsByPart[trial_type][ix[0]][0],
-                                   self.timeSplitTrials[trial_type][ix[0]],
-                                   self.templateSplitTrials[trial_type][ix[0]].copy() ))
+            for ix_ in ix:
+                selection.append(( self.windowsByPart[trial_type][ix_][0],
+                                   self.timeSplitTrials[trial_type][ix_],
+                                   self.templateSplitTrials[trial_type][ix_].copy() ))
             # Iterate also through hand0 or avatar0, which contains the other hand..
             #if trial_type.isalpha():
             #    selection += self.template_by_window_spec([windowSpec[specix]],
@@ -493,6 +493,36 @@ class VRTrial3_1(object):
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         return dphase
 
+    def retrain_gprmodel(self,**gpr_kwargs):
+        """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
+        values need to be calculated again.
+
+        Parameters
+        ----------
+        """
+        from coherence import DTWPerformance,GPR
+        perfEval=DTWPerformance()
+        gprmodel=GPR(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
+                     fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
+                     mean_performance=self.gprmodel.mean_performance,
+                     **gpr_kwargs)
+        p=np.zeros_like(self.gprmodel.coherences)
+
+        for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
+                                          self.subjectSplitTrials['avatar'],
+                                          self.templateSplitTrials['avatar'])):
+            p[i]=perfEval.time_average(avv[75:-60,1:],sv[75:-60,1:],dt=1/30)
+            
+            f=self.gprmodel.fractions[i]
+            dur=self.gprmodel.durations[i]
+            gprmodel.update(self.gprmodel.ilogistic(p[i]),dur,f)
+            #gprmodel.update(self.gprmodel.coherences[i],dur,f)
+
+            print '%1.1f, %1.1f, %1.2f, %1.2f'%( dur,f,
+                    gprmodel.coherences[-1],
+                    self.gprmodel.coherences[i] )
+        self.gprmodel=gprmodel
+
     def pickle_trial_dicts(self,disp=False):
         """
         Put data for analysis into easily accessible pickles. Right now, I extract only visibility and hand
@@ -507,6 +537,7 @@ class VRTrial3_1(object):
         from utils import match_time
         from ue4 import load_visibility
         import dill as pickle
+        from experiment import remove_pause_intervals
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
@@ -521,11 +552,17 @@ class VRTrial3_1(object):
         for trialno,part in enumerate(self.trialTypes):
             if disp:
                 print "Processing %s..."%part
-            # Select time interval during which the trial happened.
+
+            # Load visibility time points saved by UE4 and remove pause intervals.
             if part.isalpha():
                 visible,invisible = load_visibility(part+'_visibility',self.dr)
             else:
                 visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
+            visible,_=remove_pause_intervals(visible.tolist(),zip(*self.pause))
+            invisible,_=remove_pause_intervals(invisible.tolist(),zip(*self.pause))
+            visible,invisible=np.array(visible),np.array(invisible)
+            
+            # Start and end times counting only the time the simulation is running (and not paused).
             exptStartEnd = [visible[0],invisible[-1]]
             
             # Extract template. Downsample to 30Hz from 60Hz.
@@ -538,14 +575,18 @@ class VRTrial3_1(object):
             # Extract subject from port file.
             anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
                                                rotation_angle=self.rotation )
+            # Remove pauses.
+            anT,_,removeIx=remove_pause_intervals(anT.tolist(),zip(*self.pause),True)
+            anT=np.array(anT)
+            anV=np.delete(anV[0],removeIx,axis=0)
+            # Remove parts that extend beyond trial.
             showIx = (anT>=exptStartEnd[0]) & (anT<=exptStartEnd[1])
-            subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
+            anT,anV = anT[showIx],anV[showIx]
+            # Save into variables used here.
+            subjectTrial[part+'T'],subjectTrial[part+'V'] = anT,anV
             
             # Put trajectories on the same time samples so we can pipeline our regular computation.
-            print subjectTrial[part+'T'][0]
-            print exptStartEnd[0]
             offset = (subjectTrial[part+'T'][0]-exptStartEnd[0]).total_seconds()
-            print offset
             subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
                                                                        subjectTrial[part+'T'],
                                                                        1/30,
@@ -614,7 +655,6 @@ class VRTrial3_1(object):
         -------
         ix : list of ints
         """
-        ix = []
         trialWindows = np.array([w[0] for w in self.windowsByPart[trial_type]])
         i = 0  # counter
 
@@ -622,19 +662,19 @@ class VRTrial3_1(object):
             for spec in specs:
                 ix_ = (np.array(spec)[None,:]==trialWindows).all(1)
                 if ix_.any():
-                    ix.append( np.where(ix_)[0][0] )
+                    ix=np.where(ix_)[0].tolist()
         elif type(precision) is float:
             for spec in specs:
                 specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
                 ix_ = (specDiffs<=precision).all(1)
                 if ix_.any():
-                    ix.append(np.where(ix_)[0][0])
+                    ix=np.where(ix_)[0].tolist()
         elif type(precision) is tuple:
             for spec in specs:
                 specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
                 ix_ = (specDiffs[:,0]<=precision[0])&(specDiffs[:,1]<=precision[1])
                 if ix_.any():
-                    ix.append(np.where(ix_)[0][0])
+                    ix=np.where(ix_)[0].tolist()
         else:
             raise NotImplementedError("precision type not supported.")
 
@@ -659,6 +699,7 @@ class VRTrial3_1(object):
             Window type is a tuple (inv_duration,window_duration)
         """
         from ue4 import load_visibility 
+        from experiment import remove_pause_intervals
 
         # Load AN subject data.
         df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
@@ -672,6 +713,8 @@ class VRTrial3_1(object):
                 fname = part[:-1]+'_visibility_0'
 
             visible,invisible = load_visibility(fname,dr)
+            visible=self._remove_pauses(visible)
+            invisible=self._remove_pauses(invisible)
 
             # Array denoting visible (with 1) and invisible (with 0) times.
             start = np.zeros((len(visible)+len(invisible)),dtype=object)
@@ -687,8 +730,8 @@ class VRTrial3_1(object):
             # times are when the trial counter is updated immediately after the first fully visible trial. The
             # remaining points are the following trials.
             dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
-            trialStartTimes = dataDict['trialStartTimes']
-            trialEndTimes = dataDict['trialEndTimes']
+            trialStartTimes = self._remove_pauses(dataDict['trialStartTimes'])
+            trialEndTimes = self._remove_pauses(dataDict['trialEndTimes'])
             windowSpecs = []
             windowStart,windowEnd = [],[]
             for i in xrange(len(self.gprmodel.fractions)):
@@ -712,6 +755,16 @@ class VRTrial3_1(object):
             visDur = invisibleStart[1:][:mxLen-1]-visibleStart[:-1][:mxLen-1]
             windowDur = invDur[:-1]+visDur  # total duration cycle of visible and invisible
         return windowsByPart,invDur,visDur
+
+    def _remove_pauses(self,x):
+        """Wrapper around experiment.remove_pause_intervals."""
+        from experiment import remove_pause_intervals
+        if type(x) is list:
+            x,_=remove_pause_intervals(x,zip(*self.pause))
+            return x
+        x,_=remove_pause_intervals(x.tolist(),zip(*self.pause))
+        return np.array(x)
+
 # end VRTrial3_1
 
 

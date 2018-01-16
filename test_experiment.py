@@ -46,7 +46,30 @@ def test_logistic():
     assert np.isclose( ilogistic(logistic(r)),r ).all()
 
 def test_remove_pause_intervals():
-    remove_pause_intervals([datetime.now()],[])
+    from datetime import datetime,timedelta
+
+    # Case where pause list is empty.
+    tdate,t=remove_pause_intervals([datetime.now()],[])
+    
+    t0=datetime.now()
+    t=[t0+timedelta(seconds=.01*i) for i in xrange(20)]
+
+    # Case where nothing falls within pauses but entries should still be time shifted.
+    pause=[(t0+timedelta(seconds=.055),t0+timedelta(seconds=.058))]
+    
+    tdate,shiftedt,removedIx=remove_pause_intervals(t,pause,return_removed_ix=True)
+    assert np.isclose(shiftedt[-1],.01*19-.003)
+    assert len(removedIx)==0
+
+
+    # Case where two data points fall within two separate pauses.
+    pause=[(t0+timedelta(seconds=.055),t0+timedelta(seconds=.065)),
+           (t0+timedelta(seconds=.075),t0+timedelta(seconds=.085))]
+    
+    tdate,shiftedt,removedIx=remove_pause_intervals(t,pause,return_removed_ix=True)
+    assert len(shiftedt)==18
+    assert removedIx[0]==6
+    assert removedIx[1]==8
 
 def test_update_broadcast():
     """Generate fake velocity data set. Check that performance evaluation is able to match up the avatar and
@@ -99,3 +122,6 @@ def test_update_broadcast():
 
     stopEvent.set()
     assert (np.array(performance)>.99).all()
+
+if __name__=='__main__':
+    test_remove_pause_intervals()

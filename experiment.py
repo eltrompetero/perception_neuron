@@ -722,7 +722,7 @@ def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
     # Return part of avatar's trajectory that agrees with the stipulated time bounds.
     return avatar(t)
 
-def remove_pause_intervals(t,pause_intervals):
+def remove_pause_intervals(t,pause_intervals,return_removed_ix=False):
     """
     Given a list of time points where data was taken and a list of tuples where the data take was paused,
     return the times at which the data would've been taken if there had been no pause having removed all data
@@ -734,19 +734,28 @@ def remove_pause_intervals(t,pause_intervals):
         datetime.datetime objects of when data was recorded. These should be ordered in time.
     pause_intervals : list of tuples
         Each tuple should be (start,end).
+    return_removed_ix : bool,False
+        If True, return the indices of all the entries in t that were removed.
 
     Returns
     -------
     tDate : list of datetime.datetime objects
     t : ndarray
         Time is seconds starting from tDate[0]
+    removedIx : list
+        Indices of elements removed from t.
     """
     t = t[:]
     pause_intervals = pause_intervals[:]
+    removedIx=[]
+    rangeT=range(len(t))
 
     for dtix,(t0,t1) in enumerate(pause_intervals):
         assert t0<t1
+        
         dt = t1-t0
+
+        # Count up to the beginning of the pause interval.
         counter = 0
         t_ = t[counter]
         while t_<t0 and counter<len(t):
@@ -757,13 +766,16 @@ def remove_pause_intervals(t,pause_intervals):
         if counter>0:
             while t[counter-1] < t1:
                 t.pop(counter-1)
+                removedIx.append(rangeT.pop(counter-1))
         
-        # If none of the pause intervals overlap with the given data.
+        # Subtract the duration of the removed pause interval from the remaining data.
         if counter<len(t):
             for counter in xrange(counter-1,len(t)):
                 t[counter] -= dt
             for dtix in xrange(dtix+1,len(pause_intervals)):
                 pause_intervals[dtix] = (pause_intervals[dtix][0]-dt,pause_intervals[dtix][1]-dt)
+    if return_removed_ix:
+        return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])]),removedIx
     return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])])
 
 def ilogistic(x):

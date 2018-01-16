@@ -664,6 +664,8 @@ class GPR(object):
         tstep : float,0.1
         fmin : float
             minimum visibility fraction.
+        fmax : float
+        fstep : float
 
         Members
         -------
