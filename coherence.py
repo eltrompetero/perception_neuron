@@ -1,5 +1,5 @@
 # ================================================================================================ # 
-# Functions for calculating coherence measure.
+# Functions for calculating performance measures.
 # Authors: Eddie Lee, edl56@cornell.edu
 #          Ted Esposito
 # ================================================================================================ # 
@@ -692,7 +692,7 @@ class GPR(object):
         
         self.durations = np.zeros(0)
         self.fractions = np.zeros(0)
-        self.coherences = np.zeros(0)
+        self.performanceData = np.zeros(0)
         self.mean_performance = mean_performance
         
         # Create two grids for t and f.
@@ -703,7 +703,7 @@ class GPR(object):
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
         
         self.gp = GaussianProcessRegressor(self.kernel,alpha**-2)
-        self.coherence_pred = 0  # [-inf,inf]
+        self.performanceGrid = 0  # [-inf,inf]
         self.std_pred = 0
 
         self.pointsToAvoid = []
@@ -729,11 +729,11 @@ class GPR(object):
         if mesh is None:
             mesh = self.meshPoints
 
-        self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.coherences-self.mean_performance )
-        self.coherence_pred, self.std_pred = self.gp.predict(mesh,return_std=True)
-        self.coherence_pred += self.mean_performance
+        self.gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-self.mean_performance )
+        self.performanceGrid, self.std_pred = self.gp.predict(mesh,return_std=True)
+        self.performanceGrid += self.mean_performance
 
-        return self.coherence_pred.copy(),self.std_pred.copy()
+        return self.performanceGrid.copy(),self.std_pred.copy()
 
     def grad(self,eps=1e-5):
         '''
@@ -817,7 +817,7 @@ class GPR(object):
         if choose_algo=='avoid':
             ix = []
             for pstar_ in pstar:
-                sortix = np.argsort( np.abs(self.logistic(self.coherence_pred)-pstar_) )
+                sortix = np.argsort( np.abs(self.logistic(self.performanceGrid)-pstar_) )
                 counter = 0
                 while counter<len(sortix):
                     if not any(np.array_equal(self.meshPoints[sortix[counter]],x)
@@ -831,12 +831,12 @@ class GPR(object):
 
             ix = []
             for pstar_ in pstar:
-                dist = np.abs(self.logistic(self.coherence_pred)-pstar_)
+                dist = np.abs(self.logistic(self.performanceGrid)-pstar_)
                 thresholdIx = dist<algo_kwargs['threshold']
                 dist[thresholdIx==0] += 1e30
                 ix.append( np.argmin(dist-algo_kwargs['std_scale']*self.std_pred) )
         else:
-            ix = [np.argmin(np.abs(self.coherence_pred-pstar_)) for pstar_ in pstar]
+            ix = [np.argmin(np.abs(self.performanceGrid-pstar_)) for pstar_ in pstar]
         return self.meshPoints[ix,0],self.meshPoints[ix,1]
     
     @staticmethod
@@ -844,17 +844,17 @@ class GPR(object):
         from scipy.special import erf
         return .5 + erf( (x-mu)/std/np.sqrt(2) )/std/2
 
-    def update(self,new_coherence,window_dur,vis_fraction):
+    def update(self,new_performance,window_dur,vis_fraction):
         '''
         This is called to add new data point to prediction.
 
         Parameters
         ----------
-        new_coherence : float
+        new_performance : float
         window_dur : float
         vis_fraction : float
         '''
-        self.coherences = np.append(self.coherences,new_coherence)
+        self.performanceData = np.append(self.performanceData,new_performance)
         self.fractions = np.append(self.fractions,vis_fraction)
         self.durations = np.append(self.durations,window_dur)
         

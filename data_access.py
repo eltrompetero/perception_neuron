@@ -510,7 +510,7 @@ class VRTrial3_1(object):
                      fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
                      mean_performance=self.gprmodel.mean_performance,
                      **gpr_kwargs)
-        p=np.zeros_like(self.gprmodel.coherences)
+        p=np.zeros_like(self.gprmodel.performanceData)
         
         # Update GPR on performance data points calculated again.
         for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],

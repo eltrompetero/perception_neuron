@@ -27,3 +27,5 @@ def test_kernel(n_tries=10,n_points=50):
             c[ii,ii] = kernel(randomPts[ii],randomPts[ii])
 
         assert (np.linalg.eigvals(c)>-1e-14).all()
+
+
