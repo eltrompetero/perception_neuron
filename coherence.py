@@ -453,9 +453,14 @@ class DTWPerformance(object):
         """
         from numpy.linalg import norm
         from fastdtw import fastdtw
+        from warnings import warn
 
         dist,path = fastdtw(x,y,**self.dwtSettings)
-        path = np.vstack(path)
+        try:
+            path = np.vstack(path)
+        except ValueError:
+            warn("fastdtw could not align. Possible because subject data is flat.")
+            path=range(len(x))
 
         normx = norm(x[path[:,0]],axis=1)+np.nextafter(0,1)
         normy = norm(y[path[:,1]],axis=1)+np.nextafter(0,1)
