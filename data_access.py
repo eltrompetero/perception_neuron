@@ -132,7 +132,7 @@ def subject_settings_v3_2(index,return_list=True):
 def subject_settings_v3_3(index,hand,return_list=True):
     """
     Subject info for experiment v3.3.
-    2018-01-10
+    2018-01-15
 
     Parameters
     ----------
@@ -147,15 +147,18 @@ def subject_settings_v3_3(index,hand,return_list=True):
     dr : str
     """
     settings = [{'person':'Subject01_3_3',
-                 'trials':['avatar']},
+                 'trials':['avatar'],
+                 'reverse':[False,True]},
                 {'person':'Subject02_3_3',
-                 'trials':['avatar']}
+                 'trials':['avatar'],
+                 'reverse':[True,False]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+    reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
 
     if return_list:
-        return settings['person'],dr,rotAngle
+        return settings['person'],dr,rotAngle,reverse
     return settings,dr
 
 
