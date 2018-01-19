@@ -131,7 +131,7 @@ def subject_settings_v3_2(index,return_list=True):
 
 def subject_settings_v3_3(index,hand,return_list=True):
     """
-    Subject info for experiment v3.3.
+    Subject info for experiment v3.3. Twoples refer to the left and right subject hands.
     2018-01-15
 
     Parameters
@@ -148,17 +148,28 @@ def subject_settings_v3_3(index,hand,return_list=True):
     """
     settings = [{'person':'Subject01_3_3',
                  'trials':['avatar'],
-                 'reverse':[False,True]},
+                 'reverse':[False,True],
+                 'usable':[True,True]},
                 {'person':'Subject02_3_3',
                  'trials':['avatar'],
-                 'reverse':[True,False]}
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject03_3_3',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,False]},
+                {'person':'Subject04_3_3',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
     reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
+    usable=settings['usable'][0] if hand=='left' else settings['usable'][1]
 
     if return_list:
-        return settings['person'],dr,rotAngle,reverse
+        return settings['person'],dr,rotAngle,reverse,usable
     return settings,dr
 
 
@@ -533,7 +544,7 @@ class VRTrial3_1(object):
         disp : bool,False
         """
         from axis_neuron import extract_AN_port
-        from pipeline import extract_motionbuilder_model3
+        from pipeline import extract_motionbuilder_model3_3
         from utils import match_time
         from ue4 import load_visibility
         import dill as pickle
@@ -566,8 +577,8 @@ class VRTrial3_1(object):
             exptStartEnd = [visible[0],invisible[-1]]
             
             # Extract template. Downsample to 30Hz from 60Hz.
-            mbV,mbT = extract_motionbuilder_model3( self.modelhandedness[trialno],
-                                                    reverse_time=self.reverse )
+            mbV,mbT = extract_motionbuilder_model3_3( self.modelhandedness[trialno],
+                                                      reverse_time=self.reverse )
             showIx = mbT < (exptStartEnd[1]-exptStartEnd[0]).total_seconds()
             templateTrial[part+'T'] = mbT[showIx][::2]
             templateTrial[part+'V'] = mbV

@@ -11,6 +11,12 @@ import dill
 from subprocess import call
 
 
+def ilogistic(x):
+    return -np.log(1/x-1)
+
+def logistic(x):
+    return 1/(1+np.exp(-x))
+
 
 class HandSyncExperiment(object):
     def __init__(self,duration,trial_type,
@@ -437,7 +443,7 @@ class HandSyncExperiment(object):
                initial_window_duration=1.0,initial_vis_fraction=0.5,
                min_window_duration=.5,max_window_duration=2,
                min_vis_fraction=.1,max_vis_fraction=1.,
-               gpr_mean_prior=np.log(.44/.56),
+               gpr_mean_prior=ilogistic(.42),
                reverse_time=False,
                verbose=False,
                export_realtime_velocities=False):
@@ -454,7 +460,7 @@ class HandSyncExperiment(object):
         max_window_duration : float,2
         min_vis_fraction : float,.1
         max_vis_fraction : float,.9
-        gpr_mean_prior : float,np.log(.44/.56)
+        gpr_mean_prior : float,ilogistic(.42)
         reverse_time : bool,False
         verbose : bool,False
         export_realtime_velocities : bool,False
@@ -778,11 +784,7 @@ def remove_pause_intervals(t,pause_intervals,return_removed_ix=False):
         return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])]),removedIx
     return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])])
 
-def ilogistic(x):
-    return -np.log(1/x-1)
 
-def logistic(x):
-    return 1/(1+np.exp(-x))
 
 def extract_rot_angle(v,noise_threshold=.4,min_points=10):
     """
