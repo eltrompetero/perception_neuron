@@ -178,7 +178,10 @@ def subject_settings_v3_3(index,hand,return_list=True):
 # Class definitions. #
 # ------------------ #
 class VRTrial3_1(object):
-    def __init__(self,person,modelhandedness,rotation,dr,fname='trial_dictionaries.p',reverse=False):
+    def __init__(self,person,modelhandedness,rotation,dr,
+                 fname='trial_dictionaries.p',
+                 reverse=False,
+                 retrain=True):
         """
         Parameters
         ----------
@@ -234,6 +237,9 @@ class VRTrial3_1(object):
         self.templateSplitTrials = data['templateSplitTrials']
         self.subjectSplitTrials = data['subjectSplitTrials']
         self.windowsByPart = data['windowsByPart']
+        
+        if retrain:
+            self.retrain_gprmodel()
 
     def info(self):
         print "Person %s"%self.person
@@ -507,19 +513,21 @@ class VRTrial3_1(object):
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         return dphase
 
-    def retrain_gprmodel(self,**gpr_kwargs):
+    def retrain_gprmodel(self,start_ix=60,**gpr_kwargs):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
         Parameters
         ----------
+        start_ix : int,60
+            Time index at which to start comparing trajectories. Since dt=1/30, 60 corresponds to 2 seconds.
         **gpr_kwargs
         """
         from coherence import DTWPerformance,GPR
         perfEval=DTWPerformance()
         gprmodel=GPR(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
                      fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                     mean_performance=self.gprmodel.mean_performance,
+                     mean_performance=self.gprmodel.performanceData.mean(),
                      **gpr_kwargs)
         p=np.zeros_like(self.gprmodel.performanceData)
         
@@ -527,7 +535,7 @@ class VRTrial3_1(object):
         for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
                                           self.subjectSplitTrials['avatar'],
                                           self.templateSplitTrials['avatar'])):
-            p[i]=perfEval.time_average(avv[75:,1:],sv[75:,1:],dt=1/30)
+            p[i]=perfEval.time_average(avv[60:,1:],sv[60:,1:],dt=1/30)
             
             f=self.gprmodel.fractions[i]
             dur=self.gprmodel.durations[i]
@@ -674,18 +682,24 @@ class VRTrial3_1(object):
                 ix_ = (np.array(spec)[None,:]==trialWindows).all(1)
                 if ix_.any():
                     ix=np.where(ix_)[0].tolist()
+                else:
+                    ix=[]
         elif type(precision) is float:
             for spec in specs:
                 specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
                 ix_ = (specDiffs<=precision).all(1)
                 if ix_.any():
                     ix=np.where(ix_)[0].tolist()
+                else:
+                    ix=[]
         elif type(precision) is tuple:
             for spec in specs:
                 specDiffs = np.abs( trialWindows-np.array(spec)[None,:] )
                 ix_ = (specDiffs[:,0]<=precision[0])&(specDiffs[:,1]<=precision[1])
                 if ix_.any():
                     ix=np.where(ix_)[0].tolist()
+                else:
+                    ix=[]
         else:
             raise NotImplementedError("precision type not supported.")
 
