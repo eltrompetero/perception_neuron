@@ -831,11 +831,11 @@ def extract_motionbuilder_model3_3(hand,
     Parameters
     ----------
     hand : str
-        Hand of the model.
+        Hand of the model. Must be 'Left' or 'Right'.
     fname : str,'Eddie_Grid_Model_%s_Anim_Export_Take_001'
         Name of file with %s to replace with handedness.
     reverse_time : bool,False
-        Read data backwards from end.
+        Read data backwards from end. This option is used when the avatar's motion is played in reverse.
 
     Returns
     -------
