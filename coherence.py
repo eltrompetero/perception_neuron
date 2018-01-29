@@ -639,7 +639,6 @@ class CoherenceEvaluator(object):
 
 class GPR(object):
     def __init__(self,
-                 GPRKernel = RBF(length_scale=np.array([1.,1.])),
                  alpha = .2,
                  mean_performance=np.log(1),
                  length_scale=np.array([1.,.2]),
@@ -650,7 +649,6 @@ class GPR(object):
 
         Parameters
         ----------
-        GPRKernel : sklearn.gaussian_processes.kernels.RBF
         alpha : float
             Uncertainty in diagonal matrix for GPR kernel.
         mean_performance : float,.5
