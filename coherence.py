@@ -842,11 +842,6 @@ class GPR(object):
             ix = [np.argmin(np.abs(self.performanceGrid-pstar_)) for pstar_ in pstar]
         return self.meshPoints[ix,0],self.meshPoints[ix,1]
     
-    @staticmethod
-    def _scale_erf(x,mu,std):
-        from scipy.special import erf
-        return .5 + erf( (x-mu)/std/np.sqrt(2) )/std/2
-
     def update(self,new_performance,window_dur,vis_fraction):
         '''
         This is called to add new data point to prediction.
@@ -862,7 +857,12 @@ class GPR(object):
         self.durations = np.append(self.durations,window_dur)
         
         self.predict()
-    
+
+    @staticmethod
+    def _scale_erf(x,mu,std):
+        from scipy.special import erf
+        return .5 + erf( (x-mu)/std/np.sqrt(2) )/std/2
+   
     @staticmethod
     def ilogistic(x):
         return -np.log(1/x-1)
