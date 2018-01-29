@@ -10,6 +10,7 @@ from scipy.signal import coherence
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
 from warnings import warn
+from gaussian_process.regressor import GaussianProcessRegressor
 
 
 
@@ -681,7 +682,6 @@ class GPR(object):
         '''
         assert (type(length_scale) is np.ndarray) and len(length_scale)==2
 
-        from gaussian_process.regressor import GaussianProcessRegressor
         self.tmin = tmin
         self.tmax = tmax
         self.tstep = tstep
@@ -842,11 +842,6 @@ class GPR(object):
             ix = [np.argmin(np.abs(self.performanceGrid-pstar_)) for pstar_ in pstar]
         return self.meshPoints[ix,0],self.meshPoints[ix,1]
     
-    @staticmethod
-    def _scale_erf(x,mu,std):
-        from scipy.special import erf
-        return .5 + erf( (x-mu)/std/np.sqrt(2) )/std/2
-
     def update(self,new_performance,window_dur,vis_fraction):
         '''
         This is called to add new data point to prediction.
@@ -862,7 +857,71 @@ class GPR(object):
         self.durations = np.append(self.durations,window_dur)
         
         self.predict()
-    
+
+    def search_hyperparams(self,n_restarts=1):
+        """Find the hyperparameters that maximize the log likelihood of the data.
+
+        This doesn't seem well-behaved with the length_scale parameters so those are not optimized.
+
+        Parameters
+        ----------
+        n_restarts : int,1
+        """
+        from scipy.optimize import minimize
+
+        def train_new_gpr(params):
+            length_scale=params[:2]
+            alpha=params[2]
+            mean_performance=params[3]
+
+            kernel=self.handsync_experiment_kernel(length_scale)
+            gp=GaussianProcessRegressor(kernel,alpha**-2)
+            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
+            return gp
+
+        def f(params):
+            assert len(params)==2
+            if params[0]<0:
+                return 1e30
+            params=np.concatenate((self.length_scale,params))
+            gp=train_new_gpr(params)
+            return -gp.log_likelihood()
+        
+        #initialGuess=np.concatenate((self.length_scale,[self.alpha,self.mean_performance]))
+        soln=[]
+        initialGuess=np.array([self.alpha,self.mean_performance])
+        soln.append( minimize(f,initialGuess) )
+        for i in xrange(1,n_restarts):
+            initialGuess=np.array([np.random.exponential(),np.random.normal()])
+            soln.append( minimize(f,initialGuess) )
+
+        if len(soln)>1:
+            minLikIx=np.argmin([s['fun'] for s in soln])
+            soln=[soln[minLikIx]]
+        return soln[0]
+
+    def optimize_hyperparams(self,verbose=False):
+        """Find the hyperparameters that optimize the log likelihood and reset the kernel.
+
+        Parameters
+        ----------
+        verbose : bool,False
+        """
+        soln=self.search_hyperparams()
+        if verbose:
+            print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%(soln['x'][0],soln['x'][1])
+        self.alpha,self.mean_performance=soln['x']
+        
+        # Refresh kernel.
+        self.kernel=self.handsync_experiment_kernel(self.length_scale)
+        self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
+        self.predict()
+
+    @staticmethod
+    def _scale_erf(x,mu,std):
+        from scipy.special import erf
+        return .5 + erf( (x-mu)/std/np.sqrt(2) )/std/2
+   
     @staticmethod
     def ilogistic(x):
         return -np.log(1/x-1)
