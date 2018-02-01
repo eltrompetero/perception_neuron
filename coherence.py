@@ -712,9 +712,11 @@ class GPR(object):
         self.pointsToAvoid = []
    
     def predict(self,mesh=None):
-        '''
+        """
         Fits the GPR to all data points and saves the predicted values with errors. The mean in the target
         perf values is accounted for here.
+
+        Update self.performanceGrid with the latest prediction (this includes the mean offset).
 
         Parameters
         ----------
@@ -728,7 +730,7 @@ class GPR(object):
             Performance grid.
         perfErr : ndarray
             Performance estimated standard deviation.
-        '''
+        """
         if mesh is None:
             mesh = self.meshPoints
 
@@ -901,7 +903,7 @@ class GPR(object):
         return soln[0]
 
     def optimize_hyperparams(self,verbose=False):
-        """Find the hyperparameters that optimize the log likelihood and reset the kernel.
+        """Find the hyperparameters that optimize the log likelihood and reset the kernel and the GPR landscape.
 
         Parameters
         ----------

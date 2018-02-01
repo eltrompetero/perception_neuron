@@ -22,6 +22,7 @@ class HandSyncExperiment(object):
     def __init__(self,duration,trial_type,
                  parts_ix=None,
                  broadcast_port=5001,
+                 anPort=7013,
                  fs=30,
                  rotation_angle=0,
                  check_directory=True,
@@ -54,7 +55,7 @@ class HandSyncExperiment(object):
         self.trialStartTimes = [] # times trials (excluding very first fully visible trial) were started
         self.trialEndTimes = [] # times trials end (including very first fully visible trial) were started
 
-        self.anPort=7013  # port at which to receive AN calculation broadcast
+        self.anPort=anPort  # port at which to receive AN calculation broadcast
 
         # Check that data is being broadcast on anPort.
         self._check_an_port() 
@@ -687,7 +688,7 @@ class HandSyncExperiment(object):
         if not os.path.isdir(handedness):
             os.mkdir(handedness)
         for f in os.listdir('./'):
-            if os.path.isfile(f):
+            if os.path.isfile(f) or f=='capture':
                 os.rename(f,'%s/%s'%(handedness,f))
 
     def stop(self):

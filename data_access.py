@@ -173,7 +173,23 @@ def subject_settings_v3_3(index,hand,return_list=True):
                 {'person':'Subject07_3_3',
                  'trials':['avatar'],
                  'reverse':[True,False],
-                 'usable':[True,True]}
+                 'usable':[True,True]},
+                {'person':'Subject08_3_3',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,True]},
+                {'person':'Subject09_3_3',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,False]},
+                {'person':'Subject10_3_3',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,False]},
+                {'person':'Subject11_3_3',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,True]},
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
