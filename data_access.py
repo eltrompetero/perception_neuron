@@ -200,6 +200,48 @@ def subject_settings_v3_3(index,hand,return_list=True):
         return settings['person'],dr,rotAngle,reverse,usable
     return settings,dr
 
+def subject_settings_v3_4(index,hand,return_list=True):
+    """
+    Subject info for experiment v3.3. Twoples refer to the left and right subject hands.
+    2018-02-16
+
+    Parameters
+    ----------
+    index : int
+    hand : str
+        Subject hand used.
+    return_list : bool,True
+
+    Returns
+    -------
+    settings : dict
+    dr : str
+    """
+    settings = [{'person':'Subject01_3_4',
+                 'trials':['avatar'],
+                 'reverse':[False,False],
+                 'usable':[False,True]},
+                {'person':'Subject02_3_4',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject03_3_4',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,True]},
+                ][index]
+    dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
+    try:
+        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+    except IOError:
+        rotAngle=np.nan
+    reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
+    usable=settings['usable'][0] if hand=='left' else settings['usable'][1]
+
+    if return_list:
+        return settings['person'],dr,rotAngle,reverse,usable
+    return settings,dr
+
 
 
 # ------------------ #
