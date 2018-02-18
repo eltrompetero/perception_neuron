@@ -229,6 +229,14 @@ def subject_settings_v3_4(index,hand,return_list=True):
                  'trials':['avatar'],
                  'reverse':[True,False],
                  'usable':[True,True]},
+                {'person':'Subject04_3_4',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject05_3_4',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
