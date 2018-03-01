@@ -987,7 +987,7 @@ class GPREllipsoid(GPR):
             return gp
 
         def f(params):
-            #assert len(params)==2
+            assert len(params)==2
             if 0>params[0]:
                 return 1e30
             gp=train_new_gpr(params)
@@ -1007,9 +1007,9 @@ class GPREllipsoid(GPR):
         return soln[0]
 
     def _search_hyperparams_with_length_scales(self,n_restarts=1):
-        """Find the hyperparameters that maximize the log likelihood of the data.
-
-        This doesn't seem well-behaved with the length_scale parameters so those are not optimized.
+        """Find the hyperparameters that maximize the log likelihood of the data including length
+        scale parameters on the surface of ellipsoid.
+        Must run several times for good results with minimizing length scale parameters.
 
         Parameters
         ----------
@@ -1026,23 +1026,19 @@ class GPREllipsoid(GPR):
             return gp
 
         def f(params):
-            #assert len(params)==2
             if 0>params[0]:
                 return 1e30
             if params[2]<0: return 1e30
             if not 0<=params[3]<1: return 1e30
+
             gp=train_new_gpr(params)
-            #print 'det sign=%1.0f,det=%1.2f'%np.linalg.slogdet(gp.cov)
-            #print 'inv=%1.2f'%np.linalg.inv(gp.cov).max()
             return -gp.log_likelihood()
         
-        #initialGuess=np.concatenate((self.length_scale,[self.alpha,self.mean_performance]))
         soln=[]
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
         initialGuess=np.array([self.alpha,self.mean_performance,1,.1])
         soln.append( minimize(f,initialGuess) )
         for i in xrange(1,n_restarts):
-            #initialGuess=np.array([self.alpha,self.mean_performance,1,.1])
             initialGuess=np.array([np.random.exponential(),np.random.normal(),
                                    np.random.exponential(),np.random.rand()])
             soln.append( minimize(f,initialGuess) )
@@ -1109,12 +1105,6 @@ class GPREllipsoid(GPR):
 
             lat0=(tfx[1]-.5)*180
             lat1=(tfy[1]-.5)*180
-
-            assert 0<=lon0<=180
-            assert 0<=lon1<=180
-            assert -90<=lat0<=90
-            assert -90<=lat1<=90
-
             return np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2 )
         return kernel
 
@@ -1151,15 +1141,10 @@ class GPREllipsoid(GPR):
 
             lat0=(tfx[1]-.5)*180
             lat1=(tfy[1]-.5)*180
-
-            assert 0<=lon0<=180,lon0
-            assert 0<=lon1<=180,lon1
-            assert -90<=lat0<=90,lat0
-            assert -90<=lat1<=90,lat1
-
             return np.exp( -self._geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2 )
         self.kernel=kernel
 #end GPREllipsoid
+
 
 
 def define_delta(x,width=0.):
