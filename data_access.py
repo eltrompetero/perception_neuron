@@ -617,12 +617,12 @@ class VRTrial3_1(object):
             Time index at which to start comparing trajectories. Since dt=1/30, 60 corresponds to 2 seconds.
         **gpr_kwargs
         """
-        from coherence import DTWPerformance,GPR
+        from coherence import DTWPerformance,GPREllipsoid
         perfEval=DTWPerformance()
-        gprmodel=GPR(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
-                     fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                     mean_performance=self.gprmodel.performanceData.mean(),
-                     **gpr_kwargs)
+        gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
+                             fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
+                             mean_performance=self.gprmodel.performanceData.mean(),
+                             **gpr_kwargs)
         p=np.zeros_like(self.gprmodel.performanceData)
         
         # Update GPR on performance data points calculated again.
