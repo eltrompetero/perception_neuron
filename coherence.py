@@ -860,7 +860,7 @@ class GPR(object):
         
         self.predict()
 
-    def search_hyperparams(self,n_restarts=1):
+    def _search_hyperparams(self,n_restarts=1):
         """Find the hyperparameters that maximize the log likelihood of the data.
 
         This doesn't seem well-behaved with the length_scale parameters so those are not optimized.
@@ -909,7 +909,7 @@ class GPR(object):
         ----------
         verbose : bool,False
         """
-        soln=self.search_hyperparams()
+        soln=self._search_hyperparams()
         if verbose:
             print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%(soln['x'][0],soln['x'][1])
         self.alpha,self.mean_performance=soln['x']
@@ -953,16 +953,213 @@ class GPR(object):
         assert length_scales[0]>=(self.tmax/np.pi)
         delta = define_delta(1,width=.0)
         
-        def kernel(tf0,tf1,length_scales=length_scales):
-            xy0 = np.array([ (1-tf0[1])/length_scales[1]*np.cos(tf0[0]/length_scales[0]),
-                             (1-tf0[1])/length_scales[1]*np.sin(tf0[0]/length_scales[0]) ])
-            xy1 = np.array([ (1-tf1[1])/length_scales[1]*np.cos(tf1[0]/length_scales[0]),
-                             (1-tf1[1])/length_scales[1]*np.sin(tf1[0]/length_scales[0]) ])
+        def kernel(tfx,tfy,length_scales=length_scales):
+            xy0 = np.array([ (1-tfx[1])/length_scales[1]*np.cos(tfx[0]/length_scales[0]),
+                             (1-tfx[1])/length_scales[1]*np.sin(tfx[0]/length_scales[0]) ])
+            xy1 = np.array([ (1-tfy[1])/length_scales[1]*np.cos(tfy[0]/length_scales[0]),
+                             (1-tfy[1])/length_scales[1]*np.sin(tfy[0]/length_scales[0]) ])
 
             return np.exp( -((xy0-xy1)**2).sum() )
         return kernel
 #end GPR
 
+
+
+class GPREllipsoid(GPR):
+    def __init__(self,*args,**kwargs):
+        super(GPREllipsoid,self).__init__(*args,**kwargs)
+        self._update_kernel(1,0)
+
+    def _search_hyperparams(self,n_restarts=1):
+        """Find the hyperparameters that maximize the log likelihood of the data.
+
+        Parameters
+        ----------
+        n_restarts : int,1
+        """
+        from scipy.optimize import minimize
+
+        def train_new_gpr(params):
+            alpha,mean_performance=params
+            
+            gp=GaussianProcessRegressor(self.kernel,alpha**-2)
+            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
+            return gp
+
+        def f(params):
+            #assert len(params)==2
+            if 0>params[0]:
+                return 1e30
+            gp=train_new_gpr(params)
+            return -gp.log_likelihood()
+        
+        soln=[]
+        # Parameters are noise std, mean perf
+        initialGuess=np.array([self.alpha,self.mean_performance])
+        soln.append( minimize(f,initialGuess) )
+        for i in xrange(1,n_restarts):
+            initialGuess=np.array([np.random.exponential(),np.random.normal()])
+            soln.append( minimize(f,initialGuess) )
+
+        if len(soln)>1:
+            minNegLikIx=np.argmin([s['fun'] for s in soln])
+            soln=[soln[minNegLikIx]]
+        return soln[0]
+
+    def _search_hyperparams_with_length_scales(self,n_restarts=1):
+        """Find the hyperparameters that maximize the log likelihood of the data.
+
+        This doesn't seem well-behaved with the length_scale parameters so those are not optimized.
+
+        Parameters
+        ----------
+        n_restarts : int,1
+        """
+        from scipy.optimize import minimize
+
+        def train_new_gpr(params):
+            alpha,mean_performance,a,f=params
+            
+            kernel=self.define_kernel(a,f)
+            gp=GaussianProcessRegressor(kernel,alpha**-2)
+            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
+            return gp
+
+        def f(params):
+            #assert len(params)==2
+            if 0>params[0]:
+                return 1e30
+            if params[2]<0: return 1e30
+            if not 0<=params[3]<1: return 1e30
+            gp=train_new_gpr(params)
+            #print 'det sign=%1.0f,det=%1.2f'%np.linalg.slogdet(gp.cov)
+            #print 'inv=%1.2f'%np.linalg.inv(gp.cov).max()
+            return -gp.log_likelihood()
+        
+        #initialGuess=np.concatenate((self.length_scale,[self.alpha,self.mean_performance]))
+        soln=[]
+        # Parameters are noise std, mean perf, equatorial radius, oblateness.
+        initialGuess=np.array([self.alpha,self.mean_performance,1,.1])
+        soln.append( minimize(f,initialGuess) )
+        for i in xrange(1,n_restarts):
+            #initialGuess=np.array([self.alpha,self.mean_performance,1,.1])
+            initialGuess=np.array([np.random.exponential(),np.random.normal(),
+                                   np.random.exponential(),np.random.rand()])
+            soln.append( minimize(f,initialGuess) )
+
+        if len(soln)>1:
+            minNegLikIx=np.argmin([s['fun'] for s in soln])
+            soln=[soln[minNegLikIx]]
+        return soln[0]
+
+    def optimize_hyperparams(self,verbose=False,optimize_length_scales=False):
+        """Find the hyperparameters that optimize the log likelihood and reset the kernel and the GPR landscape.
+
+        Parameters
+        ----------
+        verbose : bool,False
+        """
+        if optimize_length_scales:
+            soln=self._search_hyperparams_with_length_scales(3)
+            if verbose:
+                print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f, a=%1.2f, f=%1.2f"%tuple(soln['x'])
+            self.alpha,self.mean_performance,self.equatorialRadius,self.oblateness=soln['x']
+        else:
+            soln=self._search_hyperparams(3)
+            if verbose:
+                print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
+            self.alpha,self.mean_performance=soln['x']
+            self.equatorialRadius,self.oblateness=1,0
+
+        # Refresh kernel.
+        self._update_kernel(self.equatorialRadius,self.oblateness)
+        self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
+        self.predict()
+
+    def define_kernel(self,*args):
+        """Define new Geodesic within given parameters and wrap it nicely.
+
+        Parameters
+        ----------
+        a : float
+            Equatorial radius.
+        f : float
+            Polar radius b=a*(1-f)
+        """
+        from geographiclib.geodesic import Geodesic
+        if len(args)==2:
+            a,f=args
+        elif len(args)==1:
+            a,f=args[0]
+        else:
+            raise Exception("Wrong inputs.")
+
+        _geodesic=Geodesic(a,f)
+        def kernel(tfx,tfy):
+            # Account for cases where f=1.
+            if tfx[0]==0:
+                lon0=0
+            else:
+                lon0=(tfx[0]-.5)*180/(self.tmax-self.tmin)
+
+            if tfy[0]==0:
+                lon1=0
+            else:
+                lon1=(tfy[0]-.5)*180/(self.tmax-self.tmin)
+
+            lat0=(tfx[1]-.5)*180
+            lat1=(tfy[1]-.5)*180
+
+            assert 0<=lon0<=180
+            assert 0<=lon1<=180
+            assert -90<=lat0<=90
+            assert -90<=lat1<=90
+
+            return np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2 )
+        return kernel
+
+    def _update_kernel(self,*args):
+        """Update instance Geodesic kernel parameters and wrap it nicely.
+
+        Parameters
+        ----------
+        a : float
+            Equatorial radius.
+        f : float
+            Polar radius b=a*(1-f)
+        """
+        from geographiclib.geodesic import Geodesic
+        if len(args)==2:
+            a,f=args
+        elif len(args)==1:
+            a,f=args[0]
+        else:
+            raise Exception("Wrong inputs.")
+
+        self._geodesic=Geodesic(a,f)
+        def kernel(tfx,tfy):
+            # Account for cases where f=1.
+            if tfx[0]==0:
+                lon0=0
+            else:
+                lon0=(tfx[0]-.5)*180/(self.tmax-self.tmin)
+
+            if tfy[0]==0:
+                lon1=0
+            else:
+                lon1=(tfy[0]-.5)*180/(self.tmax-self.tmin)
+
+            lat0=(tfx[1]-.5)*180
+            lat1=(tfy[1]-.5)*180
+
+            assert 0<=lon0<=180,lon0
+            assert 0<=lon1<=180,lon1
+            assert -90<=lat0<=90,lat0
+            assert -90<=lat1<=90,lat1
+
+            return np.exp( -self._geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2 )
+        self.kernel=kernel
+#end GPREllipsoid
 
 
 def define_delta(x,width=0.):
@@ -991,11 +1188,11 @@ def handsync_experiment_kernel(self,length_scales):
         from numpy.linalg import norm
         delta = define_delta(1,width=.00)
         
-        def kernel(tf0,tf1,length_scales=length_scales):
-            xy0 = np.array([ (1-tf0[1])/length_scales[1]*np.cos(tf0[0]/length_scales[0]),
-                             (1-tf0[1])/length_scales[1]*np.sin(tf0[0]/length_scales[0]) ])
-            xy1 = np.array([ (1-tf1[1])/length_scales[1]*np.cos(tf1[0]/length_scales[0]),
-                             (1-tf1[1])/length_scales[1]*np.sin(tf1[0]/length_scales[0]) ])
+        def kernel(tfx,tfy,length_scales=length_scales):
+            xy0 = np.array([ (1-tfx[1])/length_scales[1]*np.cos(tfx[0]/length_scales[0]),
+                             (1-tfx[1])/length_scales[1]*np.sin(tfx[0]/length_scales[0]) ])
+            xy1 = np.array([ (1-tfy[1])/length_scales[1]*np.cos(tfy[0]/length_scales[0]),
+                             (1-tfy[1])/length_scales[1]*np.sin(tfy[0]/length_scales[0]) ])
 
             return np.exp( -((xy0-xy1)**2).sum() )
         return kernel
