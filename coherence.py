@@ -987,8 +987,7 @@ class GPREllipsoid(GPR):
             return gp
 
         def f(params):
-            assert len(params)==2
-            if 0>params[0]:
+            if params[0]<0:
                 return 1e30
             gp=train_new_gpr(params)
             return -gp.log_likelihood()
@@ -1036,7 +1035,7 @@ class GPREllipsoid(GPR):
         
         soln=[]
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
-        initialGuess=np.array([self.alpha,self.mean_performance,1,.1])
+        initialGuess=np.array([self.alpha,self.mean_performance,.8,.1])
         soln.append( minimize(f,initialGuess) )
         for i in xrange(1,n_restarts):
             initialGuess=np.array([np.random.exponential(),np.random.normal(),
