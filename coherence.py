@@ -11,6 +11,7 @@ from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
 from warnings import warn
 from gaussian_process.regressor import GaussianProcessRegressor
+import multiprocess as mp
 
 
 
@@ -992,13 +993,17 @@ class GPREllipsoid(GPR):
             gp=train_new_gpr(params)
             return -gp.log_likelihood()
         
-        soln=[]
         # Parameters are noise std, mean perf
         initialGuess=np.array([self.alpha,self.mean_performance])
-        soln.append( minimize(f,initialGuess) )
-        for i in xrange(1,n_restarts):
-            initialGuess=np.array([np.random.exponential(),np.random.normal()])
-            soln.append( minimize(f,initialGuess) )
+        if n_restarts>1:
+            initialGuess=np.vstack((initialGuess,
+                                    np.vstack((np.random.exponential(size=n_restarts-1),
+                                               np.random.normal(size=n_restarts-1))).T ))
+            pool=mp.Pool(mp.cpu_count())
+            soln=pool.map( lambda x:minimize(f,x),initialGuess )
+            pool.close()
+        else:
+            soln=[minimize(f,initialGuess)]
 
         if len(soln)>1:
             minNegLikIx=np.argmin([s['fun'] for s in soln])
@@ -1033,14 +1038,19 @@ class GPREllipsoid(GPR):
             gp=train_new_gpr(params)
             return -gp.log_likelihood()
         
-        soln=[]
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
         initialGuess=np.array([self.alpha,self.mean_performance,.8,.1])
-        soln.append( minimize(f,initialGuess) )
-        for i in xrange(1,n_restarts):
-            initialGuess=np.array([np.random.exponential(),np.random.normal(),
-                                   np.random.exponential(),np.random.rand()])
-            soln.append( minimize(f,initialGuess) )
+        if n_restarts>1:
+            initialGuess=np.vstack((initialGuess,
+                                    np.vstack((np.random.exponential(size=n_restarts-1),
+                                               np.random.normal(size=n_restarts-1),
+                                               np.random.exponential(size=n_restarts-1),
+                                               np.random.rand(n_restarts-1))).T ))
+            pool=mp.Pool(mp.cpu_count())
+            soln=pool.map( lambda x:minimize(f,x),initialGuess )
+            pool.close()
+        else:
+            soln=[minimize(f,initialGuess)]
 
         if len(soln)>1:
             minNegLikIx=np.argmin([s['fun'] for s in soln])
@@ -1055,12 +1065,12 @@ class GPREllipsoid(GPR):
         verbose : bool,False
         """
         if optimize_length_scales:
-            soln=self._search_hyperparams_with_length_scales(3)
+            soln=self._search_hyperparams_with_length_scales(4)
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f, a=%1.2f, f=%1.2f"%tuple(soln['x'])
             self.alpha,self.mean_performance,self.equatorialRadius,self.oblateness=soln['x']
         else:
-            soln=self._search_hyperparams(3)
+            soln=self._search_hyperparams(4)
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
             self.alpha,self.mean_performance=soln['x']
