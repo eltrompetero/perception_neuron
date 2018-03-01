@@ -970,9 +970,11 @@ class GPREllipsoid(GPR):
     def __init__(self,*args,**kwargs):
         from geographiclib.geodesic import Geodesic
         super(GPREllipsoid,self).__init__(*args,**kwargs)
-        self.DEFAULT_LENGTH_SCALE=10000
+        self.DEFAULT_LENGTH_SCALE=100
         self._geodesic=Geodesic(self.DEFAULT_LENGTH_SCALE,0)
-        self._update_kernel(10000)
+
+        self.length_scale=self.DEFAULT_LENGTH_SCALE**2
+        self._update_kernel(self.length_scale)
 
     def _search_hyperparams(self,n_restarts=2):
         """Find the hyperparameters that maximize the log likelihood of the data.
@@ -1046,12 +1048,12 @@ class GPREllipsoid(GPR):
                 return np.nan
         
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
-        initialGuess=np.array([self.alpha,self.mean_performance,self.DEFAULT_LENGTH_SCALE])
+        initialGuess=np.array([self.alpha,self.mean_performance,self.length_scale])
         if n_restarts>1:
             initialGuess=np.vstack((initialGuess,
-                                    np.vstack((np.random.exponential(size=n_restarts-1),
-                                               np.random.normal(size=n_restarts-1),
-                                               np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE)+10)).T ))
+                np.vstack((np.random.exponential(size=n_restarts-1),
+                           np.random.normal(size=n_restarts-1),
+                           np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE**2)+10)).T ))
                                                #np.random.rand(n_restarts-1))).T ))
             pool=mp.Pool(mp.cpu_count())
             soln=pool.map( lambda x:minimize(f,x),initialGuess )
@@ -1074,19 +1076,20 @@ class GPREllipsoid(GPR):
         if optimize_length_scales:
             soln=self._search_hyperparams_with_length_scales(4)
             if verbose:
-                #print soln['fun']
+                print soln['fun']
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f, a=%1.2f"%tuple(soln['x'])
-            self.alpha,self.mean_performance,self.equatorialRadius=soln['x']
+            self.alpha,self.mean_performance,self.length_scale=soln['x']
+            
+            # Refresh kernel.
+            self._update_kernel(self.length_scale)
         else:
             soln=self._search_hyperparams(4)
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
             self.alpha,self.mean_performance=soln['x']
-            self.equatorialRadius,self.oblateness=1,0
 
-        # Refresh kernel.
-        self._update_kernel(self.equatorialRadius)
-        self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
+            # Refresh kernel.
+            self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
         self.predict()
     
     @staticmethod
@@ -1126,12 +1129,15 @@ class GPREllipsoid(GPR):
     def _update_kernel(self,a):
         """Update instance Geodesic kernel parameters and wrap it nicely.
 
+        Performance grid is not updated.
+
         Parameters
         ----------
         a : float
             Equatorial radius.
         """
-        self.kernel=self._kernel(self._geodesic,self.tmin,self.tmax,a)
+        self.kernel=self._kernel( self._geodesic,self.tmin,self.tmax,a )
+        self.gp=GaussianProcessRegressor( self.kernel,self.alpha**-2 )
 #end GPREllipsoid
 
 
