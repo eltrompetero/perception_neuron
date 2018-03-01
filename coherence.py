@@ -1030,7 +1030,7 @@ class GPREllipsoid(GPR):
             return gp
 
         def f(params):
-            if 0>params[0]:
+            if params[0]<0:
                 return 1e30
             if params[2]<0: return 1e30
             if not 0<=params[3]<1: return 1e30
