@@ -968,10 +968,13 @@ class GPR(object):
 
 class GPREllipsoid(GPR):
     def __init__(self,*args,**kwargs):
+        from geographiclib.geodesic import Geodesic
         super(GPREllipsoid,self).__init__(*args,**kwargs)
-        self._update_kernel(1,0)
+        self.DEFAULT_LENGTH_SCALE=10000
+        self._geodesic=Geodesic(self.DEFAULT_LENGTH_SCALE,0)
+        self._update_kernel(10000)
 
-    def _search_hyperparams(self,n_restarts=1):
+    def _search_hyperparams(self,n_restarts=2):
         """Find the hyperparameters that maximize the log likelihood of the data.
 
         Parameters
@@ -1013,6 +1016,7 @@ class GPREllipsoid(GPR):
     def _search_hyperparams_with_length_scales(self,n_restarts=1):
         """Find the hyperparameters that maximize the log likelihood of the data including length
         scale parameters on the surface of ellipsoid.
+        
         Must run several times for good results with minimizing length scale parameters.
 
         Parameters
@@ -1022,30 +1026,33 @@ class GPREllipsoid(GPR):
         from scipy.optimize import minimize
 
         def train_new_gpr(params):
-            alpha,mean_performance,a,f=params
+            alpha,mean_performance,a=params
             
-            kernel=self.define_kernel(a,f)
+            kernel=self.define_kernel(a)
             gp=GaussianProcessRegressor(kernel,alpha**-2)
             gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
             return gp
 
         def f(params):
-            if params[0]<0:
+            if params[0]<=0:
                 return 1e30
-            if params[2]<0: return 1e30
-            if not 0<=params[3]<1: return 1e30
-
+            if params[2]<=10: return 1e30
+            #if not 0<=params[3]<1: return 1e30
             gp=train_new_gpr(params)
-            return -gp.log_likelihood()
+            try:
+                return -gp.log_likelihood()
+            except AssertionError:
+                print params
+                return np.nan
         
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
-        initialGuess=np.array([self.alpha,self.mean_performance,.8,.1])
+        initialGuess=np.array([self.alpha,self.mean_performance,self.DEFAULT_LENGTH_SCALE])
         if n_restarts>1:
             initialGuess=np.vstack((initialGuess,
                                     np.vstack((np.random.exponential(size=n_restarts-1),
                                                np.random.normal(size=n_restarts-1),
-                                               np.random.exponential(size=n_restarts-1),
-                                               np.random.rand(n_restarts-1))).T ))
+                                               np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE)+10)).T ))
+                                               #np.random.rand(n_restarts-1))).T ))
             pool=mp.Pool(mp.cpu_count())
             soln=pool.map( lambda x:minimize(f,x),initialGuess )
             pool.close()
@@ -1067,8 +1074,9 @@ class GPREllipsoid(GPR):
         if optimize_length_scales:
             soln=self._search_hyperparams_with_length_scales(4)
             if verbose:
-                print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f, a=%1.2f, f=%1.2f"%tuple(soln['x'])
-            self.alpha,self.mean_performance,self.equatorialRadius,self.oblateness=soln['x']
+                #print soln['fun']
+                print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f, a=%1.2f"%tuple(soln['x'])
+            self.alpha,self.mean_performance,self.equatorialRadius=soln['x']
         else:
             soln=self._search_hyperparams(4)
             if verbose:
@@ -1077,81 +1085,53 @@ class GPREllipsoid(GPR):
             self.equatorialRadius,self.oblateness=1,0
 
         # Refresh kernel.
-        self._update_kernel(self.equatorialRadius,self.oblateness)
+        self._update_kernel(self.equatorialRadius)
         self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
         self.predict()
+    
+    @staticmethod
+    def _kernel(_geodesic,tmin,tmax,length_scale):
+        """Return kernel function as defined with given parameters.
+        """
+        assert tmax>tmin
+        assert length_scale>0
 
-    def define_kernel(self,*args):
+        def kernel(tfx,tfy):
+            # Account for cases where f=1.
+            if tfx[0]==0:
+                lon0=0
+            else:
+                lon0=(tfx[0]-.5)*180/(tmax-tmin)
+
+            if tfy[0]==0:
+                lon1=0
+            else:
+                lon1=(tfy[0]-.5)*180/(tmax-tmin)
+
+            lat0=(tfx[1]-.5)*180
+            lat1=(tfy[1]-.5)*180
+            return np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2/length_scale )
+        return kernel
+
+    def define_kernel(self,a):
         """Define new Geodesic within given parameters and wrap it nicely.
 
         Parameters
         ----------
         a : float
             Equatorial radius.
-        f : float
-            Polar radius b=a*(1-f)
         """
-        from geographiclib.geodesic import Geodesic
-        if len(args)==2:
-            a,f=args
-        elif len(args)==1:
-            a,f=args[0]
-        else:
-            raise Exception("Wrong inputs.")
+        return self._kernel(self._geodesic,self.tmin,self.tmax,a)
 
-        _geodesic=Geodesic(a,f)
-        def kernel(tfx,tfy):
-            # Account for cases where f=1.
-            if tfx[0]==0:
-                lon0=0
-            else:
-                lon0=(tfx[0]-.5)*180/(self.tmax-self.tmin)
-
-            if tfy[0]==0:
-                lon1=0
-            else:
-                lon1=(tfy[0]-.5)*180/(self.tmax-self.tmin)
-
-            lat0=(tfx[1]-.5)*180
-            lat1=(tfy[1]-.5)*180
-            return np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2 )
-        return kernel
-
-    def _update_kernel(self,*args):
+    def _update_kernel(self,a):
         """Update instance Geodesic kernel parameters and wrap it nicely.
 
         Parameters
         ----------
         a : float
             Equatorial radius.
-        f : float
-            Polar radius b=a*(1-f)
         """
-        from geographiclib.geodesic import Geodesic
-        if len(args)==2:
-            a,f=args
-        elif len(args)==1:
-            a,f=args[0]
-        else:
-            raise Exception("Wrong inputs.")
-
-        self._geodesic=Geodesic(a,f)
-        def kernel(tfx,tfy):
-            # Account for cases where f=1.
-            if tfx[0]==0:
-                lon0=0
-            else:
-                lon0=(tfx[0]-.5)*180/(self.tmax-self.tmin)
-
-            if tfy[0]==0:
-                lon1=0
-            else:
-                lon1=(tfy[0]-.5)*180/(self.tmax-self.tmin)
-
-            lat0=(tfx[1]-.5)*180
-            lat1=(tfy[1]-.5)*180
-            return np.exp( -self._geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2 )
-        self.kernel=kernel
+        self.kernel=self._kernel(self._geodesic,self.tmin,self.tmax,a)
 #end GPREllipsoid
 
 
