@@ -976,7 +976,7 @@ class GPREllipsoid(GPR):
         self.length_scale=self.DEFAULT_LENGTH_SCALE**2
         self._update_kernel(self.length_scale)
 
-    def _search_hyperparams(self,n_restarts=2):
+    def _search_hyperparams(self,n_restarts=1,initial_guess=None):
         """Find the hyperparameters that maximize the log likelihood of the data.
 
         Parameters
@@ -984,6 +984,8 @@ class GPREllipsoid(GPR):
         n_restarts : int,1
         """
         from scipy.optimize import minimize
+        if initial_guess is None:
+            initial_guess=np.array([self.alpha,self.mean_performance])
 
         def train_new_gpr(params):
             alpha,mean_performance=params
@@ -999,23 +1001,22 @@ class GPREllipsoid(GPR):
             return -gp.log_likelihood()
         
         # Parameters are noise std, mean perf
-        initialGuess=np.array([self.alpha,self.mean_performance])
         if n_restarts>1:
-            initialGuess=np.vstack((initialGuess,
+            initial_guess=np.vstack((initial_guess,
                                     np.vstack((np.random.exponential(size=n_restarts-1),
                                                np.random.normal(size=n_restarts-1))).T ))
             pool=mp.Pool(mp.cpu_count())
-            soln=pool.map( lambda x:minimize(f,x),initialGuess )
+            soln=pool.map( lambda x:minimize(f,x),initial_guess )
             pool.close()
         else:
-            soln=[minimize(f,initialGuess)]
+            soln=[minimize(f,initial_guess)]
 
         if len(soln)>1:
             minNegLikIx=np.argmin([s['fun'] for s in soln])
             soln=[soln[minNegLikIx]]
         return soln[0]
 
-    def _search_hyperparams_with_length_scales(self,n_restarts=1):
+    def _search_hyperparams_with_length_scales(self,n_restarts=1,initial_guess=None):
         """Find the hyperparameters that maximize the log likelihood of the data including length
         scale parameters on the surface of ellipsoid.
         
@@ -1026,6 +1027,8 @@ class GPREllipsoid(GPR):
         n_restarts : int,1
         """
         from scipy.optimize import minimize
+        if initial_guess is None:
+            initial_guess=np.array([self.alpha,self.mean_performance,self.length_scale])
 
         def train_new_gpr(params):
             alpha,mean_performance,a=params
@@ -1048,25 +1051,24 @@ class GPREllipsoid(GPR):
                 return np.nan
         
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
-        initialGuess=np.array([self.alpha,self.mean_performance,self.length_scale])
         if n_restarts>1:
-            initialGuess=np.vstack((initialGuess,
+            initial_guess=np.vstack((initial_guess,
                 np.vstack((np.random.exponential(size=n_restarts-1),
                            np.random.normal(size=n_restarts-1),
                            np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE**2)+10)).T ))
                                                #np.random.rand(n_restarts-1))).T ))
             pool=mp.Pool(mp.cpu_count())
-            soln=pool.map( lambda x:minimize(f,x),initialGuess )
+            soln=pool.map( lambda x:minimize(f,x),initial_guess )
             pool.close()
         else:
-            soln=[minimize(f,initialGuess)]
+            soln=[minimize(f,initial_guess)]
 
         if len(soln)>1:
             minNegLikIx=np.argmin([s['fun'] for s in soln])
             soln=[soln[minNegLikIx]]
         return soln[0]
 
-    def optimize_hyperparams(self,verbose=False,optimize_length_scales=False):
+    def optimize_hyperparams(self,verbose=False,optimize_length_scales=False,initial_guess=None):
         """Find the hyperparameters that optimize the log likelihood and reset the kernel and the GPR landscape.
 
         Parameters
@@ -1074,7 +1076,7 @@ class GPREllipsoid(GPR):
         verbose : bool,False
         """
         if optimize_length_scales:
-            soln=self._search_hyperparams_with_length_scales(4)
+            soln=self._search_hyperparams_with_length_scales(4,initial_guess)
             if verbose:
                 print soln['fun']
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f, a=%1.2f"%tuple(soln['x'])
@@ -1083,7 +1085,7 @@ class GPREllipsoid(GPR):
             # Refresh kernel.
             self._update_kernel(self.length_scale)
         else:
-            soln=self._search_hyperparams(4)
+            soln=self._search_hyperparams(4,initial_guess)
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
             self.alpha,self.mean_performance=soln['x']
