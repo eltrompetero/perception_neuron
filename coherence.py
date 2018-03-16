@@ -968,6 +968,11 @@ class GPR(object):
 
 class GPREllipsoid(GPR):
     def __init__(self,*args,**kwargs):
+        """
+        Modeling performance landscape to live on the surface of an ellipsoid. For now, it is
+        assumed that it is a sphere because optimization with the major and minor axes seems
+        difficult.
+        """
         from geographiclib.geodesic import Geodesic
         super(GPREllipsoid,self).__init__(*args,**kwargs)
         self.DEFAULT_LENGTH_SCALE=100

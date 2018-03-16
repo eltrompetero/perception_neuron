@@ -190,6 +190,10 @@ def subject_settings_v3_3(index,hand,return_list=True):
                  'trials':['avatar'],
                  'reverse':[True,False],
                  'usable':[True,False]},
+                {'person':'Subject12_3_3',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,False]},
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
@@ -256,6 +260,10 @@ def subject_settings_v3_4(index,hand,return_list=True):
                 {'person':'Subject10_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject11_3_4',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
                  'usable':[True,True]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
@@ -624,9 +632,9 @@ class VRTrial3_1(object):
         from coherence import DTWPerformance,GPREllipsoid
         perfEval=DTWPerformance()
         gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
-                             fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                             mean_performance=self.gprmodel.performanceData.mean(),
-                             **gpr_kwargs)
+                              fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
+                              mean_performance=self.gprmodel.performanceData.mean(),
+                              **gpr_kwargs)
         p=np.zeros_like(self.gprmodel.performanceData)
         
         # Update GPR on performance data points calculated again.
