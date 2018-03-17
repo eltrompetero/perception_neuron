@@ -1052,7 +1052,7 @@ class GPREllipsoid(GPR):
             try:
                 return -gp.log_likelihood()
             except AssertionError:
-                print params
+                print "Bad parameter values %, %f, %f"%params
                 return np.nan
         
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
