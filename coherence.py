@@ -879,7 +879,8 @@ class GPR(object):
 
             kernel=self.handsync_experiment_kernel(length_scale)
             gp=GaussianProcessRegressor(kernel,alpha**-2)
-            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
+            gp.fit( np.vstack((self.durations,self.fractions)).T,
+                    self.performanceData-mean_performance )
             return gp
 
         def f(params):
@@ -904,7 +905,8 @@ class GPR(object):
         return soln[0]
 
     def optimize_hyperparams(self,verbose=False):
-        """Find the hyperparameters that optimize the log likelihood and reset the kernel and the GPR landscape.
+        """Find the hyperparameters that optimize the log likelihood and reset the kernel and the
+        GPR landscape.
 
         Parameters
         ----------
@@ -1052,7 +1054,7 @@ class GPREllipsoid(GPR):
             try:
                 return -gp.log_likelihood()
             except AssertionError:
-                print "Bad parameter values %, %f, %f"%params
+                print "Bad parameter values %f, %f, %f"%tuple(params)
                 return np.nan
         
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
