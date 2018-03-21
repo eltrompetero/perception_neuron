@@ -1102,6 +1102,9 @@ class GPREllipsoid(GPR):
         Parameters
         ----------
         verbose : bool,False
+        optimize_length_scales : bool,False
+            If True, optimize the radius of the ellipsoid used as well.
+        initial_guess : ndarray,None
         """
         if optimize_length_scales:
             soln=self._search_hyperparams_with_length_scales(4,initial_guess)
