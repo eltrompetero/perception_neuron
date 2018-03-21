@@ -643,6 +643,7 @@ class GPR(object):
     def __init__(self,
                  alpha = .2,
                  mean_performance=np.log(1),
+                 theta=.5,
                  length_scale=np.array([1.,.2]),
                  tmin=0.5,tmax=2,tstep=0.1,
                  fmin=0.1,fmax=1.,fstep=0.1):
@@ -659,6 +660,8 @@ class GPR(object):
             here. Since the GPR is trained in the logistic space, the offset is given by the logistic offset.
             The mean is automatically accounted for under the hood, so you don't have to worry about adding or
             subtracting it in the interface.
+        theta : float
+            Coefficient for kernel.
         length_scale : ndarray
             (duration_scale,fraction_scale) Remember that duration is the angle about the origin restricted to
             be between [0,pi] and fraction is the radius. The GPR learns once (r,theta) has been mapped to the
@@ -680,6 +683,10 @@ class GPR(object):
             Duration of window.
         meshPoints : ndarray
             List of grid points (duration,fraction) over which performance was measured.
+        performanceData : ndarray
+            List of performance data points that have been used to update GPR.
+        performanceGrid : ndarray
+            Unraveled grid of performance predictions on mesh of duration and fraction.
         '''
         assert (type(length_scale) is np.ndarray) and len(length_scale)==2
 
@@ -691,8 +698,9 @@ class GPR(object):
         self.fstep = fstep
         
         self.length_scale = length_scale
-        self.kernel = self.handsync_experiment_kernel(length_scale)
+        self.kernel = self.handsync_experiment_kernel(length_scale,theta)
         self.alpha = alpha
+        self.theta = theta
         
         self.durations = np.zeros(0)
         self.fractions = np.zeros(0)
@@ -861,7 +869,7 @@ class GPR(object):
         
         self.predict()
 
-    def _search_hyperparams(self,n_restarts=1):
+    def _search_hyperparams(self,initial_guess,n_restarts=1,min_alpha_bound=1e-3):
         """Find the hyperparameters that maximize the log likelihood of the data.
 
         This doesn't seem well-behaved with the length_scale parameters so those are not optimized.
@@ -869,6 +877,7 @@ class GPR(object):
         Parameters
         ----------
         n_restarts : int,1
+        min_alpha_bound : float,1e-3
         """
         from scipy.optimize import minimize
 
@@ -876,16 +885,20 @@ class GPR(object):
             length_scale=params[:2]
             alpha=params[2]
             mean_performance=params[3]
+            theta=params[4]
 
-            kernel=self.handsync_experiment_kernel(length_scale)
+            kernel=self.handsync_experiment_kernel(length_scale,theta)
             gp=GaussianProcessRegressor(kernel,alpha**-2)
             gp.fit( np.vstack((self.durations,self.fractions)).T,
                     self.performanceData-mean_performance )
             return gp
 
         def f(params):
-            assert len(params)==2
-            if params[0]<0:
+            """First parameter is std, second is mean, third is coefficient for kernel."""
+            assert len(params)==3
+            if params[0]<min_alpha_bound:
+                return 1e30
+            if params[2]<=0:
                 return 1e30
             params=np.concatenate((self.length_scale,params))
             gp=train_new_gpr(params)
@@ -893,32 +906,38 @@ class GPR(object):
         
         #initialGuess=np.concatenate((self.length_scale,[self.alpha,self.mean_performance]))
         soln=[]
-        initialGuess=np.array([self.alpha,self.mean_performance])
-        soln.append( minimize(f,initialGuess) )
+        soln.append( minimize(f,initial_guess) )
         for i in xrange(1,n_restarts):
-            initialGuess=np.array([np.random.exponential(),np.random.normal()])
-            soln.append( minimize(f,initialGuess) )
+            initial_guess=np.array([np.random.exponential(),np.random.normal(),np.random.exponential()])
+            soln.append( minimize(f,initial_guess) )
 
         if len(soln)>1:
             minLikIx=np.argmin([s['fun'] for s in soln])
             soln=[soln[minLikIx]]
         return soln[0]
 
-    def optimize_hyperparams(self,verbose=False):
+    def optimize_hyperparams(self,initial_guess=None,verbose=False):
         """Find the hyperparameters that optimize the log likelihood and reset the kernel and the
         GPR landscape.
 
         Parameters
         ----------
+        initial_guess : ndarray
+            (alpha,mean,theta)
         verbose : bool,False
         """
-        soln=self._search_hyperparams()
+        if initial_guess is None:
+            initial_guess=np.array([self.alpha,self.mean_performance,self.theta])
+        else:
+            assert len(initial_guess)==3
+
+        soln=self._search_hyperparams(initial_guess)
         if verbose:
             print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%(soln['x'][0],soln['x'][1])
-        self.alpha,self.mean_performance=soln['x']
+        self.alpha,self.mean_performance,self.theta=soln['x']
         
         # Refresh kernel.
-        self.kernel=self.handsync_experiment_kernel(self.length_scale)
+        self.kernel=self.handsync_experiment_kernel(self.length_scale,self.theta)
         self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
         self.predict()
 
@@ -935,7 +954,7 @@ class GPR(object):
     def logistic(x):
         return 1/(1+np.exp(-x))
 
-    def handsync_experiment_kernel(self,length_scales):
+    def handsync_experiment_kernel(self,length_scales,theta):
         """
         Calculates the RBF kernel for one pair of (window_duration,visible_fraction). Specifically for the
         handsync experiment.
@@ -947,6 +966,8 @@ class GPR(object):
         ----------
         length_scales : ndarray
             2 element vector specifying (duration,fraction)
+        theta : float
+            Coefficient in front of kernel.
 
         Returns
         -------
@@ -962,7 +983,7 @@ class GPR(object):
             xy1 = np.array([ (1-tfy[1])/length_scales[1]*np.cos(tfy[0]/length_scales[0]),
                              (1-tfy[1])/length_scales[1]*np.sin(tfy[0]/length_scales[0]) ])
 
-            return np.exp( -((xy0-xy1)**2).sum() )
+            return np.exp( -((xy0-xy1)**2).sum() )*theta
         return kernel
 #end GPR
 
