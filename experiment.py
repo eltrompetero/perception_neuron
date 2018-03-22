@@ -5,6 +5,7 @@
 from __future__ import division
 from utils import *
 import time
+from datetime import datetime
 from axis_neuron import left_hand_col_indices,right_hand_col_indices
 from port import *
 import dill
@@ -488,13 +489,13 @@ class HandSyncExperiment(object):
         """
         from data_access import subject_settings_v3
         from data_access import VRTrial3_1 as VRTrial
-        from coherence import GPR,DTWPerformance
+        from coherence import GPREllipsoid,DTWPerformance
         self.wait_for_start()
         
         # Setup routines for calculating coherence.
-        gprmodel = GPR(mean_performance=gpr_mean_prior,
-                       tmin=min_window_duration,tmax=max_window_duration,
-                       fmin=min_vis_fraction,fmax=max_vis_fraction)
+        gprmodel = GPREllipsoid(mean_performance=gpr_mean_prior,
+                                tmin=min_window_duration,tmax=max_window_duration,
+                                fmin=min_vis_fraction,fmax=max_vis_fraction)
         realTimePerfEval = DTWPerformance()
         gprPerfEval = DTWPerformance()
 
@@ -572,16 +573,22 @@ class HandSyncExperiment(object):
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
                         gprmodel.update( ilogistic(perf),0.,1. )
-                        nextDuration,nextFraction = gprmodel.max_uncertainty()
                     else:
                         gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
-                        nextDuration,nextFraction = gprmodel.max_uncertainty()
+                    # Initialize noise width at .3 in case there is a local min at .1.
+                    #initialGuess = [gprmodel.alpha,gprmodel.mean_performance,gprmodel.theta,gprmodel.length_scale]
+                    earlier=datetime.now()
+                    gprmodel.optimize_hyperparams(verbose=verbose,optimize_length_scales=True,n_restarts=1)
+                    if (datetime.now()-earlier).total_seconds()>1.9:
+                        print "Gaussian process optimization took too long! %1.2f s"%(datetime.now()-earlier).total_seconds()
+
+                    nextDuration,nextFraction = gprmodel.max_uncertainty()
+
                     if verbose:
                         #print call("ls --time-style='+%d-%m-%Y %H:%M:%S' -l this_setting",shell=True)
                         print "thisDuration: %1.1f\tthisFraction: %1.1f"%(thisDuration,thisFraction)
                         print "nextDuration: %1.1f\tnextFraction: %1.1f"%(nextDuration,nextFraction)
-                    open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,
-                                                                            nextFraction))
+                    open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction))
                     
                     # Delete signal file.
                     self.delete_file('run_gpr')

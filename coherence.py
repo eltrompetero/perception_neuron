@@ -1142,7 +1142,7 @@ class GPREllipsoid(GPR):
 
             soln=self._search_hyperparams_with_length_scales(n_restarts,
                                                              initial_guess=initial_guess,
-                                                             alpha_bds=(1e-3,np.inf),
+                                                             alpha_bds=(1e-1,np.inf),
                                                              coeff_bds=(.1,10))
             if verbose:
                 print( "Optimal hyperparameters are\n"+
@@ -1205,7 +1205,7 @@ class GPREllipsoid(GPR):
     def _update_kernel(self,coeff,length_scale):
         """Update instance Geodesic kernel parameters and wrap it nicely.
 
-        Performance grid is not updated.
+        Performance grid is not updated. Must run self.predict() if you wish to do that.
 
         Parameters
         ----------
