@@ -1005,7 +1005,10 @@ class GPREllipsoid(GPR):
         self.length_scale=self.DEFAULT_LENGTH_SCALE
         self._update_kernel(self.theta,self.length_scale)
 
-    def _search_hyperparams(self,n_restarts=1,initial_guess=None,alpha_bds=(0,np.inf)):
+    def _search_hyperparams(self,n_restarts=1,
+                            initial_guess=None,
+                            alpha_bds=(0,np.inf),
+                            coeff_bds=(0,np.inf)):
         """Find the hyperparameters that maximize the log likelihood of the data.
 
         Parameters
@@ -1029,7 +1032,7 @@ class GPREllipsoid(GPR):
 
         def f(params):
             if not alpha_bds[0]<params[0]<alpha_bds[1]: return 1e30
-            if params[2]<=0: return 1e30
+            if not coeff_bds[0]<params[2]<coeff_bds[1]: return 1e30
 
             gp=train_new_gpr(params)
             return -gp.log_likelihood()
@@ -1051,7 +1054,10 @@ class GPREllipsoid(GPR):
             soln=[soln[minNegLikIx]]
         return soln[0]
 
-    def _search_hyperparams_with_length_scales(self,n_restarts=1,initial_guess=None):
+    def _search_hyperparams_with_length_scales(self,n_restarts=1,
+                                               initial_guess=None,
+                                               alpha_bds=(1e-3,np.inf),
+                                               coeff_bds=(0,np.inf)):
         """Find the hyperparameters that maximize the log likelihood of the data including length
         scale parameters on the surface of ellipsoid.
         
@@ -1061,6 +1067,11 @@ class GPREllipsoid(GPR):
         ----------
         n_restarts : int,1
         initial_guess : list,None
+
+        Returns
+        -------
+        soln : dict
+            As returned by scipy.optimize.minimize.
         """
         from scipy.optimize import minimize
         if initial_guess is None:
@@ -1075,7 +1086,9 @@ class GPREllipsoid(GPR):
             return gp
 
         def f(params):
-            if params[0]<=0 or params[2]<=0: return 1e30
+            if not alpha_bds[0]<params[0]<alpha_bds[1]: return 1e30
+            if not coeff_bds[0]<params[2]<coeff_bds[1]: return 1e30
+
             # Bound length_scale to be above certain value.
             if params[3]<=10: return 1e30
 
@@ -1117,12 +1130,20 @@ class GPREllipsoid(GPR):
             If True, optimize the radius of the ellipsoid used as well.
         initial_guess : ndarray,None
         n_restarts : int,4
+
+        Returns
+        -------
+        logLikelihood : float
+            Log likelihood of the data given the found parameters.
         """
         if optimize_length_scales:
             if not initial_guess is None:
                 assert len(initial_guess)==4
 
-            soln=self._search_hyperparams_with_length_scales(n_restarts,initial_guess)
+            soln=self._search_hyperparams_with_length_scales(n_restarts,
+                                                             initial_guess=initial_guess,
+                                                             alpha_bds=(1e-3,np.inf),
+                                                             coeff_bds=(.1,10))
             if verbose:
                 print( "Optimal hyperparameters are\n"+
                        "alpha=%1.2f, mu=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
@@ -1131,7 +1152,10 @@ class GPREllipsoid(GPR):
             if not initial_guess is None:
                 assert len(initial_guess)==3
 
-            soln=self._search_hyperparams(n_restarts,initial_guess,alpha_bds=(1e-3,np.inf))
+            soln=self._search_hyperparams(n_restarts,
+                                          initial_guess=initial_guess,
+                                          alpha_bds=(1e-3,np.inf),
+                                          coeff_bds=(.1,np.inf))
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
             self.alpha,self.mean_performance=soln['x']
@@ -1139,6 +1163,8 @@ class GPREllipsoid(GPR):
         # Refresh kernel.
         self._update_kernel(self.theta,self.length_scale)
         self.predict()
+
+        return soln['fun']
     
     @staticmethod
     def _kernel(_geodesic,tmin,tmax,coeff,length_scale):
