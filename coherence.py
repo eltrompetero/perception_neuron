@@ -1001,7 +1001,7 @@ class GPREllipsoid(GPR):
         self.DEFAULT_LENGTH_SCALE=100
         self._geodesic=Geodesic(self.DEFAULT_LENGTH_SCALE,0)
 
-        self.length_scale=self.DEFAULT_LENGTH_SCALE**2
+        self.length_scale=self.DEFAULT_LENGTH_SCALE
         self._update_kernel(self.length_scale)
 
     def _search_hyperparams(self,n_restarts=1,initial_guess=None):
@@ -1146,7 +1146,7 @@ class GPREllipsoid(GPR):
 
             lat0=(tfx[1]-.5)*180
             lat1=(tfy[1]-.5)*180
-            return np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**2/length_scale )
+            return np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']/length_scale )
         return kernel
 
     def define_kernel(self,a):
