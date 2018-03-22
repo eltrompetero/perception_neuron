@@ -995,6 +995,7 @@ class GPREllipsoid(GPR):
         Modeling performance landscape to live on the surface of an ellipsoid. For now, it is
         assumed that it is a sphere because optimization with the major and minor axes seems
         difficult.
+        But that may have had to do with a bad form of the kernel.
         """
         from geographiclib.geodesic import Geodesic
         super(GPREllipsoid,self).__init__(*args,**kwargs)
@@ -1002,29 +1003,34 @@ class GPREllipsoid(GPR):
         self._geodesic=Geodesic(self.DEFAULT_LENGTH_SCALE,0)
 
         self.length_scale=self.DEFAULT_LENGTH_SCALE
-        self._update_kernel(self.length_scale)
+        self._update_kernel(self.theta,self.length_scale)
 
-    def _search_hyperparams(self,n_restarts=1,initial_guess=None):
+    def _search_hyperparams(self,n_restarts=1,initial_guess=None,alpha_bds=(0,np.inf)):
         """Find the hyperparameters that maximize the log likelihood of the data.
 
         Parameters
         ----------
         n_restarts : int,1
+        initial_guess : list
+        alpha_bds : tuple
+            Lower and upper bounds on alpha.
         """
         from scipy.optimize import minimize
         if initial_guess is None:
-            initial_guess=np.array([self.alpha,self.mean_performance])
+            initial_guess=np.array([self.alpha,self.mean_performance,self.theta])
 
         def train_new_gpr(params):
-            alpha,mean_performance=params
+            alpha,mean_performance,coeff=params
             
-            gp=GaussianProcessRegressor(self.kernel,alpha**-2)
+            kernel=self.define_kernel(coeff,self.length_scale)
+            gp=GaussianProcessRegressor(kernel,alpha**-2)
             gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
             return gp
 
         def f(params):
-            if params[0]<0:
-                return 1e30
+            if not alpha_bds[0]<params[0]<alpha_bds[1]: return 1e30
+            if params[2]<=0: return 1e30
+
             gp=train_new_gpr(params)
             return -gp.log_likelihood()
         
@@ -1032,7 +1038,8 @@ class GPREllipsoid(GPR):
         if n_restarts>1:
             initial_guess=np.vstack((initial_guess,
                                     np.vstack((np.random.exponential(size=n_restarts-1),
-                                               np.random.normal(size=n_restarts-1))).T ))
+                                               np.random.normal(size=n_restarts-1),
+                                               np.random.exponential(size=n_restarts-1))).T ))
             pool=mp.Pool(mp.cpu_count())
             soln=pool.map( lambda x:minimize(f,x),initial_guess )
             pool.close()
@@ -1053,24 +1060,25 @@ class GPREllipsoid(GPR):
         Parameters
         ----------
         n_restarts : int,1
+        initial_guess : list,None
         """
         from scipy.optimize import minimize
         if initial_guess is None:
-            initial_guess=np.array([self.alpha,self.mean_performance,self.length_scale])
+            initial_guess=np.array([self.alpha,self.mean_performance,self.theta,self.length_scale])
 
         def train_new_gpr(params):
-            alpha,mean_performance,a=params
+            alpha,mean_performance,coeff,length_scale=params
             
-            kernel=self.define_kernel(a)
+            kernel=self.define_kernel(coeff,length_scale)
             gp=GaussianProcessRegressor(kernel,alpha**-2)
             gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
             return gp
 
         def f(params):
-            if params[0]<=0:
-                return 1e30
-            if params[2]<=10: return 1e30
-            #if not 0<=params[3]<1: return 1e30
+            if params[0]<=0 or params[2]<=0: return 1e30
+            # Bound length_scale to be above certain value.
+            if params[3]<=10: return 1e30
+
             gp=train_new_gpr(params)
             try:
                 return -gp.log_likelihood()
@@ -1083,8 +1091,8 @@ class GPREllipsoid(GPR):
             initial_guess=np.vstack((initial_guess,
                 np.vstack((np.random.exponential(size=n_restarts-1),
                            np.random.normal(size=n_restarts-1),
-                           np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE**2)+10)).T ))
-                                               #np.random.rand(n_restarts-1))).T ))
+                           np.random.exponential(size=n_restarts-1,),
+                           np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE)+10)).T ))
             pool=mp.Pool(mp.cpu_count())
             soln=pool.map( lambda x:minimize(f,x),initial_guess )
             pool.close()
@@ -1096,7 +1104,10 @@ class GPREllipsoid(GPR):
             soln=[soln[minNegLikIx]]
         return soln[0]
 
-    def optimize_hyperparams(self,verbose=False,optimize_length_scales=False,initial_guess=None):
+    def optimize_hyperparams(self,verbose=False,
+                             optimize_length_scales=False,
+                             initial_guess=None,
+                             n_restarts=4):
         """Find the hyperparameters that optimize the log likelihood and reset the kernel and the GPR landscape.
 
         Parameters
@@ -1105,28 +1116,32 @@ class GPREllipsoid(GPR):
         optimize_length_scales : bool,False
             If True, optimize the radius of the ellipsoid used as well.
         initial_guess : ndarray,None
+        n_restarts : int,4
         """
         if optimize_length_scales:
-            soln=self._search_hyperparams_with_length_scales(4,initial_guess)
+            if not initial_guess is None:
+                assert len(initial_guess)==4
+
+            soln=self._search_hyperparams_with_length_scales(n_restarts,initial_guess)
             if verbose:
-                print soln['fun']
-                print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f, a=%1.2f"%tuple(soln['x'])
-            self.alpha,self.mean_performance,self.length_scale=soln['x']
-            
-            # Refresh kernel.
-            self._update_kernel(self.length_scale)
+                print( "Optimal hyperparameters are\n"+
+                       "alpha=%1.2f, mu=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
+            self.alpha,self.mean_performance,self.theta,self.length_scale=soln['x']
         else:
-            soln=self._search_hyperparams(4,initial_guess)
+            if not initial_guess is None:
+                assert len(initial_guess)==3
+
+            soln=self._search_hyperparams(n_restarts,initial_guess,alpha_bds=(1e-3,np.inf))
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
             self.alpha,self.mean_performance=soln['x']
 
-            # Refresh kernel.
-            self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
+        # Refresh kernel.
+        self._update_kernel(self.theta,self.length_scale)
         self.predict()
     
     @staticmethod
-    def _kernel(_geodesic,tmin,tmax,length_scale):
+    def _kernel(_geodesic,tmin,tmax,coeff,length_scale):
         """Return kernel function as defined with given parameters.
         """
         assert tmax>tmin
@@ -1146,30 +1161,34 @@ class GPREllipsoid(GPR):
 
             lat0=(tfx[1]-.5)*180
             lat1=(tfy[1]-.5)*180
-            return np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']/length_scale )
+            return coeff*np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']/length_scale )
         return kernel
 
-    def define_kernel(self,a):
+    def define_kernel(self,coeff,length_scale):
         """Define new Geodesic within given parameters and wrap it nicely.
 
         Parameters
         ----------
-        a : float
-            Equatorial radius.
+        coeff : float
+            Coefficient in front of kernel.
+        length_scale : float
+            Length scale used in the kernel.
         """
-        return self._kernel(self._geodesic,self.tmin,self.tmax,a)
+        return self._kernel(self._geodesic,self.tmin,self.tmax,coeff,length_scale)
 
-    def _update_kernel(self,a):
+    def _update_kernel(self,coeff,length_scale):
         """Update instance Geodesic kernel parameters and wrap it nicely.
 
         Performance grid is not updated.
 
         Parameters
         ----------
-        a : float
-            Equatorial radius.
+        coeff : float
+            Coefficient in front of kernel.
+        length_scale : float
+            Length scale used in the kernel.
         """
-        self.kernel=self._kernel( self._geodesic,self.tmin,self.tmax,a )
+        self.kernel=self._kernel( self._geodesic,self.tmin,self.tmax,coeff,length_scale )
         self.gp=GaussianProcessRegressor( self.kernel,self.alpha**-2 )
 #end GPREllipsoid
 
