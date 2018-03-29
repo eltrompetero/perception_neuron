@@ -1057,7 +1057,8 @@ class GPREllipsoid(GPR):
     def _search_hyperparams_with_length_scales(self,n_restarts=1,
                                                initial_guess=None,
                                                alpha_bds=(1e-3,np.inf),
-                                               coeff_bds=(0,np.inf)):
+                                               coeff_bds=(0,np.inf),
+                                               min_ocv=False):
         """Find the hyperparameters that maximize the log likelihood of the data including length
         scale parameters on the surface of ellipsoid.
         
@@ -1094,6 +1095,8 @@ class GPREllipsoid(GPR):
 
             gp=train_new_gpr(params)
             try:
+                if min_ocv:
+                    return gp.ocv_error()
                 return -gp.log_likelihood()
             except AssertionError:
                 print "Bad parameter values %f, %f, %f"%tuple(params)
@@ -1120,8 +1123,10 @@ class GPREllipsoid(GPR):
     def optimize_hyperparams(self,verbose=False,
                              optimize_length_scales=False,
                              initial_guess=None,
-                             n_restarts=4):
-        """Find the hyperparameters that optimize the log likelihood and reset the kernel and the GPR landscape.
+                             n_restarts=4,
+                             use_ocv=False):
+        """Find the hyperparameters that optimize the log likelihood and reset the kernel and the
+        GPR landscape.
 
         Parameters
         ----------
@@ -1130,6 +1135,8 @@ class GPREllipsoid(GPR):
             If True, optimize the radius of the ellipsoid used as well.
         initial_guess : ndarray,None
         n_restarts : int,4
+        use_ocv : bool,False
+            If True, minimize the OCV error instead of maximizing log likelihood.
 
         Returns
         -------
@@ -1142,8 +1149,9 @@ class GPREllipsoid(GPR):
 
             soln=self._search_hyperparams_with_length_scales(n_restarts,
                                                              initial_guess=initial_guess,
-                                                             alpha_bds=(1e-1,np.inf),
-                                                             coeff_bds=(.1,10))
+                                                             alpha_bds=(2e-1,np.inf),
+                                                             coeff_bds=(.1,10),
+                                                             min_ocv=use_ocv)
             if verbose:
                 print( "Optimal hyperparameters are\n"+
                        "alpha=%1.2f, mu=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
@@ -1173,7 +1181,7 @@ class GPREllipsoid(GPR):
         assert tmax>tmin
         assert length_scale>0
 
-        def kernel(tfx,tfy):
+        def kernel_function(tfx,tfy):
             # Account for cases where f=1.
             if tfx[0]==0:
                 lon0=0
@@ -1188,7 +1196,7 @@ class GPREllipsoid(GPR):
             lat0=(tfx[1]-.5)*180
             lat1=(tfy[1]-.5)*180
             return coeff*np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']/length_scale )
-        return kernel
+        return kernel_function
 
     def define_kernel(self,coeff,length_scale):
         """Define new Geodesic within given parameters and wrap it nicely.
