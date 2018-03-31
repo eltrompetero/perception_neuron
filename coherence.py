@@ -1009,7 +1009,8 @@ class GPREllipsoid(GPR):
                             initial_guess=None,
                             alpha_bds=(0,np.inf),
                             coeff_bds=(0,np.inf)):
-        """Find the hyperparameters that maximize the log likelihood of the data.
+        """Find the hyperparameters alpha, mu, theta that maximize the log likelihood of the data.
+        These are the noise std, mean performance, and kernel coefficient.
 
         Parameters
         ----------
@@ -1121,7 +1122,7 @@ class GPREllipsoid(GPR):
         return soln[0]
 
     def optimize_hyperparams(self,verbose=False,
-                             optimize_length_scales=False,
+                             optimize_length_scales=True,
                              initial_guess=None,
                              n_restarts=4,
                              use_ocv=False):
@@ -1131,7 +1132,7 @@ class GPREllipsoid(GPR):
         Parameters
         ----------
         verbose : bool,False
-        optimize_length_scales : bool,False
+        optimize_length_scales : bool,True
             If True, optimize the radius of the ellipsoid used as well.
         initial_guess : ndarray,None
         n_restarts : int,4
@@ -1146,10 +1147,12 @@ class GPREllipsoid(GPR):
         if optimize_length_scales:
             if not initial_guess is None:
                 assert len(initial_guess)==4
+            else:
+                initial_guess=[self.alpha,self.mean_performance,self.theta,self.length_scale]
 
-            soln=self._search_hyperparams_with_length_scales(n_restarts,
+            soln=self._search_hyperparams_with_length_scales(n_restarts=n_restarts,
                                                              initial_guess=initial_guess,
-                                                             alpha_bds=(2e-1,np.inf),
+                                                             alpha_bds=(2e-1,1e3),
                                                              coeff_bds=(.1,10),
                                                              min_ocv=use_ocv)
             if verbose:
@@ -1159,14 +1162,17 @@ class GPREllipsoid(GPR):
         else:
             if not initial_guess is None:
                 assert len(initial_guess)==3
+            else:
+                initial_guess=[self.alpha,self.mean_performance,self.theta,self.length_scale]
 
-            soln=self._search_hyperparams(n_restarts,
+
+            soln=self._search_hyperparams(n_restarts=n_restarts,
                                           initial_guess=initial_guess,
-                                          alpha_bds=(1e-3,np.inf),
-                                          coeff_bds=(.1,np.inf))
+                                          alpha_bds=(2e-1,1e3),
+                                          coeff_bds=(.1,10))
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
-            self.alpha,self.mean_performance=soln['x']
+            self.alpha,self.mean_performance,self.theta=soln['x']
 
         # Refresh kernel.
         self._update_kernel(self.theta,self.length_scale)
