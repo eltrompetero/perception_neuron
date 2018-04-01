@@ -725,7 +725,9 @@ class GPR(object):
         Fits the GPR to all data points and saves the predicted values with errors. The mean in the target
         perf values is accounted for here.
 
-        Update self.performanceGrid with the latest prediction (this includes the mean offset).
+        Updates self.performanceGrid with the latest prediction.
+
+        If you want to just query the model, you should access self.gp directly.
 
         Parameters
         ----------
@@ -1001,7 +1003,8 @@ class GPREllipsoid(GPR):
         super(GPREllipsoid,self).__init__(*args,**kwargs)
         self.DEFAULT_LENGTH_SCALE=100
         self._geodesic=Geodesic(self.DEFAULT_LENGTH_SCALE,0)
-
+        
+        self.alpha=1  # make this big to improve hyperparameter search
         self.length_scale=self.DEFAULT_LENGTH_SCALE
         self._update_kernel(self.theta,self.length_scale)
 
@@ -1100,8 +1103,8 @@ class GPREllipsoid(GPR):
                     return gp.ocv_error()
                 return -gp.log_likelihood()
             except AssertionError:
-                print "Bad parameter values %f, %f, %f"%tuple(params)
-                return np.nan
+                print "Bad parameter values %f, %f, %f, %f"%tuple(params)
+                return 1e30
         
         # Parameters are noise std, mean perf, equatorial radius, oblateness.
         if n_restarts>1:

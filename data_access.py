@@ -633,6 +633,7 @@ class VRTrial3_1(object):
             Time index at which to start comparing trajectories. Since dt=1/30, 60 corresponds to 2 seconds.
         **gpr_kwargs
         """
+        print "Retraining model..."
         from coherence import DTWPerformance,GPREllipsoid
         perfEval=DTWPerformance()
         gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
