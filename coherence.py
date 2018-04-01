@@ -1098,6 +1098,9 @@ class GPREllipsoid(GPR):
             if params[3]<=10: return 1e30
 
             gp=train_new_gpr(params)
+            predMu,predStd=gp.predict(gp.X,return_std=True)
+            if np.isnan(predStd).any():
+                return 1e30
             try:
                 if min_ocv:
                     return gp.ocv_error()
@@ -1182,6 +1185,12 @@ class GPREllipsoid(GPR):
         self.predict()
 
         return soln['fun']
+
+    def print_parameters(self):
+        print "Noise parameter alpha = %1.2f"%self.alpha
+        print "Mean performance mu = %1.2f"%self.mean_performance
+        print "Kernel coeff theta = %1.2f"%self.theta
+        print "Kernel length scale el = %1.2f"%self.length_scale
     
     @staticmethod
     def _kernel(_geodesic,tmin,tmax,coeff,length_scale):
