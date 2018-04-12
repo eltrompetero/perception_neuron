@@ -119,22 +119,18 @@ class SoundPlayer():
 		yvals = []
 		ycums = []
 		yadds = []
+                
+                # Revision for speed and correct scaling of frequency.
+		t=np.arange(int(wav_samplerate*duration))/wav_samplerate
+                rawVelocity = data_fx(t)
+                freq=function(rawVelocity*factor) 
+                # Rescale frequency to be between min max.
+                freq=(freq-freq.min())/(freq.max()-freq.min())*(MAX_FREQ-MIN_FREQ)+MIN_FREQ
+                phase=np.cumsum(freq)/wav_samplerate
+                amp    = np.sin(phase*2.0*np.pi)
 
 		stream = pyaudio.PyAudio().open(format=pyaudio.paFloat32,channels=2,rate=44100,output=True)
-
-		amps = []
-		while x_val<max_x:
-			y_val  = data_fx(x_val)
-			y_add  = function(y_val*factor) #rescaled and transformed
-			y_add  = (y_add-myMinVal)/myRange*(MAX_FREQ-MIN_FREQ)+MIN_FREQ # scale from one range to another
-			y_cum += y_add/wav_samplerate # f(t)*t
-			amp    = np.sin(y_cum*2.0*np.pi)
-			print amp
-			ind   += 1
-			amps.append(amp)
-			x_val += step
-
-		stream.write(np.array(amps).astype(np.float32))
+		stream.write(amps.astype(np.float32))
 		wavef.writeframes('')
 		wavef.close()	
 
@@ -161,6 +157,8 @@ class SoundPlayer():
 
 		# Interpolation
 		data_fx = itp.interp1d(np.arange(len(smooth_data))/60.0,smooth_data)
+                if duration is None:
+                    duration=(len(smooth_data)-1)/60.
 		
 
 		if not os.path.exists(self.directory) : os.mkdir(self.directory)
@@ -183,13 +181,13 @@ class SoundPlayer():
 		print("creating file with %f seconds"%max_x)
 
 		# Scaling the original Range 
-		myMinVal = function(min(smooth_data)*factor)
-		myMaxVal = function(max(smooth_data)*factor)
+		myMinVal = function(min(smooth_data)*factor*2)
+		myMaxVal = function(max(smooth_data)*factor*2)
 		myRange = myMaxVal-myMinVal
 
 
 		MIN_FREQ = 150.0
-		MAX_FREQ = 1000.0
+		MAX_FREQ = 340.0
 
 		step = 1.0/wav_samplerate
 		x_val = 0.0
@@ -201,17 +199,17 @@ class SoundPlayer():
 		ycums = []
 		yadds = []
 
-		while x_val<max_x:
-			y_val  = data_fx(x_val)
-			yvals.append(y_val)
-			y_add  = function(y_val*factor)  # rescaled and transformed
-			y_add  = (y_add-myMinVal)/myRange*(MAX_FREQ-MIN_FREQ)+MIN_FREQ  # scale from one range to another
-			yadds.append(y_add)
-			y_cum += y_add/wav_samplerate  # f(t)*t
-			ycums.append(y_cum)
-			amp    = np.sin(y_cum*2.0*np.pi)
-			x_val += step
-			wavef.writeframesraw(struct.pack('<h',amp*32767))
+                # Revision for speed and correct scaling of frequency.
+		t=np.arange(int(wav_samplerate*duration))/wav_samplerate
+                rawVelocity=data_fx(t)
+                freq=function(rawVelocity*factor/10) 
+                # Rescale frequency to be between min max.
+                freq=(freq-freq.min())/(freq.max()-freq.min())*(MAX_FREQ-MIN_FREQ)+MIN_FREQ
+                phase=np.cumsum(freq)/wav_samplerate
+                amp=np.sin(phase*2.0*np.pi)
+
+                for a in amp:
+                    wavef.writeframesraw(struct.pack('<h',int(a*32767)))
 
 		wavef.writeframes('')
 		wavef.close()	
