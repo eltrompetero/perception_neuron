@@ -152,8 +152,8 @@ class SoundPlayer():
                 None
                 """
 		data_amp = [np.linalg.norm(x) for x in self.data]
-		smooth_data = fftconvolve(data_amp,np.ones(12)/12.0)
-		smooth_data = fftconvolve(smooth_data[::-1],np.ones(12)/12.0)[::-1]
+		smooth_data = fftconvolve(data_amp,np.ones(12)/12.0,mode='same')
+		smooth_data = fftconvolve(smooth_data[::-1],np.ones(12)/12.0,mode='same')[::-1]
 
 		if self.direction.lower() == 'left': 
 			smooth_data = smooth_data[::-1]
@@ -183,8 +183,6 @@ class SoundPlayer():
 		print("creating file with %f seconds"%max_x)
 
 		# Scaling the original Range 
-		# ex ) np.exp(min_value*factor)*2.0*np.pi
-
 		myMinVal = function(min(smooth_data)*factor)
 		myMaxVal = function(max(smooth_data)*factor)
 		myRange = myMaxVal-myMinVal
@@ -206,10 +204,10 @@ class SoundPlayer():
 		while x_val<max_x:
 			y_val  = data_fx(x_val)
 			yvals.append(y_val)
-			y_add  = function(y_val*factor) #rescaled and transformed
-			y_add  = (y_add-myMinVal)/myRange*(MAX_FREQ-MIN_FREQ)+MIN_FREQ # scale from one range to another
+			y_add  = function(y_val*factor)  # rescaled and transformed
+			y_add  = (y_add-myMinVal)/myRange*(MAX_FREQ-MIN_FREQ)+MIN_FREQ  # scale from one range to another
 			yadds.append(y_add)
-			y_cum += y_add/wav_samplerate # f(t)*t
+			y_cum += y_add/wav_samplerate  # f(t)*t
 			ycums.append(y_cum)
 			amp    = np.sin(y_cum*2.0*np.pi)
 			x_val += step
@@ -232,5 +230,5 @@ if __name__ == '__main__':
     assert os.path.isdir(dr)
 
     sp = SoundPlayer(dr,motionFileName,hand,reverseTime)
-    sp.save_sound_leftright("motion_to_audio",mapType)
+    sp.save_sound("motion_to_audio",mapType)
 
