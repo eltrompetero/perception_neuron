@@ -815,6 +815,8 @@ def extract_motionbuilder_test(hand,
     return mbV,mbT
 
 def extract_motionbuilder_model3_3(hand,
+                                   dr=( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
+                                        'Animations/Eddie_Grid_Model' ),
                                    fname='Eddie_Grid_Model_%s_Anim_Export_Truncate_Take_001',
                                    reverse_time=False):
     """
@@ -826,8 +828,6 @@ def extract_motionbuilder_model3_3(hand,
     These are pickled csv files that were exported from Mokka after preprocessing in Motionbuilder. Note that
     the coordinate system in Motionbuilder and Mokka are different.
 
-    NOTE: Directory where animation data is stored is hard-coded.
-    
     Parameters
     ----------
     hand : str
@@ -849,8 +849,6 @@ def extract_motionbuilder_model3_3(hand,
     from scipy.interpolate import interp1d
     assert hand=='Left' or hand=='Right'
 
-    dr = ( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
-           'Animations/Eddie_Grid_Model' )
     fname = fname%hand
     
     # Create pickle if it doesn't already exist.
@@ -884,6 +882,67 @@ def extract_motionbuilder_model3_3(hand,
     mbV = interp1d(mbT,mbV,axis=0,assume_sorted=True,copy=False)
 
     return mbV,mbT
+
+def extract_motionbuilder_Eddie_Grid_Model_2(hand,
+                                   dr=( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
+                                        'Animations/Eddie_Grid_Model_2' ),
+                                   fname='Eddie_Grid_Model_2_%s_Take_001',
+                                   reverse_time=False):
+    """
+    See extract_motionbuilder_model3_3 for notes. The only difference here is that the orientation
+    of the avatar in Mokka is in the -x direction for both left and right hands. 
+
+    Parameters
+    ----------
+    hand : str
+        Hand of the model. Must be 'Left' or 'Right'.
+    dr : str,( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
+                                       'Animations/Eddie_Grid_Model_2' )
+    fname : str,'Eddie_Grid_Model_%s_Anim_Export_Take_001'
+        Name of file with %s to replace with handedness.
+    reverse_time : bool,False
+        Read data backwards from end. This option is used when the avatar's motion is played in reverse.
+
+    Returns
+    -------
+    mbV : scipy.interpolate.interp1d
+        Returns (n_samples,3) dimensional matrix.
+    mbT : ndarray of float
+        Number of seconds since the beginning of the avatar motion file.
+    """
+    from datetime import datetime,timedelta
+    import cPickle as pickle
+    from scipy.interpolate import interp1d
+    assert hand=='Left' or hand=='Right'
+
+    fname = fname%hand
+    
+    # Create pickle if it doesn't already exist.
+    if not os.path.exists('%s/%s.p'%(dr,fname)):
+        from axis_neuron import load_csv
+        mbdf = load_csv('%s/%s.csv'%(dr,fname))
+        mbdf.to_pickle('%s/%s.p'%(dr,fname))
+
+    mbdf = pickle.load(open('%s/%s.p'%(dr,fname),'rb'))
+    mbT = mbdf['Time'].values.astype(float)
+    mbT -= mbT[0]
+    mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
+
+    if reverse_time:
+        # When you reverse time, you must also reverse the velocities.
+        mbV = -mbV[::-1]
+
+    # Put these in the standard global coordinate system such that avatars are facing +x direction. See Tango
+    # III pg 45. Only 180 degree rotation about z-axis is required here.
+    mbV[:,:2] *= -1
+
+    # y-axis needs to be reflected to put into same chirality as subject
+    mbV[:,1] *= -1
+    
+    mbV = interp1d(mbT,mbV,axis=0,assume_sorted=True,copy=False)
+
+    return mbV,mbT
+
 
 def extract_motionbuilder_model3(hand,
                                  fname='Eddie_Grid_Model_%s_Anim_Export_Take_001',
