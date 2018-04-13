@@ -884,10 +884,10 @@ def extract_motionbuilder_model3_3(hand,
     return mbV,mbT
 
 def extract_motionbuilder_Eddie_Grid_Model_2(hand,
-                                   dr=( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
-                                        'Animations/Eddie_Grid_Model_2' ),
-                                   fname='Eddie_Grid_Model_2_%s_Take_001',
-                                   reverse_time=False):
+                       dr=( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
+                            'Animations/Eddie_Grid_Model_2' ),
+                       fname='Eddie_Grid_Model_2_%s_Take_001',
+                       reverse_time=False):
     """
     See extract_motionbuilder_model3_3 for notes. The only difference here is that the orientation
     of the avatar in Mokka is in the -x direction for both left and right hands. 
