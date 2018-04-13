@@ -167,14 +167,6 @@ class SoundPlayer():
             function, factor = self.function_dict[key]
             print("function %s with factor %f"%(key,factor))
 
-            # opening wav file
-            wavef = wave.open(os.path.join(self.directory,'_'.join([filename,key,self.direction])+'.wav'),'w')
-            wavef.setnchannels(2)
-            wavef.setsampwidth(2) 
-            wavef.setframerate(wav_samplerate)
-
-            print("creating file with %f seconds"%duration)
-
             # Revision for speed and correct scaling of frequency.
             t=np.arange(int(duration*wav_samplerate)*2)/wav_samplerate/2
             rawVelocity=data_fx(t)
@@ -183,7 +175,13 @@ class SoundPlayer():
             freq=(freq-freq.min())/(freq.max()-freq.min())*(MAX_FREQ-MIN_FREQ)+MIN_FREQ
             phase=np.cumsum(freq)/wav_samplerate
             amp=np.sin(phase*2.0*np.pi)
-
+            
+            # opening wav file
+            print("creating file with %f seconds"%duration)
+            wavef = wave.open(os.path.join(self.directory,'_'.join([filename,key,self.direction])+'.wav'),'w')
+            wavef.setnchannels(2)
+            wavef.setsampwidth(2) 
+            wavef.setframerate(wav_samplerate)
             for a in amp:
                 wavef.writeframesraw(struct.pack('<h',int(a*32767)))
 
@@ -204,5 +202,5 @@ if __name__ == '__main__':
     assert os.path.isdir(dr)
 
     sp=SoundPlayer(dr,motionFileName,hand,reverseTime)
-    sp.save_sound("motion_to_audio",mapType,10)
+    sp.save_sound("motion_to_audio",mapType)
 
