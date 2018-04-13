@@ -150,12 +150,9 @@ class SoundPlayer():
             MAX_FREQ = 340.0
                     
             # Read in and filter motion data.
-            data_amp = np.linalg.norm(self.data,axis=1)
+            data_amp = np.linalg.norm(self.data[:,1:],axis=1)
             smooth_data = fftconvolve(data_amp,np.ones(12)/12.0,mode='same')
             smooth_data = fftconvolve(smooth_data[::-1],np.ones(12)/12.0,mode='same')[::-1]
-
-            if self.direction.lower() == 'left': 
-                    smooth_data = smooth_data[::-1]
 
             # Interpolation
             data_fx = itp.interp1d(self.time,smooth_data)
@@ -198,9 +195,13 @@ if __name__ == '__main__':
     motionFileName=sys.argv[3]
     hand=sys.argv[4]
     reverseTime=True if sys.argv[5]=='True' else False
+    if len(sys.argv)>6:
+        duration=float(sys.argv[6])
+    else:
+        duration=None
     assert mapType in ('exp','log','sig')
     assert os.path.isdir(dr)
 
     sp=SoundPlayer(dr,motionFileName,hand,reverseTime)
-    sp.save_sound("motion_to_audio",mapType)
+    sp.save_sound("motion_to_audio",mapType,duration)
 
