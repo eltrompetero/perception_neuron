@@ -690,7 +690,10 @@ class HandSyncExperiment(object):
                    'trialEndTimes':self.trialEndTimes,
                    'rotAngle':rotAngle},
                   open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
-        
+
+        # Give time for UE4 to finish saving files.
+        time.sleep(10)
+
         # Move all files into the left or right directory given by which hand the subject was using.
         if not os.path.isdir(handedness):
             os.mkdir(handedness)
