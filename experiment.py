@@ -411,6 +411,42 @@ class HandSyncExperiment(object):
                 self.rotAngle[0]*180/np.pi)
         print "Rotation angle to center right hand about x-axis is %1.1f degrees."%(
                 self.rotAngle[1]*180/np.pi)
+    
+    @staticmethod
+    def read_cal(fname,min_v):
+        """
+        Read calibration recording from file. 
+                
+        Parameters
+        ----------
+        fname : str
+            Name of file to save as.
+        min_v : float,0.3
+            Subject must be moving at least this fast (m/s) along the xy-plane for the calibration to
+            register.
+        """
+        from numpy.linalg import norm
+
+        # Load the data and find which direction the user is facing. Extract from that, the
+        # rotation angle needed about the z-axis (pointing up out of the ground) to make the person face the
+        # x-axis.
+        df = load_AN_port(fname,time_as_dt=False)
+
+        # Get xy vector.
+        vright = df.iloc[:,right_hand_col_indices()].values[:,:2]
+        vleft = df.iloc[:,left_hand_col_indices()].values[:,:2]
+        vright[:,1] *= -1
+        vleft[:,1] *= -1
+        sright = np.linalg.norm(vright,axis=1)
+        sleft = np.linalg.norm(vleft,axis=1)
+        
+        # Extract 80 percentile of speed for analysis (as long as it is at least min_v).
+        ix = (sright>=np.percentile(sright,80)) & (sright>min_v)
+        angleRight = extract_rot_angle(vright[ix])
+        ix = (sleft>=np.percentile(sleft,80)) & (sleft>min_v)
+        angleLeft = extract_rot_angle(vleft[ix])
+
+        return [-angleLeft,-angleRight]
 
     def run_lf(self,trial_duration):
         """
@@ -661,12 +697,12 @@ class HandSyncExperiment(object):
                         except IOError:
                             pass
                     self.delete_file('unpause_time')
-                    
                     reader.refresh()
-                    while reader.len_history()<(self.duration*30):
-                        if verbose:
-                            print "Waiting to collect more data...(%d)"%reader.len_history()
-                        time.sleep(.5)
+
+                while reader.len_history()<(self.duration*30) and not os.path.isfile('%s/%s'%(DATADR,'end')):
+                    if verbose:
+                        print "Waiting to collect more data...(%d)"%reader.len_history()
+                    time.sleep(.25)
                 
                 time.sleep(.1)
             
