@@ -437,7 +437,7 @@ class DTWPerformance(object):
         self.normdvRatioThreshold = norm_dv_ratio_threshold
         self.dtThreshold = dt_threshold
 
-    def time_average(self,x,y,dt=1.,strict=False):
+    def time_average(self,x,y,dt=1.,strict=False,bds=[0,np.inf]):
         """
         Measure performance as the fraction of time you are within the thresholds.
 
@@ -447,6 +447,9 @@ class DTWPerformance(object):
         y : ndarray
         dt : float,1
             Sampling rate for x and y.
+        bds : list,[0,inf]
+            Lower and upper bounds for times at which to truncate the data according to x before calculating
+            performance.
 
         Returns
         -------
@@ -463,6 +466,7 @@ class DTWPerformance(object):
         except ValueError:
             warn("fastdtw could not align. Possible because subject data is flat.")
             path=range(len(x))
+        keepIx=(path[:,0]*dt>=bds[0])&(path[:,0]<=bds[1])
 
         normx = norm(x[path[:,0]],axis=1)+np.nextafter(0,1)
         normy = norm(y[path[:,1]],axis=1)+np.nextafter(0,1)
@@ -479,13 +483,13 @@ class DTWPerformance(object):
         # product, and dt cutoffs.
         if strict:
             if (np.abs(dt)<self.dtThreshold).all():
-                performance = ((1-inner)<self.innerThreshold).mean()
+                performance = ((1-inner)<self.innerThreshold)[keepIx].mean()
             else:
                 performance = 0.
         else:
             performance = ( #((normDiff<self.normdvThreshold)|(normRatio<self.normdvRatioThreshold)) &
                             ((1-inner)<self.innerThreshold) & 
-                            (np.abs(dt)<self.dtThreshold) ).mean()
+                            (np.abs(dt)<self.dtThreshold) )[keepIx].mean()
         
         return performance
 

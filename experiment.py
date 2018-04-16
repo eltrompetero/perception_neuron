@@ -605,7 +605,7 @@ class HandSyncExperiment(object):
                     # the file is being written.
                     thisDuration,thisFraction=self.read_this_setting()
                     # Get subject performance ignoring the first few seconds of performance.
-                    perf=gprPerfEval.time_average( avv[75:,1:],v[75:,1:],dt=1/30 )
+                    perf=gprPerfEval.time_average( avv[:,1:],v[:,1:],dt=1/30,bds=[2,np.inf] )
                     # Update GPR. For initial full visibility trial, update values for all values of fraction.
                     if thisDuration==0:
                         gprmodel.update( ilogistic(perf),0.,1. )
@@ -703,7 +703,7 @@ class HandSyncExperiment(object):
         updateBroadcastThread.join()
         broadcastThread.join()
         recordThread.join()
-        gprThread.join()
+        settingsThread.join()
 
         with open('%s/%s'%(DATADR,'end_port_read'),'w') as f:
             f.write('')
