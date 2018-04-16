@@ -577,12 +577,9 @@ class HandSyncExperiment(object):
         # This relies on reader to fetch data which is declared later.
         self.updateBroadcastEvent = threading.Event()
 
-        # Define functions for GPR updated. One thread updates the settings. The other updates GPR.
+        # Define function for GPR updating. One thread updates the settings. The other updates GPR.
         def update_settings(reader,gprmodel):
             """
-            Read in current window setting from this_setting and write out next window setting to
-            next_setting.
-
             1) GPR is updated.
             2) Next setting is set.
             3) GPR is optimized. This can take a long time so the safest thing to do is to run it
@@ -631,48 +628,6 @@ class HandSyncExperiment(object):
                         time.sleep(.5)
                     
                     print "Running GPR on this trial..."
-                    gprmodel.optimize_hyperparams(verbose=verbose,optimize_length_scales=True,n_restarts=1)
-                    
-                    # Cleanup.
-                    self.delete_file('run_gpr')
-                    dill.dump({'gprmodel':gprmodel,'performance':performance,
-                               'pause':self.pause,'unpause':self.unpause,
-                               'trialStartTimes':self.trialStartTimes,
-                               'trialEndTimes':self.trialEndTimes},
-                              open('%s/%s'%(DATADR,'gpr.p'),'wb'),-1)
-
-
-                time.sleep(.05)
-
-        def run_gpr_update(reader,gprmodel):
-            """Run GPR updater when run_gpr appears."""
-            while not self.endEvent.is_set():
-                pauseEvent.wait()
-
-                # Run GPR for the next windows setting.
-                if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
-                    print "Running GPR on this trial..."
-                    v,t,tdateHistory = reader.copy_history()
-                    # Put output from Axis Neuron into comparable coordinate system accounting for reflection
-                    # symmetry.
-                    v[:,1:] *= -1
-                    v[:,:2] = rotate_xy(v[:,:2],rotAngle)
-
-                    tdateHistory,_=remove_pause_intervals(tdateHistory.tolist(),
-                                                            zip(self.pause,self.unpause))
-                    avv=fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
-                    thisDuration,thisFraction=self.read_this_setting()
-                    
-                    # Get subject performance ignoring the first few seconds of performance.
-                    perf=gprPerfEval.time_average( avv[75:,1:],v[75:,1:],dt=1/30 )
-                    
-                    # Update GPR. For initial full visibility trial, update values for all values of fraction.
-                    if thisDuration==0:
-                        gprmodel.update( ilogistic(perf),0.,1. )
-                    else:
-                        gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
-                    # Initialize noise width at .3 in case there is a local min at .1.
-                    #initialGuess = [gprmodel.alpha,gprmodel.mean_performance,gprmodel.theta,gprmodel.length_scale]
                     gprmodel.optimize_hyperparams(verbose=verbose,optimize_length_scales=True,n_restarts=1)
                     
                     # Cleanup.
