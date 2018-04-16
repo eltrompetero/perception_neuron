@@ -708,8 +708,8 @@ class GPR(object):
         self.mean_performance = mean_performance
         
         # Create two grids for t and f.
-        self.tRange = np.arange(self.tmin,self.tmax+self.tstep,self.tstep)
-        self.fRange = np.arange(self.fmin,self.fmax+self.fstep,self.fstep)
+        self.tRange = np.arange(self.tmin,self.tmax+self.tstep/2,self.tstep)
+        self.fRange = np.arange(self.fmin,self.fmax+self.fstep/2,self.fstep)
         self.meshPoints = np.meshgrid(self.tRange,self.fRange)
         # Flatten t and f grids and stack them into an Nx2 array.
         self.meshPoints = np.vstack([x.ravel() for x in self.meshPoints]).T
@@ -725,13 +725,13 @@ class GPR(object):
         Fits the GPR to all data points and saves the predicted values with errors. The mean in the target
         perf values is accounted for here.
 
-        Updates self.performanceGrid with the latest prediction.
+        Updates self.performanceGrid and self.std_pred with the latest prediction.
 
         If you want to just query the model, you should access self.gp directly.
 
         Parameters
         ----------
-        mesh : ndarray
+        mesh : ndarray,None
             Points at which to evaluate GPR. Should be (samples,2) with first column durations and the second
             fraction of visible window.
 
@@ -783,21 +783,39 @@ class GPR(object):
         grad = np.concatenate((grad[:,0].reshape(shape)[:,:,None],grad[:,1].reshape(shape)[:,:,None]),2)
         return grad
         
-    def max_uncertainty(self):
-        '''
+    def max_uncertainty(self,explore_new=True):
+        """
         Returns next_duration,next_fraction as the point where the variance of the GPR is max
         Currently finds maximum uncertainty, and then returns a point with that uncertainty as the
-        update value. But really this should be a point which would minimize the total uncertainty.
+        update value.
+
+        Avoids values that have already been measured and fraction=1.
+
+        Parameters
+        ----------
+        explore_new : bool,True 
         
         Returns
         -------
         next_window_duration : float
         next_vis_fraction : float
-        '''
-        maxIndex = np.argmax(self.std_pred)
-
-        next_duration = self.meshPoints[maxIndex][0]
-        next_fraction = self.meshPoints[maxIndex][1]
+        """
+        sortIx=np.argsort(self.std_pred)[::-1]
+        
+        if explore_new:
+            next_fraction=1
+            counter=0
+            while next_fraction==1 or ((next_duration in self.durations) and (next_fraction in self.fractions)):
+                next_duration=self.meshPoints[sortIx[counter]][0]
+                next_fraction=self.meshPoints[sortIx[counter]][1]
+                counter+=1
+        else:
+            next_fraction=1
+            counter=0
+            while next_fraction==1:
+                next_duration=self.meshPoints[sortIx[counter]][0]
+                next_fraction=self.meshPoints[sortIx[counter]][1]
+                counter+=1
         
         return next_duration,next_fraction
         
@@ -906,7 +924,6 @@ class GPR(object):
             gp=train_new_gpr(params)
             return -gp.log_likelihood()
         
-        #initialGuess=np.concatenate((self.length_scale,[self.alpha,self.mean_performance]))
         soln=[]
         soln.append( minimize(f,initial_guess) )
         for i in xrange(1,n_restarts):
@@ -928,11 +945,14 @@ class GPR(object):
             (alpha,mean,theta)
         verbose : bool,False
         """
+        from datetime import datetime
+
         if initial_guess is None:
             initial_guess=np.array([self.alpha,self.mean_performance,self.theta])
         else:
             assert len(initial_guess)==3
-
+        
+        t0=datetime.now()
         soln=self._search_hyperparams(initial_guess)
         if verbose:
             print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%(soln['x'][0],soln['x'][1])
@@ -942,6 +962,9 @@ class GPR(object):
         self.kernel=self.handsync_experiment_kernel(self.length_scale,self.theta)
         self.gp=GaussianProcessRegressor(self.kernel,self.alpha**-2)
         self.predict()
+
+        if verbose:
+            return "GPR hyperparameter optimization took %1.2f s."%(datetime.now()-t0).total_seconds()
 
     @staticmethod
     def _scale_erf(x,mu,std):

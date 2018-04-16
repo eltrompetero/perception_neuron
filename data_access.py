@@ -299,7 +299,15 @@ def subject_settings_v3_5(index,hand,return_list=True):
     settings : dict
     dr : str
     """
-    settings = [{'person':'Subject01_3_5',
+    settings = [#{'person':'Subject01_3_5',
+                # 'trials':['avatar'],
+                # 'reverse':[False,True],
+                # 'usable':[True,True]},
+                {'person':'Subject02_3_5',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject03_3_5',
                  'trials':['avatar'],
                  'reverse':[False,True],
                  'usable':[True,True]}
