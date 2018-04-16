@@ -296,6 +296,11 @@ class HandSyncExperiment(object):
         rotAngle : float
         avatar : Interpolation
         t0 : datetime.datetime
+
+        Returns
+        -------
+        update_broadcaster : function
+            Function for updating the performance broadcast port with latest performance value.
         """
         def update_broadcaster(performance,export=False):
             try:
@@ -581,13 +586,16 @@ class HandSyncExperiment(object):
         def update_settings(reader,gprmodel):
             """
             1) GPR is updated.
-            2) Next setting is set.
+            2) Next trial setting is set.
             3) GPR is optimized. This can take a long time so the safest thing to do is to run it
                 during a trial.
+            4) gprmodel and other data is saved into gpr.p.
             """
             while not self.endEvent.is_set():
+                # This is only triggered during pauses in order to prevent unnecessary CPU overhead, but I
+                # don't think is necessary.
                 pauseEvent.wait()
-
+                
                 # Update next trial settings and refresh reader history.
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
                     # Fetch user movement during trial.
@@ -611,8 +619,11 @@ class HandSyncExperiment(object):
                         gprmodel.update( ilogistic(perf),0.,1. )
                     else:
                         gprmodel.update( ilogistic(perf),thisDuration,thisFraction )
-                    nextDuration,nextFraction=gprmodel.max_uncertainty()
 
+                    # Get next trial settings and output them to a file that is read by UE4 before the start
+                    # of the next trial.
+                    # NOTE: There is no guarantee that this file is read before the next trial starts.
+                    nextDuration,nextFraction=gprmodel.max_uncertainty()
                     if verbose:
                         #print call("ls --time-style='+%d-%m-%Y %H:%M:%S' -l this_setting",shell=True)
                         print "thisDuration: %1.1f\tthisFraction: %1.1f"%(thisDuration,thisFraction)
@@ -621,13 +632,13 @@ class HandSyncExperiment(object):
                     
                     # Refresh history.
                     self.broadcast.update_payload('-1.0')
+                    if verbose:print "Refreshing reader history (update_settings)."
                     reader.refresh()
-                    while reader.len_history()<(self.duration*30):
-                        if verbose:
-                            print "Waiting to collect more data...(%d)"%reader.len_history()
-                        time.sleep(.5)
                     
-                    print "Running GPR on this trial..."
+                    # Optimize hyperparameters of GPR given the latest trial data.
+                    # NOTE: This has to finish running before the trial ends. Right now, there is no guarantee
+                    # that it will.
+                    if verbose:print "Running GPR on this trial..."
                     gprmodel.optimize_hyperparams(verbose=verbose,optimize_length_scales=True,n_restarts=1)
                     
                     # Cleanup.
@@ -643,8 +654,7 @@ class HandSyncExperiment(object):
         # Wait til start_time has been written to start experiment.
         t0 = self.wait_for_start_time()
 
-        if verbose:
-            print "Starting threads."
+        if verbose:print "Starting threads."
         recordThread.start()
         with ANReader(self.duration,self.subPartsIx,
                       port=7011,
@@ -654,15 +664,14 @@ class HandSyncExperiment(object):
             
             updateBroadcastThread = threading.Thread(
                     target=self.define_update_broadcaster(reader,self.updateBroadcastEvent,pauseEvent,
-                                                      windowsInIndexUnits,realTimePerfEval,self.broadcast,
-                                                      rotAngle,avatar,t0),
+                                                          windowsInIndexUnits,realTimePerfEval,self.broadcast,
+                                                          rotAngle,avatar,t0),
                     args=(performance,export_realtime_velocities,) )
 
             while reader.len_history()<windowsInIndexUnits:
-                if verbose:
-                    print "Waiting to collect more data...(%d)"%reader.len_history()
+                if verbose:print "Waiting to collect more data...(%d)"%reader.len_history()
                 self.broadcast.update_payload('-1.0')
-                time.sleep(1)
+                time.sleep(.25)
             updateBroadcastThread.start()
            
             # Start GPR thread.
@@ -673,7 +682,7 @@ class HandSyncExperiment(object):
                 # If UE4 has been paused
                 if os.path.isfile('%s/%s'%(DATADR,'pause_time')):
                     pauseEvent.clear()
-                    if verbose: print "Paused."
+                    if verbose:print "Paused."
                     self.read_pause()
                     self.delete_file('pause_time')
                     while not os.path.isfile('%s/%s'%(DATADR,'unpause_time')):
@@ -688,17 +697,17 @@ class HandSyncExperiment(object):
                                 self.unpause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
                             success = True
                             pauseEvent.set()
-                            if verbose: print "Unpaused."
+                            if verbose:print "Unpaused."
                         except IOError:
                             pass
                     self.delete_file('unpause_time')
-
-                    print "Refreshing reader history."
+                    
+                    if verbose:print "Refreshing reader history (pause)."
                     reader.refresh()
                 
                 time.sleep(.1)
-            
-        print "Ending threads..."
+         
+        if verbose:print "Ending threads..."
         self.stop()
         updateBroadcastThread.join()
         broadcastThread.join()
@@ -711,7 +720,7 @@ class HandSyncExperiment(object):
         # Read in last trial setting.
         self.read_this_setting() 
         
-        print "Saving GPR."
+        if verbose:print "Saving GPR."
         dill.dump({'gprmodel':gprmodel,'performance':performance,
                    'pause':self.pause,'unpause':self.unpause,
                    'trialStartTimes':self.trialStartTimes,
