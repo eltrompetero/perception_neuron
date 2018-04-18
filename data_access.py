@@ -9,6 +9,9 @@ from __future__ import division
 from utils import *
 import os
 import cPickle as pickle
+from warnings import warn
+
+
 
 def subject_settings_v3(index,return_list=True):
     settings = [{'person':'Zimu3',
@@ -299,22 +302,33 @@ def subject_settings_v3_5(index,hand,return_list=True):
     settings : dict
     dr : str
     """
-    settings = [#{'person':'Subject01_3_5',
-                # 'trials':['avatar'],
-                # 'reverse':[False,True],
-                # 'usable':[True,True]},
+    settings = [{'person':'Subject04_3_5',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[False,True]},
                 {'person':'Subject02_3_5',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]},
-                {'person':'Subject03_3_5',
-                 'trials':['avatar'],
-                 'reverse':[False,True],
                  'usable':[True,True]}
+                #{'person':'Subject02_3_5',
+                # 'trials':['avatar'],
+                # 'reverse':[False,True],
+                # 'usable':[True,True]},
+                #{'person':'Subject03_3_5',
+                # 'trials':['avatar'],
+                # 'reverse':[False,True],
+                # 'usable':[True,True]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
         rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+    except KeyError:
+        from experiment import HandSyncExperiment
+
+        # Need to reload data from file.
+        f=[f for f in os.listdir('%s'%dr) if 'an_port_cal' in f]
+        f.sort()
+        rotAngle=HandSyncExperiment.read_cal('%s/%s'%(dr,f[-1]),.3)
     except IOError:
         rotAngle=np.nan
     reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
@@ -712,7 +726,7 @@ class VRTrial3_1(object):
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
-        windowsByPart,_,_ = self.window_specs(self.person,self.dr)
+        windowsByPart,_,_ = self.window_specs(self.person,self.dr,reload_trial_times=True)
 
         # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial,
         # hmdTrials. These contain arrays for time that were interpolated in for regular sampling and
@@ -857,7 +871,7 @@ class VRTrial3_1(object):
 
         return ix
 
-    def window_specs(self,person,dr):
+    def window_specs(self,person,dr,reload_trial_times=False):
         """
         Get when the different visible/invisible cycles occur in the given experiment. These data are
         obtained from visibility text files output from UE4.
@@ -867,16 +881,17 @@ class VRTrial3_1(object):
         person : str
             Will point to the folder that the data is in.
         dr : str
+        reload_trial_times : bool,False
+            If True, identify trial start and end times from the visibility data.
 
         Returns
         -------
         windowsByPart : dict
-            Keys correspond to trial types. Each dict entry is a list of tuples 
-            ((type of window),(window start, window end))
-            Window type is a tuple (inv_duration,window_duration)
+            Keys correspond to trial types. Each dict entry is a list of tuples ((type of
+            window),(window start, window end)) Window type is a tuple
+            (inv_duration,window_duration)
         """
         from ue4 import load_visibility 
-        from experiment import remove_pause_intervals
 
         # Load AN subject data.
         df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
@@ -907,8 +922,12 @@ class VRTrial3_1(object):
             # times are when the trial counter is updated immediately after the first fully visible trial. The
             # remaining points are the following trials.
             dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
-            trialStartTimes = self._remove_pauses(dataDict['trialStartTimes'])
-            trialEndTimes = self._remove_pauses(dataDict['trialEndTimes'])
+            if reload_trial_times:
+                t0,t1=infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr)
+                trialStartTimes,trialEndTimes=t0,t1
+            else:
+                trialStartTimes = self._remove_pauses(dataDict['trialStartTimes'])
+                trialEndTimes = self._remove_pauses(dataDict['trialEndTimes'])
             windowSpecs = []
             windowStart,windowEnd = [],[]
             for i in xrange(len(self.gprmodel.fractions)):
@@ -1531,3 +1550,66 @@ class Tree(object):
 
         return parents
 
+
+
+def infer_trial_times_from_visibility(pause,unpause,dr,
+                                      file_name='avatar_visibility'):
+    """Identify endpoints of trials from the visibility/invisibility times. This will 
+    return the start and end times for 16 trials that are about 30 s long.
+    
+    Parameters
+    ----------
+    pause : list of datetime
+        Usually there are only three pauses.
+    unpause : list datetime
+    dr : str
+    file_name : str,'avatar_visibility'
+    
+    Returns
+    -------
+    trialStartTimes : list
+    trialEndTimes : list
+    """
+    from datetime import timedelta
+    from ue4 import load_visibility
+    from experiment import remove_pause_intervals
+
+    visible,invisible=load_visibility('%s/%s'%(dr,'avatar_visibility'))
+    visible,_=remove_pause_intervals(visible,zip(pause,unpause))
+    invisible,_=remove_pause_intervals(invisible,zip(pause,unpause))
+    visible=visible.tolist()
+    invisible=invisible.tolist()
+
+    # Duration of each visibility cycle.
+    dt=[i.total_seconds() 
+        for i in np.diff( np.vstack(zip(visible,invisible)),1 ).ravel()]
+    assert (np.array(dt)>0).all()
+    assert np.around(dt[0])==30 and np.around(dt[-1])==30, (dt[0],dt[-1])
+
+    trialStartTimes=[visible.pop(0)]
+    trialEndTimes=[invisible.pop(0)]
+    dt.pop(0)
+
+    # Loop through all the visibility windows and identify when they change.
+    lastdt=dt.pop(0)
+    while len(dt)>0:
+        nowdt=dt.pop(0)
+        if np.abs(nowdt-lastdt)>1.5e-2:
+            trialStartTimes.append(trialEndTimes[-1])
+            trialEndTimes.append(invisible.pop(0))
+        else:
+            invisible.pop(0)
+        visible.pop(0)
+        lastdt=nowdt
+    trialStartTimes.append(visible.pop(0))
+    trialEndTimes.append(trialStartTimes[-1]+timedelta(seconds=30))
+    
+    assert len(trialStartTimes)==len(trialEndTimes)
+    if (len(trialStartTimes)!=16 or len(trialEndTimes)!=16):
+        warn("The number of trials is not 16. There are %d trials."%len(trialStartTimes))
+    # Check that trials are all 30+/-1 seconds long.
+    if not (np.abs(np.around([i.total_seconds() 
+                              for i in np.diff( np.vstack(zip(trialStartTimes,trialEndTimes)),
+                                  axis=1 ).ravel()])-30)<=1).all():
+        warn("The trials are not all 30s long.")
+    return trialStartTimes,trialEndTimes

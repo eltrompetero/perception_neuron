@@ -817,7 +817,7 @@ def extract_motionbuilder_test(hand,
 def extract_motionbuilder_model3_3(hand,
                                    dr=( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
                                         'Animations/Eddie_Grid_Model' ),
-                                   fname='Eddie_Grid_Model_%s_Anim_Export_Take_001',
+                                   fname='Eddie_Grid_Model_%s_Anim_Export_Truncate_Take_001',
                                    reverse_time=False):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
@@ -832,7 +832,7 @@ def extract_motionbuilder_model3_3(hand,
     ----------
     hand : str
         Hand of the model. Must be 'Left' or 'Right'.
-    fname : str,'Eddie_Grid_Model_%s_Anim_Export_Take_001'
+    fname : str,'Eddie_Grid_Model_%s_Anim_Export_Truncate_Take_001'
         Name of file with %s to replace with handedness.
     reverse_time : bool,False
         Read data backwards from end. This option is used when the avatar's motion is played in reverse.

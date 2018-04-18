@@ -598,14 +598,15 @@ class HandSyncExperiment(object):
                 
                 # Update next trial settings and refresh reader history.
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
+                    print "successfully read run_gpr"
                     # Fetch user movement during trial.
-                    v,t,tdateHistory = reader.copy_history()
+                    v,t,tdateHistory=reader.copy_history()
                     # Put output from Axis Neuron into comparable coordinate system accounting for reflection
                     # symmetry.
-                    v[:,1:] *= -1
-                    v[:,:2] = rotate_xy(v[:,:2],rotAngle)
-                    tdateHistory,_=remove_pause_intervals(tdateHistory.tolist(),
-                                                            zip(self.pause,self.unpause))
+                    v[:,1:]*=-1
+                    v[:,:2]=rotate_xy(v[:,:2],rotAngle)
+                    tdateHistory,_=remove_pause_intervals( tdateHistory.tolist(),
+                                                           zip(self.pause,self.unpause) )
                     avv=fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
                     
                     # Update GPR with this trial's data.
@@ -831,8 +832,6 @@ def remove_pause_intervals(t,pause_intervals,return_removed_ix=False):
     if return_removed_ix:
         return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])]),removedIx
     return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])])
-
-
 
 def extract_rot_angle(v,noise_threshold=.4,min_points=10):
     """
