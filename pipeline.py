@@ -817,7 +817,7 @@ def extract_motionbuilder_test(hand,
 def extract_motionbuilder_model3_3(hand,
                                    dr=( os.path.expanduser('~')+'/Dropbox/Research/tango/data/UE4_Experiments/'+
                                         'Animations/Eddie_Grid_Model' ),
-                                   fname='Eddie_Grid_Model_%s_Anim_Export_Truncate_Take_001',
+                                   fname='Eddie_Grid_Model_%s_Anim_Export_Take_001',
                                    reverse_time=False):
     """
     Load model motion data. Assuming the play rate is a constant 1/60 Hz as has been set in MotionBuilder when
@@ -859,7 +859,7 @@ def extract_motionbuilder_model3_3(hand,
 
     mbdf = pickle.load(open('%s/%s.p'%(dr,fname),'rb'))
     mbT = mbdf['Time'].values.astype(float)
-    print mbT[0],mbT[-1]
+    print "MB start and end times: %1.2f and %1.2f"%(mbT[0],mbT[-1])
     mbT -= mbT[0]
     mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
     mbV[:,:] = mbV[:,[1,0,2]]

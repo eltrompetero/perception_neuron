@@ -306,10 +306,22 @@ def subject_settings_v3_5(index,hand,return_list=True):
                  'trials':['avatar'],
                  'reverse':[False,True],
                  'usable':[False,True]},
-                {'person':'Subject02_3_5',
+                {'person':'Subject05_3_5',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,True]},
+                {'person':'Subject06_3_5',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject07_3_5',
                  'trials':['avatar'],
                  'reverse':[False,True],
                  'usable':[True,True]}
+                #{'person':'Subject02_3_5',
+                # 'trials':['avatar'],
+                # 'reverse':[False,True],
+                # 'usable':[True,True]}
                 #{'person':'Subject02_3_5',
                 # 'trials':['avatar'],
                 # 'reverse':[False,True],
@@ -726,7 +738,7 @@ class VRTrial3_1(object):
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
-        windowsByPart,_,_ = self.window_specs(self.person,self.dr,reload_trial_times=True)
+        windowsByPart,_,_ = self.window_specs(self.person,self.dr)#,reload_trial_times=True)
 
         # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial,
         # hmdTrials. These contain arrays for time that were interpolated in for regular sampling and
