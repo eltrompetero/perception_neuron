@@ -302,7 +302,19 @@ def subject_settings_v3_5(index,hand,return_list=True):
     settings : dict
     dr : str
     """
-    settings = [{'person':'Subject04_3_5',
+    settings = [{'person':'Subject01_3_5',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject02_3_5',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject03_3_5',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject04_3_5',
                  'trials':['avatar'],
                  'reverse':[False,True],
                  'usable':[False,True]},
@@ -317,23 +329,31 @@ def subject_settings_v3_5(index,hand,return_list=True):
                 {'person':'Subject07_3_5',
                  'trials':['avatar'],
                  'reverse':[False,True],
+                 'usable':[True,True]},
+                {'person':'Subject08_3_5',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,True]},
+                {'person':'Subject09_3_5',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[False,True]},
+                {'person':'Subject10_3_5',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,True]},
+                {'person':'Subject11_3_5',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
                  'usable':[True,True]}
-                #{'person':'Subject02_3_5',
-                # 'trials':['avatar'],
-                # 'reverse':[False,True],
-                # 'usable':[True,True]}
-                #{'person':'Subject02_3_5',
-                # 'trials':['avatar'],
-                # 'reverse':[False,True],
-                # 'usable':[True,True]},
-                #{'person':'Subject03_3_5',
-                # 'trials':['avatar'],
-                # 'reverse':[False,True],
-                # 'usable':[True,True]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
         rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+        # In the case where the final save in HandSyncExperiment.run_vr did not complete, the
+        # rotAngle will be a list.
+        if type(rotAngle) is list:
+            rotAngle=rotAngle[0] if hand=='left' else rotAngle[1]
     except KeyError:
         from experiment import HandSyncExperiment
 
@@ -341,6 +361,7 @@ def subject_settings_v3_5(index,hand,return_list=True):
         f=[f for f in os.listdir('%s'%dr) if 'an_port_cal' in f]
         f.sort()
         rotAngle=HandSyncExperiment.read_cal('%s/%s'%(dr,f[-1]),.3)
+        rotAngle=rotAngle[0] if hand=='left' else rotAngle[1]
     except IOError:
         rotAngle=np.nan
     reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
@@ -713,7 +734,7 @@ class VRTrial3_1(object):
         for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
                                           self.subjectSplitTrials['avatar'],
                                           self.templateSplitTrials['avatar'])):
-            p[i]=perfEval.time_average(avv[60:,1:],sv[60:,1:],dt=1/30)
+            p[i]=perfEval.time_average(avv[:,1:],sv[:,1:],dt=1/30,bds=[1,t.max()-1])
             
             f=self.gprmodel.fractions[i]
             dur=self.gprmodel.durations[i]
@@ -738,7 +759,7 @@ class VRTrial3_1(object):
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
-        windowsByPart,_,_ = self.window_specs(self.person,self.dr)#,reload_trial_times=True)
+        windowsByPart,_,_ = self.window_specs(self.person,self.dr)
 
         # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial,
         # hmdTrials. These contain arrays for time that were interpolated in for regular sampling and
@@ -972,7 +993,235 @@ class VRTrial3_1(object):
             return x
         x,_=remove_pause_intervals(x.tolist(),zip(*self.pause))
         return np.array(x)
-# end VRTrial3_1
+#end VRTrial3_1
+
+
+
+class BuggyVRTrial3_5(VRTrial3_1):
+    def retrain_gprmodel(self,**gpr_kwargs):
+        """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
+        values need to be calculated again.
+
+        In the buggy version, all the quantities for gpr are calculated again.
+
+        Parameters
+        ----------
+        **gpr_kwargs
+        """
+        print "Retraining model..."
+        from coherence import DTWPerformance,GPREllipsoid
+        perfEval=DTWPerformance()
+        gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
+                              fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
+                              mean_performance=self.gprmodel.performanceData.mean(),
+                              **gpr_kwargs)
+        p=np.zeros_like(self.gprmodel.performanceData)
+        
+        # Update GPR on performance data points calculated again.
+        for i,(t,sv,avv,(windowSpec,_)) in enumerate(zip(self.timeSplitTrials['avatar'],
+                                                         self.subjectSplitTrials['avatar'],
+                                                         self.templateSplitTrials['avatar'],
+                                                         self.windowsByPart['avatar'])):
+            p[i]=perfEval.time_average(avv[:,1:],sv[:,1:],dt=1/30,bds=[1,t.max()-1])
+            
+            if windowSpec[1]==0:
+                f=1.
+                dur=0.
+            else:
+                f=np.around((windowSpec[1]-windowSpec[0])/windowSpec[1],1)
+                dur=np.around(windowSpec[1],1)
+            gprmodel.update(self.gprmodel.ilogistic(p[i]),dur,f)
+        self.gprmodel=gprmodel
+
+    def pickle_trial_dicts(self,disp=False):
+        """
+        Put data for analysis into easily accessible pickles. Right now, I extract only visibility and hand
+        velocities for AN port data and avatar's motionbuilder files.
+        
+        Parameters
+        ----------
+        disp : bool,False
+        """
+        from axis_neuron import extract_AN_port
+        from pipeline import extract_motionbuilder_model3_3
+        from utils import match_time
+        from ue4 import load_visibility
+        import dill as pickle
+        from experiment import remove_pause_intervals
+
+        # Load AN data.
+        df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
+        windowsByPart,_,_ = self.window_specs(self.person,self.dr)
+
+        # Sort trials into the hand, arm, and avatar trial dictionaries: subjectTrial, templateTrial,
+        # hmdTrials. These contain arrays for time that were interpolated in for regular sampling and
+        # functions for velocities.
+        subjectTrial,templateTrial,hmdTrials = {},{},{}
+        timeSplitTrials,subjectSplitTrials,templateSplitTrials = {},{},{}
+
+        for trialno,part in enumerate(self.trialTypes):
+            if disp:
+                print "Processing %s..."%part
+
+            # Load visibility time points saved by UE4 and remove pause intervals.
+            if part.isalpha():
+                visible,invisible = load_visibility(part+'_visibility',self.dr)
+            else:
+                visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
+            visible,_=remove_pause_intervals(visible.tolist(),zip(*self.pause))
+            invisible,_=remove_pause_intervals(invisible.tolist(),zip(*self.pause))
+            visible,invisible=np.array(visible),np.array(invisible)
+            
+            # Start and end times counting only the time the simulation is running (and not paused).
+            exptStartEnd = [visible[0],invisible[-1]]
+            
+            # Extract template. Downsample to 30Hz from 60Hz.
+            mbV,mbT = extract_motionbuilder_model3_3( self.modelhandedness[trialno],
+                                                      reverse_time=self.reverse )
+            showIx = mbT < (exptStartEnd[1]-exptStartEnd[0]).total_seconds()
+            templateTrial[part+'T'] = mbT[showIx][::2]
+            templateTrial[part+'V'] = mbV
+            
+            # Extract subject from port file.
+            anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
+                                               rotation_angle=self.rotation )
+            # Remove pauses.
+            anT,_,removeIx=remove_pause_intervals(anT.tolist(),zip(*self.pause),True)
+            anT=np.array(anT)
+            anV=np.delete(anV[0],removeIx,axis=0)
+            # Remove parts that extend beyond trial.
+            showIx = (anT>=exptStartEnd[0]) & (anT<=exptStartEnd[1])
+            anT,anV = anT[showIx],anV[showIx]
+            # Save into variables used here.
+            subjectTrial[part+'T'],subjectTrial[part+'V'] = anT,anV
+            
+            # Put trajectories on the same time samples so we can pipeline our regular computation.
+            offset = (subjectTrial[part+'T'][0]-exptStartEnd[0]).total_seconds()
+            subjectTrial[part+'V'],subjectTrial[part+'T'] = match_time(subjectTrial[part+'V'],
+                                                                       subjectTrial[part+'T'],
+                                                                       1/30,
+                                                                       offset=offset,
+                                                                       use_univariate=True)
+
+            # Separate the different visible trials into separate arrays.
+            # Times for when visible/invisible windows start.
+            start = np.zeros((len(visible)+len(invisible)),dtype=object)
+            start[::2] = visible
+            start[1::2] = invisible
+            # Units of seconds.
+            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.cumsum(start)
+            invisibleStart = start[::2]  # as seconds
+            visibleStart = start[1::2]  # as seconds
+            
+            # When target is invisible, set visibility to 0.
+            visibility = np.ones_like(templateTrial[part+'T'])
+            for i,j in zip(invisibleStart,visibleStart):
+                if i<j:
+                    visibility[(templateTrial[part+'T']>=i) & (templateTrial[part+'T']<j)] = 0
+            if len(visible)<len(invisible):
+                visibility[(templateTrial[part+'T']>=invisible[-1])] = 0
+            templateTrial[part+'visibility'] = visibility
+            
+            # Separate single data take into separate trials.
+            timeSplitTrials[part],subjectSplitTrials[part],templateSplitTrials[part] = [],[],[]
+            templateSplitTrials[part+'visibility'] = []
+            for spec,startendt in windowsByPart[part]:
+                startendt = ((startendt[0]-exptStartEnd[0]).total_seconds(),
+                             (startendt[1]-exptStartEnd[0]).total_seconds())
+
+                # Save time.
+                timeix = (templateTrial[part+'T']<=startendt[1])&(templateTrial[part+'T']>=startendt[0])
+                t = templateTrial[part+'T'][timeix]
+                timeSplitTrials[part].append(t)
+
+                # Save visibility window.
+                templateSplitTrials[part+'visibility'].append( visibility[timeix] )
+                
+                # Save velocities.
+                templateSplitTrials[part].append( templateTrial[part+'V'](t) )
+                subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
+        
+        pickle.dump({'templateTrial':templateTrial,
+                     'subjectTrial':subjectTrial,
+                     'timeSplitTrials':timeSplitTrials,
+                     'templateSplitTrials':templateSplitTrials,
+                     'subjectSplitTrials':subjectSplitTrials,
+                     'windowsByPart':windowsByPart},
+                    open('%s/trial_dictionaries.p'%self.dr,'wb'),-1)
+
+    def window_specs(self,person,dr):
+        """
+        Get when the different visible/invisible cycles occur in the given experiment. These data are
+        obtained from visibility text files output from UE4.
+        
+        Parameters
+        ----------
+        person : str
+            Will point to the folder that the data is in.
+        dr : str
+
+        Returns
+        -------
+        windowsByPart : dict
+            Keys correspond to trial types. Each dict entry is a list of tuples ((type of
+            window),(window start, window end)) Window type is a tuple
+            (inv_duration,window_duration)
+        """
+        from ue4 import load_visibility 
+
+        # Load AN subject data.
+        df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
+
+        windowsByPart = {}
+        
+        for trialno,part in enumerate(['avatar']):
+            if part.isalpha():
+                fname = part+'_visibility'
+            else:
+                fname = part[:-1]+'_visibility_0'
+
+            visible,invisible = load_visibility(fname,dr)
+            visible=self._remove_pauses(visible)
+            invisible=self._remove_pauses(invisible)
+
+            # Array denoting visible (with 1) and invisible (with 0) times.
+            start = np.zeros((len(visible)+len(invisible)),dtype=object)
+            start[::2] = visible
+            start[1::2] = invisible
+            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.cumsum(start)
+            invisibleStart = start[::2]
+            visibleStart = start[1::2]
+
+            # Load data saved in gpr.p.
+            # The first time point is when the file was written which we can throw out. The second pair of
+            # times are when the trial counter is updated immediately after the first fully visible trial. The
+            # remaining points are the following trials.
+            dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
+            t0,t1,invDur,windowDur=infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr)
+            trialStartTimes,trialEndTimes=t0,t1
+
+            windowSpecs = []
+            windowStart,windowEnd = [],[]
+            for i in xrange(len(trialStartTimes)):
+                if i==0:
+                    windowSpecs.append((0,0))
+                else:
+                    windowSpecs.append((invDur[i],windowDur[i]))
+
+                windowStart.append(trialStartTimes[i])
+                windowEnd.append(trialEndTimes[i])
+
+            windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
+
+            # Get the duration of the invisible and visible windows in the time series.
+            mxLen = min([len(visibleStart),len(invisibleStart)])
+            invDur = visibleStart[:mxLen]-invisibleStart[:mxLen]
+            visDur = invisibleStart[1:][:mxLen-1]-visibleStart[:-1][:mxLen-1]
+            #windowDur = invDur[:-1]+visDur  # total duration cycle of visible and invisible
+        return windowsByPart,invDur,visDur
+#end BuggyVRTrial3_5
 
 
 
@@ -1581,6 +1830,10 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
     -------
     trialStartTimes : list
     trialEndTimes : list
+    invDur : list
+        Invisible duration for this set of trials as pulled from the first window in this trial.
+    windowDur : list
+        Total window duration for this set of trials as pulled from the first window in this trial.
     """
     from datetime import timedelta
     from ue4 import load_visibility
@@ -1595,33 +1848,51 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
     # Duration of each visibility cycle.
     dt=[i.total_seconds() 
         for i in np.diff( np.vstack(zip(visible,invisible)),1 ).ravel()]
+    dt2=[-i.total_seconds() 
+         for i in np.diff( np.vstack(zip(visible[1:],invisible[:-1])),1 ).ravel()]
     assert (np.array(dt)>0).all()
-    assert np.around(dt[0])==30 and np.around(dt[-1])==30, (dt[0],dt[-1])
+    if not (np.around(dt[0])==30 and np.around(dt[-1])==30, (dt[0],dt[-1])):
+        msg="Initial and final trials are not 30s: %1.2f and %1.2f."%(dt[0],dt[-1])
+        warn(msg)
 
     trialStartTimes=[visible.pop(0)]
     trialEndTimes=[invisible.pop(0)]
+    invDur=[0.]
+    windowDur=[0.]
     dt.pop(0)
+    dt2.pop(0)
 
     # Loop through all the visibility windows and identify when they change.
     lastdt=dt.pop(0)
     while len(dt)>0:
         nowdt=dt.pop(0)
-        if np.abs(nowdt-lastdt)>1.5e-2:
+        if len(dt2)==1:
+            # Case where second to last change can be a weird blip.
+            invisible.pop(0)
+            dt2.pop(0)
+        elif np.abs(nowdt-lastdt)>1.5e-2:
             trialStartTimes.append(trialEndTimes[-1])
             trialEndTimes.append(invisible.pop(0))
+            invDur.append(dt2.pop(0))
+            windowDur.append(invDur[-1]+nowdt)
         else:
             invisible.pop(0)
+            dt2.pop(0)
         visible.pop(0)
         lastdt=nowdt
     trialStartTimes.append(visible.pop(0))
+    # Assuming that last visible trial is 30s long.
     trialEndTimes.append(trialStartTimes[-1]+timedelta(seconds=30))
+    invDur.append(0.)
+    windowDur.append(0.)
     
     assert len(trialStartTimes)==len(trialEndTimes)
     if (len(trialStartTimes)!=16 or len(trialEndTimes)!=16):
-        warn("The number of trials is not 16. There are %d trials."%len(trialStartTimes))
+        msg="The number of trials is not 16. There are %d trials."
+        warn(msg)
     # Check that trials are all 30+/-1 seconds long.
     if not (np.abs(np.around([i.total_seconds() 
                               for i in np.diff( np.vstack(zip(trialStartTimes,trialEndTimes)),
                                   axis=1 ).ravel()])-30)<=1).all():
         warn("The trials are not all 30s long.")
-    return trialStartTimes,trialEndTimes
+    return trialStartTimes,trialEndTimes,invDur,windowDur

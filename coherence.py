@@ -466,7 +466,7 @@ class DTWPerformance(object):
         except ValueError:
             warn("fastdtw could not align. Possible because subject data is flat.")
             path=range(len(x))
-        keepIx=(path[:,0]*dt>=bds[0])&(path[:,0]<=bds[1])
+        keepIx=((path[:,0]*dt)>=bds[0])&((path[:,0]*dt)<=bds[1])
 
         normx = norm(x[path[:,0]],axis=1)+np.nextafter(0,1)
         normy = norm(y[path[:,1]],axis=1)+np.nextafter(0,1)
