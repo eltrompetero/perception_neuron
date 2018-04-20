@@ -1028,8 +1028,8 @@ class BuggyVRTrial3_5(VRTrial3_1):
                 f=1.
                 dur=0.
             else:
-                f=np.around((windowSpec[1]-windowSpec[0])/windowSpec[1],1)
-                dur=np.around(windowSpec[1],1)
+                f=(windowSpec[1]-windowSpec[0])/windowSpec[1]
+                dur=windowSpec[1]
             gprmodel.update(self.gprmodel.ilogistic(p[i]),dur,f)
         self.gprmodel=gprmodel
 
@@ -1814,7 +1814,8 @@ class Tree(object):
 
 
 def infer_trial_times_from_visibility(pause,unpause,dr,
-                                      file_name='avatar_visibility'):
+                                      file_name='avatar_visibility',
+                                      visible_duration=30):
     """Identify endpoints of trials from the visibility/invisibility times. This will 
     return the start and end times for 16 trials that are about 30 s long.
     
@@ -1825,6 +1826,8 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
     unpause : list datetime
     dr : str
     file_name : str,'avatar_visibility'
+    visible_duration : float,30
+        Duration of visible trials.
     
     Returns
     -------
@@ -1836,8 +1839,8 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
         Total window duration for this set of trials as pulled from the first window in this trial.
     """
     from datetime import timedelta
-    from ue4 import load_visibility
-    from experiment import remove_pause_intervals
+    from perceptionneuron.ue4 import load_visibility
+    from perceptionneuron.experiment import remove_pause_intervals
 
     visible,invisible=load_visibility('%s/%s'%(dr,'avatar_visibility'))
     visible,_=remove_pause_intervals(visible,zip(pause,unpause))
@@ -1848,13 +1851,15 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
     # Duration of each visibility cycle.
     dt=[i.total_seconds() 
         for i in np.diff( np.vstack(zip(visible,invisible)),1 ).ravel()]
-    dt2=[-i.total_seconds() 
-         for i in np.diff( np.vstack(zip(visible[1:],invisible[:-1])),1 ).ravel()]
+    dt2=[i.total_seconds() 
+         for i in np.diff( np.vstack(zip(invisible[:-1],visible[1:])),1 ).ravel()]
     assert (np.array(dt)>0).all()
     if not (np.around(dt[0])==30 and np.around(dt[-1])==30, (dt[0],dt[-1])):
         msg="Initial and final trials are not 30s: %1.2f and %1.2f."%(dt[0],dt[-1])
         warn(msg)
 
+    # Loop through all the visibility windows and identify when they change.
+    # First trial following full visibility window is a special case.
     trialStartTimes=[visible.pop(0)]
     trialEndTimes=[invisible.pop(0)]
     invDur=[0.]
@@ -1862,31 +1867,49 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
     dt.pop(0)
     dt2.pop(0)
 
-    # Loop through all the visibility windows and identify when they change.
-    lastdt=dt.pop(0)
-    while len(dt)>0:
-        nowdt=dt.pop(0)
+    lastdt=nowdt=dt.pop(0)
+    lastdt2=nowdt2=dt2.pop(0)
+    while len(dt2)>0:
         if len(dt2)==1:
             # Case where second to last change can be a weird blip.
             invisible.pop(0)
-            dt2.pop(0)
-        elif np.abs(nowdt-lastdt)>1.5e-2:
+        elif (abs(nowdt-lastdt)+abs(nowdt2-lastdt2)+
+              abs(nowdt+nowdt2-lastdt-lastdt2))>.1:
             trialStartTimes.append(trialEndTimes[-1])
             trialEndTimes.append(invisible.pop(0))
-            invDur.append(dt2.pop(0))
-            windowDur.append(invDur[-1]+nowdt)
+            invDur.append(lastdt2)
+            windowDur.append(lastdt2+lastdt)
         else:
             invisible.pop(0)
-            dt2.pop(0)
         visible.pop(0)
         lastdt=nowdt
+        lastdt2=nowdt2
+        nowdt=dt.pop(0)
+        nowdt2=dt2.pop(0)
+    trialStartTimes.append(trialEndTimes[-1])
+    trialEndTimes.append(invisible.pop(0))
+    invDur.append(lastdt2)
+    windowDur.append(lastdt2+lastdt)
+    #Last visible trial.
     trialStartTimes.append(visible.pop(0))
-    # Assuming that last visible trial is 30s long.
-    trialEndTimes.append(trialStartTimes[-1]+timedelta(seconds=30))
+    trialEndTimes.append(trialStartTimes[-1]+timedelta(seconds=visible_duration))
     invDur.append(0.)
     windowDur.append(0.)
     
+    # Checks.
     assert len(trialStartTimes)==len(trialEndTimes)
+    
+    # Only keep trials that are more than 10s long.
+    i=0
+    while i<len(trialStartTimes):
+        if (trialEndTimes[i]-trialStartTimes[i]).total_seconds()<10:
+            trialEndTimes.pop(i)
+            trialStartTimes.pop(i)
+            invDur.pop(i)
+            windowDur.pop(i)
+            i-=1
+        i+=1
+    
     if (len(trialStartTimes)!=16 or len(trialEndTimes)!=16):
         msg="The number of trials is not 16. There are %d trials."
         warn(msg)
