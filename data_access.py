@@ -349,6 +349,14 @@ def subject_settings_v3_5(index,hand,return_list=True):
                 {'person':'Subject12_3_5',
                  'trials':['avatar'],
                  'reverse':[True,False],
+                 'usable':[True,True]},
+                {'person':'Subject13_3_5',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
+                 'usable':[True,True]},
+                {'person':'Subject14_3_5',
+                 'trials':['avatar'],
+                 'reverse':[False,True],
                  'usable':[True,True]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
@@ -374,6 +382,7 @@ def subject_settings_v3_5(index,hand,return_list=True):
     if return_list:
         return settings['person'],dr,rotAngle,reverse,usable
     return settings,dr
+
 
 
 # ------------------ #
@@ -442,7 +451,8 @@ class VRTrial3_1(object):
         
         if retrain:
             self.retrain_gprmodel()
-
+    
+    
     def info(self):
         print "Person %s"%self.person
         print "Trials available:"
@@ -715,14 +725,12 @@ class VRTrial3_1(object):
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         return dphase
 
-    def retrain_gprmodel(self,start_ix=60,**gpr_kwargs):
+    def retrain_gprmodel(self,**gpr_kwargs):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
         Parameters
         ----------
-        start_ix : int,60
-            Time index at which to start comparing trajectories. Since dt=1/30, 60 corresponds to 2 seconds.
         **gpr_kwargs
         """
         print "Retraining model..."
@@ -1002,6 +1010,17 @@ class VRTrial3_1(object):
 
 
 class BuggyVRTrial3_5(VRTrial3_1):
+    #def __init__(self):
+    #    super(BuggyVRTrial3_5,self).__init__()
+    #    if self.person=='Subject13_3_5':
+    #        self.remove_first_trial()
+
+    #def remove_first_trial(self):
+    #    self.timeSplitTrials=self.timeSplitTrials['avatar'][1:]
+    #    self.subjectSplitTrials=self.subjectSplitTrials['avatar'][1:]
+    #    self.templateSplitTrials=self.templateSplitTrials['avatar'][1:]
+    #    self.windowsByPart=self.windowsByPart['avatar'][1:]
+
     def retrain_gprmodel(self,**gpr_kwargs):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
@@ -1146,6 +1165,12 @@ class BuggyVRTrial3_5(VRTrial3_1):
                 templateSplitTrials[part].append( templateTrial[part+'V'](t) )
                 subjectSplitTrials[part].append( subjectTrial[part+'V'](t) )
         
+        if self.person=='Subject13_3_5':
+            timeSplitTrials['avatar']=timeSplitTrials['avatar'][1:]
+            subjectSplitTrials['avatar']=subjectSplitTrials['avatar'][1:]
+            templateSplitTrials['avatar']=templateSplitTrials['avatar'][1:]
+            windowsByPart['avatar']=windowsByPart['avatar'][1:]
+
         pickle.dump({'templateTrial':templateTrial,
                      'subjectTrial':subjectTrial,
                      'timeSplitTrials':timeSplitTrials,
