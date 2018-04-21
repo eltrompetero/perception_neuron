@@ -92,6 +92,58 @@ class MultiUnivariateSpline(object):
 # ===================== #
 # Function definitions. #
 # ===================== #
+def compare_specs(x,y,precision):
+    """Given either one spec and a list or two lists, compare the twople values with each other to a
+    precision that is a multiple of precision.
+
+    Parameters
+    ----------
+    x : list of twoples or twople
+    y : list of twoples or twople
+
+    Returns
+    -------
+    comparison_result : ndarray
+    """
+    assert precision>=0
+
+    # Case with both twoples.
+    if type(x) is tuple and type(y) is tuple:
+        if precision==0:
+            if x[0]==y[0] and x[1]==y[1]:
+                return True
+            return False
+
+        if abs(x[0]-y[0])<=precision and abs(x[1]-y[1])<=precision:
+            return True
+        return False
+
+    # Case with one twople and one list.
+    if type(x) is tuple and type(y) is list or (type(x) is list and type(y) is tuple):
+        if type(x) is list:  # swap
+            x_=x
+            x=y
+            y=x_
+
+        comparison=np.zeros(len(y),dtype=bool)
+        for i in xrange(len(y)):
+            comparison[i]=compare_specs(x,y[i],precision)
+
+    # Case with both lists.
+    elif type(x) is list and type(y) is list:
+        assert len(x)==len(y)
+        comparison=np.zeros(len(y),dtype=bool)
+        for i in xrange(len(y)):
+            comparison[i]=compare_specs(x[i],y[i],precision)
+    
+    else:
+        raise Exception("Unrecognized input.")
+
+    return comparison
+
+def _equiv_round(x,y,precision):
+    return round(x/precision)==round(y/precision)
+
 def rotate_xy(xy,theta):
     """
     Apply rotation to xy-vector.

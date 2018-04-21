@@ -345,6 +345,10 @@ def subject_settings_v3_5(index,hand,return_list=True):
                 {'person':'Subject11_3_5',
                  'trials':['avatar'],
                  'reverse':[True,False],
+                 'usable':[True,True]},
+                {'person':'Subject12_3_5',
+                 'trials':['avatar'],
+                 'reverse':[True,False],
                  'usable':[True,True]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
@@ -1199,7 +1203,12 @@ class BuggyVRTrial3_5(VRTrial3_1):
             # times are when the trial counter is updated immediately after the first fully visible trial. The
             # remaining points are the following trials.
             dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
-            t0,t1,invDur,windowDur=infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr)
+            if self.person=='Subject01_3_5':
+                # Exception for anomalous trial.
+                t0,t1,invDur,windowDur = infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr,
+                                                                           visible_duration=15)
+            else:
+                t0,t1,invDur,windowDur=infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr)
             trialStartTimes,trialEndTimes=t0,t1
 
             windowSpecs = []
