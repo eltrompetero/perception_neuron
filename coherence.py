@@ -1033,6 +1033,7 @@ class GPREllipsoid(GPR):
         
         self.alpha=1  # make this big to improve hyperparameter search
         self.length_scale=self.DEFAULT_LENGTH_SCALE
+        self.dist_expon=1.
         self._update_kernel(self.theta,self.length_scale)
 
     def _search_hyperparams(self,n_restarts=1,
