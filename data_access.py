@@ -400,6 +400,7 @@ def subject_settings_v3_6(index,hand,return_list=True):
     settings : dict
     dr : str
     """
+    assert hand in ['left','right']
     settings = [{'person':'Subject01_3_6',
                  'trials':['avatar'],
                  'reverse':[False,True],
@@ -431,7 +432,7 @@ def subject_settings_v3_6(index,hand,return_list=True):
                 {'person':'Subject08_3_6',
                  'trials':['avatar'],
                  'reverse':[True,False],
-                 'usable':[True,True]},
+                 'usable':[False,False]},
                 {'person':'Subject09_3_6',
                  'trials':['avatar'],
                  'reverse':[True,False],

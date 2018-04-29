@@ -1033,7 +1033,7 @@ class GPREllipsoid(GPR):
         
         self.alpha=1  # make this big to improve hyperparameter search
         self.length_scale=self.DEFAULT_LENGTH_SCALE
-        self.dist_expon=1.
+        self.dist_power=1.
         self._update_kernel(self.theta,self.length_scale)
 
     def _search_hyperparams(self,n_restarts=1,
@@ -1134,6 +1134,7 @@ class GPREllipsoid(GPR):
                     return gp.ocv_error()
                 return -gp.log_likelihood()
             except AssertionError:
+                # This is printed when the determinant of the covariance matrix is not positive.
                 print "Bad parameter values %f, %f, %f, %f"%tuple(params)
                 return 1e30
         
@@ -1219,15 +1220,17 @@ class GPREllipsoid(GPR):
         print "Mean performance mu = %1.2f"%self.mean_performance
         print "Kernel coeff theta = %1.2f"%self.theta
         print "Kernel length scale el = %1.2f"%self.length_scale
+        print "Kernel exponent = %1.2f"%self.dist_power
     
     @staticmethod
-    def _kernel(_geodesic,tmin,tmax,coeff,length_scale):
+    def _kernel(_geodesic,tmin,tmax,coeff,length_scale,dist_power):
         """Return kernel function as defined with given parameters.
         """
         assert tmax>tmin
         assert length_scale>0
 
         def kernel_function(tfx,tfy):
+            """Takes in pairs (t,f) where t is duration and f is fraction."""
             # Account for cases where f=1.
             if tfx[0]==0:
                 lon0=0
@@ -1241,10 +1244,10 @@ class GPREllipsoid(GPR):
 
             lat0=(tfx[1]-.5)*180
             lat1=(tfy[1]-.5)*180
-            return coeff*np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']/length_scale )
+            return coeff*np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**dist_power/length_scale )
         return kernel_function
 
-    def define_kernel(self,coeff,length_scale):
+    def define_kernel(self,coeff,length_scale,dist_power=None):
         """Define new Geodesic within given parameters and wrap it nicely.
 
         Parameters
@@ -1254,9 +1257,10 @@ class GPREllipsoid(GPR):
         length_scale : float
             Length scale used in the kernel.
         """
-        return self._kernel(self._geodesic,self.tmin,self.tmax,coeff,length_scale)
+        dist_power=dist_power or self.dist_power
+        return self._kernel(self._geodesic,self.tmin,self.tmax,coeff,length_scale,dist_power)
 
-    def _update_kernel(self,coeff,length_scale):
+    def _update_kernel(self,coeff,length_scale,dist_power=None):
         """Update instance Geodesic kernel parameters and wrap it nicely.
 
         Performance grid is not updated. Must run self.predict() if you wish to do that.
@@ -1268,7 +1272,8 @@ class GPREllipsoid(GPR):
         length_scale : float
             Length scale used in the kernel.
         """
-        self.kernel=self._kernel( self._geodesic,self.tmin,self.tmax,coeff,length_scale )
+        dist_power=dist_power or self.dist_power
+        self.kernel=self._kernel( self._geodesic,self.tmin,self.tmax,coeff,length_scale,dist_power )
         self.gp=GaussianProcessRegressor( self.kernel,self.alpha**-2 )
 #end GPREllipsoid
 
