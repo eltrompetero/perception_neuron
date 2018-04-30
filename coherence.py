@@ -1037,10 +1037,10 @@ class GPREllipsoid(GPR):
         self.dist_power=1.
         self._update_kernel(self.theta,self.length_scale)
 
-    def _search_hyperparams(self,n_restarts=1,
-                            initial_guess=None,
-                            alpha_bds=(0,np.inf),
-                            coeff_bds=(0,np.inf)):
+    def _search_hyperparams_no_length_scale(self,n_restarts=1,
+                                            initial_guess=None,
+                                            alpha_bds=(0,np.inf),
+                                            coeff_bds=(0,np.inf)):
         """Find the hyperparameters alpha, mu, theta that maximize the log likelihood of the data.
         These are the noise std, mean performance, and kernel coefficient.
 
@@ -1087,11 +1087,11 @@ class GPREllipsoid(GPR):
             soln=[soln[minNegLikIx]]
         return soln[0]
 
-    def _search_hyperparams_with_length_scales(self,n_restarts=1,
-                                               initial_guess=None,
-                                               alpha_bds=(1e-3,np.inf),
-                                               coeff_bds=(0,np.inf),
-                                               min_ocv=False):
+    def _search_hyperparams(self,n_restarts=1,
+                            initial_guess=None,
+                            alpha_bds=(1e-3,np.inf),
+                            coeff_bds=(0,np.inf),
+                            min_ocv=False):
         """Find the hyperparameters that maximize the log likelihood of the data including length
         scale parameters on the surface of ellipsoid.
         
@@ -1157,8 +1157,77 @@ class GPREllipsoid(GPR):
             soln=[soln[minNegLikIx]]
         return soln[0]
 
+    def _search_hyperparams_no_mean(self,n_restarts=1,
+                                    initial_guess=None,
+                                    alpha_bds=(1e-3,np.inf),
+                                    coeff_bds=(0,np.inf),
+                                    min_ocv=False):
+        """Find the hyperparameters that maximize the log likelihood of the data while fixing the
+        mean.
+        
+        Parameters
+        ----------
+        n_restarts : int,1
+        initial_guess : list,None
+
+        Returns
+        -------
+        soln : dict
+            As returned by scipy.optimize.minimize.
+        """
+        from scipy.optimize import minimize
+        if initial_guess is None:
+            initial_guess=np.array([self.alpha,self.theta,self.length_scale])
+        else: assert len(initial_guess)==3
+        mean_performance=self.mean_performance
+
+        def train_new_gpr(params):
+            alpha,coeff,length_scale=params
+            
+            kernel=self.define_kernel(coeff,length_scale)
+            gp=GaussianProcessRegressor(kernel,alpha**-2)
+            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
+            return gp
+
+        def f(params):
+            if not alpha_bds[0]<params[0]<alpha_bds[1]: return 1e30
+            if not coeff_bds[0]<params[1]<coeff_bds[1]: return 1e30
+
+            # Bound length_scale to be above certain value.
+            if params[2]<=10: return 1e30
+
+            gp=train_new_gpr(params)
+            predMu,predStd=gp.predict(gp.X,return_std=True)
+            if np.isnan(predStd).any():
+                return 1e30
+            try:
+                if min_ocv:
+                    return gp.ocv_error()
+                return -gp.log_likelihood()
+            except AssertionError:
+                # This is printed when the determinant of the covariance matrix is not positive.
+                print "Bad parameter values %f, %f, %f"%tuple(params)
+                return 1e30
+        
+        # Parameters are noise std, mean perf, equatorial radius, oblateness.
+        if n_restarts>1:
+            initial_guess=np.vstack((initial_guess,
+                np.vstack((np.random.exponential(size=n_restarts-1),
+                           np.random.exponential(size=n_restarts-1,),
+                           np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE)+10)).T ))
+            pool=mp.Pool(mp.cpu_count())
+            soln=pool.map( lambda x:minimize(f,x),initial_guess )
+            pool.close()
+        else:
+            soln=[minimize(f,initial_guess)]
+
+        if len(soln)>1:
+            minNegLikIx=np.argmin([s['fun'] for s in soln])
+            soln=[soln[minNegLikIx]]
+        return soln[0]
+
     def optimize_hyperparams(self,verbose=False,
-                             optimize_length_scales=True,
+                             exclude_parameter=None,
                              initial_guess=None,
                              n_restarts=4,
                              use_ocv=False):
@@ -1168,8 +1237,9 @@ class GPREllipsoid(GPR):
         Parameters
         ----------
         verbose : bool,False
-        optimize_length_scales : bool,True
-            If True, optimize the radius of the ellipsoid used as well.
+        exclude_parameter : str,None
+            Name of the parameter to exclude from optimization. Can be 'length_scale',
+            'mean_performance'.
         initial_guess : ndarray,None
         n_restarts : int,4
         use_ocv : bool,False
@@ -1180,35 +1250,48 @@ class GPREllipsoid(GPR):
         logLikelihood : float
             Log likelihood of the data given the found parameters.
         """
-        if optimize_length_scales:
-            if not initial_guess is None:
-                assert len(initial_guess)==4
-            else:
+        # Optimize all parameters.
+        if exclude_parameter is None:
+            if initial_guess is None:
                 initial_guess=[self.alpha,self.mean_performance,self.theta,self.length_scale]
-
-            soln=self._search_hyperparams_with_length_scales(n_restarts=n_restarts,
-                                                             initial_guess=initial_guess,
-                                                             alpha_bds=(2e-1,1e3),
-                                                             coeff_bds=(.1,10),
-                                                             min_ocv=use_ocv)
-            if verbose:
-                print( "Optimal hyperparameters are\n"+
-                       "alpha=%1.2f, mu=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
-            self.alpha,self.mean_performance,self.theta,self.length_scale=soln['x']
-        else:
-            if not initial_guess is None:
-                assert len(initial_guess)==3
-            else:
-                initial_guess=[self.alpha,self.mean_performance,self.theta,self.length_scale]
-
 
             soln=self._search_hyperparams(n_restarts=n_restarts,
                                           initial_guess=initial_guess,
                                           alpha_bds=(2e-1,1e3),
-                                          coeff_bds=(.1,10))
+                                          coeff_bds=(.1,10),
+                                          min_ocv=use_ocv)
+            if verbose:
+                print( "Optimal hyperparameters are\n"+
+                       "alpha=%1.2f, mu=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
+            self.alpha,self.mean_performance,self.theta,self.length_scale=soln['x']
+        # Do not optimize mean performance.
+        elif exclude_parameter=='mean_performance':
+            if initial_guess is None:
+                initial_guess=[self.alpha,self.theta,self.length_scale]
+
+            soln=self._search_hyperparams_no_mean(n_restarts=n_restarts,
+                                                  initial_guess=initial_guess,
+                                                  alpha_bds=(2e-1,1e3),
+                                                  coeff_bds=(.1,10),
+                                                  min_ocv=use_ocv)
+            if verbose:
+                print( "Optimal hyperparameters are\n"+
+                       "alpha=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
+            self.alpha,self.theta,self.length_scale=soln['x']
+        # Do not optimize length scale."
+        elif exclude_parameter=='length_scale':
+            if initial_guess is None:
+                initial_guess=[self.alpha,self.mean_performance,self.theta,self.length_scale]
+
+            soln=self._search_hyperparams_no_length_scale(n_restarts=n_restarts,
+                                                          initial_guess=initial_guess,
+                                                          alpha_bds=(2e-1,1e3),
+                                                          coeff_bds=(.1,10))
             if verbose:
                 print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
             self.alpha,self.mean_performance,self.theta=soln['x']
+
+        else: raise Exception("Unrecognized parameter to exclude.")
 
         # Refresh kernel.
         self._update_kernel(self.theta,self.length_scale)
