@@ -866,7 +866,7 @@ class VRTrial3_1(object):
             # Start and end times counting only the time the simulation is running (and not paused).
             exptStartEnd = [visible[0],invisible[-1]]
             
-            # Extract template. Downsample to 30Hz from 60Hz.
+            # Extract template.
             mbV,mbT = extract_motionbuilder_model3_3( self.modelhandedness[trialno],
                                                       reverse_time=self.reverse )
             showIx = mbT < (exptStartEnd[1]-exptStartEnd[0]).total_seconds()
