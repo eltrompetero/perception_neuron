@@ -1031,7 +1031,8 @@ class GPREllipsoid(GPR):
         self.DEFAULT_LENGTH_SCALE=100
         self._geodesic=Geodesic(self.DEFAULT_LENGTH_SCALE,0)
         
-        self.alpha=1  # make this big to improve hyperparameter search
+        if self.alpha<1:
+            self.alpha=1  # make this big to improve hyperparameter search
         self.length_scale=self.DEFAULT_LENGTH_SCALE
         self.dist_power=1.
         self._update_kernel(self.theta,self.length_scale)

@@ -199,7 +199,10 @@ def subject_settings_v3_3(index,hand,return_list=True):
                  'usable':[True,True]},
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
-    rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+    try:
+        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+    except IOError:
+        rotAngle=np.nan
     reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
     usable=settings['usable'][0] if hand=='left' else settings['usable'][1]
 
