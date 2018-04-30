@@ -817,7 +817,7 @@ class VRTrial3_1(object):
         for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
                                           self.subjectSplitTrials['avatar'],
                                           self.templateSplitTrials['avatar'])):
-            p[i]=perfEval.time_average(avv[:,1:],sv[:,1:],dt=1/30,bds=[1,t.max()-1])
+            p[i]=perfEval.time_average(avv[:,1:],sv[:,1:],dt=t[1]-t[0],bds=[1,t.max()-1])
             
             f=self.gprmodel.fractions[i]
             dur=self.gprmodel.durations[i]
@@ -1240,6 +1240,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
             timeSplitTrials['avatar']=timeSplitTrials['avatar'][1:]
             subjectSplitTrials['avatar']=subjectSplitTrials['avatar'][1:]
             templateSplitTrials['avatar']=templateSplitTrials['avatar'][1:]
+            templateSplitTrials['avatarvisibility']=templateSplitTrials['avatarvisibility'][1:]
             windowsByPart['avatar']=windowsByPart['avatar'][1:]
 
         pickle.dump({'templateTrial':templateTrial,
