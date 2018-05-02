@@ -523,7 +523,6 @@ class VRTrial3_1(object):
         if retrain:
             self.retrain_gprmodel()
     
-    
     def info(self):
         print "Person %s"%self.person
         print "Trials available:"
