@@ -1154,7 +1154,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
     #    self.templateSplitTrials=self.templateSplitTrials['avatar'][1:]
     #    self.windowsByPart=self.windowsByPart['avatar'][1:]
 
-    def retrain_gprmodel(self,**gpr_kwargs):
+    def _retrain_gprmodel(self,**gpr_kwargs):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
