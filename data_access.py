@@ -212,7 +212,8 @@ def subject_settings_v3_3(index,hand,return_list=True):
 
 def subject_settings_v3_4(index,hand,return_list=True):
     """
-    Subject info for experiment v3.3. Twoples refer to the left and right subject hands.
+    Subject info for experiment v3.4. Audio no training. Twoples refer to the left and right subject
+    hands.
     2018-02-16
 
     Parameters
@@ -226,6 +227,9 @@ def subject_settings_v3_4(index,hand,return_list=True):
     -------
     settings : dict
     dr : str
+    rotAngle : float
+    reverse : bool
+    usable : bool
     """
     settings = [{'person':'Subject01_3_4',
                  'trials':['avatar'],
@@ -234,31 +238,31 @@ def subject_settings_v3_4(index,hand,return_list=True):
                 {'person':'Subject02_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]},
+                 'usable':[True,False]},
                 {'person':'Subject03_3_4',
                  'trials':['avatar'],
                  'reverse':[True,False],
-                 'usable':[True,True]},
+                 'usable':[False,True]},
                 {'person':'Subject04_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]},
+                 'usable':[True,False]},
                 {'person':'Subject05_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]},
+                 'usable':[True,False]},
                 {'person':'Subject06_3_4',
                  'trials':['avatar'],
                  'reverse':[True,False],
-                 'usable':[True,True]},
+                 'usable':[False,True]},
                 {'person':'Subject07_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]},
+                 'usable':[True,False]},
                 {'person':'Subject08_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]},
+                 'usable':[True,False]},
                 {'person':'Subject09_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
@@ -266,15 +270,15 @@ def subject_settings_v3_4(index,hand,return_list=True):
                 {'person':'Subject10_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]},
+                 'usable':[True,False]},
                 {'person':'Subject11_3_4',
                  'trials':['avatar'],
                  'reverse':[True,False],
-                 'usable':[True,True]},
+                 'usable':[False,True]},
                 {'person':'Subject12_3_4',
                  'trials':['avatar'],
                  'reverse':[False,True],
-                 'usable':[True,True]}
+                 'usable':[True,False]}
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
@@ -810,18 +814,77 @@ class VRTrial3_1(object):
                               fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
                               mean_performance=self.gprmodel.performanceData.mean(),
                               **gpr_kwargs)
-        p=np.zeros_like(self.gprmodel.performanceData)
+        p=np.zeros(len(self.timeSplitTrials['avatar']))
         
-        # Update GPR on performance data points calculated again.
-        for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
-                                          self.subjectSplitTrials['avatar'],
-                                          self.templateSplitTrials['avatar'])):
-            p[i]=perfEval.time_average(avv[:,1:],sv[:,1:],dt=t[1]-t[0],bds=[1,t.max()-1])
-            
-            f=self.gprmodel.fractions[i]
-            dur=self.gprmodel.durations[i]
-            gprmodel.update(self.gprmodel.ilogistic(p[i]),dur,f)
+        # Try to load DTW alignment path that would have been calculated with regularization.
+        version=self.person[-3:]
+        homedr=os.path.expanduser('~')
+        f=homedr+'/Dropbox/Research/tango/py/cache/dtw_v%s.p'%version
+        if os.path.isfile(f):
+            print "Using cached DTW path file."
+            pathList=pickle.load(open(f,'rb'))['pathList'][self._find_subject_settings_index()]
+            assert len(self.templateSplitTrials['avatar'])==len(pathList)
+
+            # Update GPR on performance data points calculated again.
+            for i,(t,sv,avv,path) in enumerate(zip(self.timeSplitTrials['avatar'],
+                                                   self.subjectSplitTrials['avatar'],
+                                                   self.templateSplitTrials['avatar'],
+                                                   pathList)):
+                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],
+                                                  bds=[1,t.max()-1],
+                                                  path=path)
+        else:
+            # Update GPR on performance data points calculated again.
+            for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
+                                              self.subjectSplitTrials['avatar'],
+                                              self.templateSplitTrials['avatar'])):
+                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],bds=[1,t.max()-1])
+               
+        assert (p>0).all()
+        gprmodel.update(self.gprmodel.ilogistic(p),self.gprmodel.durations,self.gprmodel.fractions)
         self.gprmodel=gprmodel
+
+    def _find_subject_settings_index(self):
+        """Find where this subject and hand would be located in the flat list of all subject
+        settings. This is bit hacked.
+
+        Returns
+        -------
+        index : int
+        """
+        done=False
+
+        if self.person[-3:]=='3_3':
+            subject_settings=subject_settings_v3_3
+        elif self.person[-3:]=='3_4':
+            subject_settings=subject_settings_v3_4
+        elif self.person[-3:]=='3_5':
+            subject_settings=subject_settings_v3_5
+        elif self.person[-3:]=='3_6':
+            subject_settings=subject_settings_v3_6
+        else:
+            raise Exception("Unrecognized experiment version.")
+
+        totalCounter=0
+        subjectCounter=0
+        while not done:
+            try:
+                person,dr,rotAngle,reverse,usable=subject_settings(subjectCounter,'left')
+                if self.person==person and self.modelhandedness[0].lower()=='right':
+                    return totalCounter
+                elif usable:
+                    totalCounter+=1
+
+                person,dr,rotAngle,reverse,usable=subject_settings(subjectCounter,'right')
+                if self.person==person and self.modelhandedness[0].lower()=='left':
+                    return totalCounter
+                elif usable:
+                    totalCounter+=1
+                subjectCounter+=1
+            except IndexError:
+                done=True
+        
+        raise Exception("Subject not found in list: %s"%self.person)
 
     def pickle_trial_dicts(self,disp=False):
         """

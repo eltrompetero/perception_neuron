@@ -640,7 +640,7 @@ class HandSyncExperiment(object):
                     # NOTE: This has to finish running before the trial ends. Right now, there is no guarantee
                     # that it will.
                     if verbose:print "Running GPR on this trial..."
-                    gprmodel.optimize_hyperparams(verbose=verbose,optimize_length_scales=True,n_restarts=1)
+                    gprmodel.optimize_hyperparams(verbose=verbose,n_restarts=1)
                     
                     # Cleanup.
                     self.delete_file('run_gpr')

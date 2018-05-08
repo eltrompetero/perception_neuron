@@ -493,6 +493,51 @@ class DTWPerformance(object):
         
         return performance
 
+    def time_average_binary(self,x,y,dt=1.,bds=[0,np.inf],path=None):
+        """
+        Measure performance as the fraction of time you are within the thresholds using the two
+        Success and Failure states identified in the paper.
+
+        Parameters
+        ----------
+        x : ndarray
+        y : ndarray
+        dt : float,1
+            Sampling rate for x and y.
+        bds : list,[0,inf]
+            Lower and upper bounds for times at which to truncate the data according to x before calculating
+            performance.
+
+        Returns
+        -------
+        performance : float
+            Fraction of the length of given trajectories that are within set thresholds.
+        """
+        from numpy.linalg import norm
+        from fastdtw import fastdtw
+        from warnings import warn
+        
+        if path is None:
+            dist,path = fastdtw(x,y,**self.dwtSettings)
+            try:
+                path = np.vstack(path)
+            except ValueError:
+                warn("fastdtw could not align. Possible because subject data is flat.")
+                path=range(len(x))
+        keepIx=((path[:,0]*dt)>=bds[0])&((path[:,0]*dt)<=bds[1])
+
+        normx = norm(x[path[:,0]],axis=1)+np.nextafter(0,1)
+        normy = norm(y[path[:,1]],axis=1)+np.nextafter(0,1)
+        # Dot product between the two vectors.
+        inner = (x[path[:,0]]*y[path[:,1]]).sum(1) / normx / normy
+        # Relative norms.
+        normDiff = np.abs(normx-normy)
+        normRatio = np.abs(np.log2(normx)-np.log2(normy))
+        dt = np.diff(path,axis=1) * dt
+
+        # Calculate performance metric.
+        return ( (np.abs(dt)<self.dtThreshold) )[keepIx].mean()
+
     def raw(self,x,y,dt=1.):
         """
         Performance as measured by the similarity of time warped trajectories. If time warping is too big,
