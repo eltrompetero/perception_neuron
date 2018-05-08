@@ -803,6 +803,9 @@ class VRTrial3_1(object):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
+        If available, use precoputed DTW with cost function to keep subject trajectory within
+        bounds.
+
         Parameters
         ----------
         **gpr_kwargs
@@ -825,7 +828,6 @@ class VRTrial3_1(object):
             pathList=pickle.load(open(f,'rb'))['pathList'][self._find_subject_settings_index()]
             assert len(self.templateSplitTrials['avatar'])==len(pathList)
 
-            # Update GPR on performance data points calculated again.
             for i,(t,sv,avv,path) in enumerate(zip(self.timeSplitTrials['avatar'],
                                                    self.subjectSplitTrials['avatar'],
                                                    self.templateSplitTrials['avatar'],
@@ -834,7 +836,6 @@ class VRTrial3_1(object):
                                                   bds=[1,t.max()-1],
                                                   path=path)
         else:
-            # Update GPR on performance data points calculated again.
             for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
                                               self.subjectSplitTrials['avatar'],
                                               self.templateSplitTrials['avatar'])):
@@ -1154,44 +1155,12 @@ class BuggyVRTrial3_5(VRTrial3_1):
     #    self.templateSplitTrials=self.templateSplitTrials['avatar'][1:]
     #    self.windowsByPart=self.windowsByPart['avatar'][1:]
 
-    def _retrain_gprmodel(self,**gpr_kwargs):
-        """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
-        values need to be calculated again.
-
-        In the buggy version, all the quantities for gpr are calculated again.
-
-        Parameters
-        ----------
-        **gpr_kwargs
-        """
-        print "Retraining model..."
-        from coherence import DTWPerformance,GPREllipsoid
-        perfEval=DTWPerformance()
-        gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
-                              fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                              mean_performance=self.gprmodel.performanceData.mean(),
-                              **gpr_kwargs)
-        p=np.zeros_like(self.gprmodel.performanceData)
-        
-        # Update GPR on performance data points calculated again.
-        for i,(t,sv,avv,(windowSpec,_)) in enumerate(zip(self.timeSplitTrials['avatar'],
-                                                         self.subjectSplitTrials['avatar'],
-                                                         self.templateSplitTrials['avatar'],
-                                                         self.windowsByPart['avatar'])):
-            p[i]=perfEval.time_average(avv[:,1:],sv[:,1:],dt=1/30,bds=[1,t.max()-1])
-            
-            if windowSpec[1]==0:
-                f=1.
-                dur=0.
-            else:
-                f=(windowSpec[1]-windowSpec[0])/windowSpec[1]
-                dur=windowSpec[1]
-            gprmodel.update(self.gprmodel.ilogistic(p[i]),dur,f)
-        self.gprmodel=gprmodel
-
     def retrain_gprmodel(self,**gpr_kwargs):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
+
+        If available, use precoputed DTW with cost function to keep subject trajectory within
+        bounds.
 
         Parameters
         ----------
@@ -1216,7 +1185,6 @@ class BuggyVRTrial3_5(VRTrial3_1):
             pathList=pickle.load(open(f,'rb'))['pathList'][self._find_subject_settings_index()]
             assert len(self.templateSplitTrials['avatar'])==len(pathList)
 
-            # Update GPR on performance data points calculated again.
             for i,(t,sv,avv,(windowSpec,_),path) in enumerate(zip(self.timeSplitTrials['avatar'],
                                                                   self.subjectSplitTrials['avatar'],
                                                                   self.templateSplitTrials['avatar'],
@@ -1234,7 +1202,6 @@ class BuggyVRTrial3_5(VRTrial3_1):
                     dur.append( windowSpec[1] )
 
         else:
-            # Update GPR on performance data points calculated again.
             for i,(t,sv,avv,(windowSpec,_)) in enumerate(zip(self.timeSplitTrials['avatar'],
                                                          self.subjectSplitTrials['avatar'],
                                                          self.templateSplitTrials['avatar'],

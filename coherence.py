@@ -496,7 +496,8 @@ class DTWPerformance(object):
     def time_average_binary(self,x,y,dt=1.,bds=[0,np.inf],path=None):
         """
         Measure performance as the fraction of time you are within the thresholds using the two
-        Success and Failure states identified in the paper.
+        Success and Failure states identified in the paper. Use Laplace counting to regularize the
+        values.
 
         Parameters
         ----------
@@ -536,7 +537,7 @@ class DTWPerformance(object):
         dt = np.diff(path,axis=1) * dt
 
         # Calculate performance metric.
-        return ( (np.abs(dt)<self.dtThreshold) )[keepIx].mean()
+        return ( ((np.abs(dt)<self.dtThreshold))[keepIx].sum()+1 ) / (keepIx.sum()+2)
 
     def raw(self,x,y,dt=1.):
         """
