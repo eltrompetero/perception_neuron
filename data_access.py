@@ -841,7 +841,7 @@ class VRTrial3_1(object):
                                               self.templateSplitTrials['avatar'])):
                 p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],bds=[1,t.max()-1])
                
-        assert (p>0).all()
+        assert ((1>p)&(p>0)).all()
         gprmodel.update(self.gprmodel.ilogistic(p),self.gprmodel.durations,self.gprmodel.fractions)
         self.gprmodel=gprmodel
 
@@ -1216,8 +1216,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
                     frac.append( (windowSpec[1]-windowSpec[0])/windowSpec[1] )
                     dur.append( windowSpec[1] )
 
-        #assert ((1>p)&(p>0)).all()
-        assert (p>0).all()
+        assert ((1>p)&(p>0)).all()
         gprmodel.update( self.gprmodel.ilogistic(p),np.array(dur),np.array(frac) )
         self.gprmodel=gprmodel
 
