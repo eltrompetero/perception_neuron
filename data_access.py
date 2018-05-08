@@ -1189,6 +1189,71 @@ class BuggyVRTrial3_5(VRTrial3_1):
             gprmodel.update(self.gprmodel.ilogistic(p[i]),dur,f)
         self.gprmodel=gprmodel
 
+    def retrain_gprmodel(self,**gpr_kwargs):
+        """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
+        values need to be calculated again.
+
+        Parameters
+        ----------
+        **gpr_kwargs
+        """
+        print "Retraining model..."
+        from coherence import DTWPerformance,GPREllipsoid
+        perfEval=DTWPerformance()
+        gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
+                              fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
+                              mean_performance=self.gprmodel.performanceData.mean(),
+                              **gpr_kwargs)
+        p=np.zeros(len(self.timeSplitTrials['avatar']))
+        
+        # Try to load DTW alignment path that would have been calculated with regularization.
+        version=self.person[-3:]
+        homedr=os.path.expanduser('~')
+        f=homedr+'/Dropbox/Research/tango/py/cache/dtw_v%s.p'%version
+        frac,dur=[],[]
+        if os.path.isfile(f):
+            print "Using cached DTW path file."
+            pathList=pickle.load(open(f,'rb'))['pathList'][self._find_subject_settings_index()]
+            assert len(self.templateSplitTrials['avatar'])==len(pathList)
+
+            # Update GPR on performance data points calculated again.
+            for i,(t,sv,avv,(windowSpec,_),path) in enumerate(zip(self.timeSplitTrials['avatar'],
+                                                                  self.subjectSplitTrials['avatar'],
+                                                                  self.templateSplitTrials['avatar'],
+                                                                  self.windowsByPart['avatar'],
+                                                                  pathList)):
+                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],
+                                                  bds=[1,t.max()-1],
+                                                  path=path)
+
+                if windowSpec[1]==0:
+                    frac.append(1.)
+                    dur.append(0.)
+                else:
+                    frac.append( (windowSpec[1]-windowSpec[0])/windowSpec[1] )
+                    dur.append( windowSpec[1] )
+
+        else:
+            # Update GPR on performance data points calculated again.
+            for i,(t,sv,avv,(windowSpec,_)) in enumerate(zip(self.timeSplitTrials['avatar'],
+                                                         self.subjectSplitTrials['avatar'],
+                                                         self.templateSplitTrials['avatar'],
+                                                         self.windowsByPart['avatar'])):
+
+                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],bds=[1,t.max()-1])
+
+                if windowSpec[1]==0:
+                    frac.append(1.)
+                    dur.append(0.)
+                else:
+                    frac.append( (windowSpec[1]-windowSpec[0])/windowSpec[1] )
+                    dur.append( windowSpec[1] )
+
+        #assert ((1>p)&(p>0)).all()
+        assert (p>0).all()
+        gprmodel.update( self.gprmodel.ilogistic(p),np.array(dur),np.array(frac) )
+        self.gprmodel=gprmodel
+
     def pickle_trial_dicts(self,disp=False):
         """
         Put data for analysis into easily accessible pickles. Right now, I extract only visibility and hand
