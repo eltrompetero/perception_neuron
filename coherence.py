@@ -933,8 +933,8 @@ class GPR(object):
         vis_fraction : float
         '''
         self.performanceData = np.append(self.performanceData,new_performance)
-        self.fractions = np.append(self.fractions,vis_fraction)
         self.durations = np.append(self.durations,window_dur)
+        self.fractions = np.append(self.fractions,vis_fraction)
         
         self.predict()
 
