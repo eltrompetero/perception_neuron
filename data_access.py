@@ -812,7 +812,7 @@ class VRTrial3_1(object):
         """
         print "Retraining model..."
         from coherence import DTWPerformance,GPREllipsoid
-        perfEval=DTWPerformance()
+        perfEval=DTWPerformance(dt_threshold=.7)
         gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
                               fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
                               mean_performance=self.gprmodel.performanceData.mean(),
