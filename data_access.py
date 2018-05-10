@@ -812,7 +812,7 @@ class VRTrial3_1(object):
         """
         print "Retraining model..."
         from coherence import DTWPerformance,GPREllipsoid
-        perfEval=DTWPerformance(dt_threshold=.7)
+        perfEval=DTWPerformance(dt_threshold=.68)
         gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
                               fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
                               mean_performance=self.gprmodel.performanceData.mean(),
@@ -832,8 +832,8 @@ class VRTrial3_1(object):
                                                    self.subjectSplitTrials['avatar'],
                                                    self.templateSplitTrials['avatar'],
                                                    pathList)):
-                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],
-                                                  bds=[1,t.max()-1],
+                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],
+                                                  dt=1/30,#t[1]-t[0],
                                                   path=path)
         else:
             for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
