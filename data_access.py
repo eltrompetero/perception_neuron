@@ -1190,10 +1190,9 @@ class BuggyVRTrial3_5(VRTrial3_1):
                                                                   self.templateSplitTrials['avatar'],
                                                                   self.windowsByPart['avatar'],
                                                                   pathList)):
-                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],
-                                                  bds=[1,t.max()-1],
+                p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],
+                                                  dt=1/30,#t[1]-t[0],
                                                   path=path)
-
                 if windowSpec[1]==0:
                     frac.append(1.)
                     dur.append(0.)
