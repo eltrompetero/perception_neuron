@@ -13,9 +13,13 @@ from subprocess import call
 
 
 def ilogistic(x):
+    """-np.log(1/x-1)"""
     return -np.log(1/x-1)
 
 def logistic(x):
+    """Squish from real line to [0,1].
+    1/(1+np.exp(-x))
+    """
     return 1/(1+np.exp(-x))
 
 
