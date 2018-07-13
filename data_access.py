@@ -1044,6 +1044,9 @@ class VRTrial3_1(object):
         -------
         ix : list of ints
         """
+        for w in self.windowsByPart[trial_type]:
+            print w[0]
+
         trialWindows = np.array([w[0] for w in self.windowsByPart[trial_type]])
         i = 0  # counter
 
@@ -1142,8 +1145,8 @@ class VRTrial3_1(object):
                     windowStart.append(visible[0])
                     windowEnd.append(trialStartTimes[1])
                 else:
-                    invDur = (1-fractions[i])*durations
-                    winDur = durations
+                    invDur = (1-fractions[i])*durations[i]
+                    winDur = durations[i]
                     windowSpecs.append((invDur,winDur))
 
                     windowStart.append(trialStartTimes[i+1])
@@ -1182,7 +1185,11 @@ class BuggyVRTrial3_5(VRTrial3_1):
     #    self.templateSplitTrials=self.templateSplitTrials['avatar'][1:]
     #    self.windowsByPart=self.windowsByPart['avatar'][1:]
 
-    def retrain_gprmodel(self):
+    def retrain_gprmodel(self,
+                         tmin=None,tmax=None,
+                         fmin=None,fmax=None,
+                         fractions=None,durations=None,
+                         performanceData=None):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
@@ -1191,13 +1198,19 @@ class BuggyVRTrial3_5(VRTrial3_1):
 
         Parameters
         ----------
+        tmin
+        tmax
+        fmin
+        fmax
+        fractions
+        durations
+        performanceData
         """
         print "Retraining model..."
-        from coherence import DTWPerformance,GPREllipsoid
+        from .coherence import DTWPerformance,GPREllipsoid
+        from .experiment import ilogistic
+
         perfEval=DTWPerformance(dt_threshold=.68)
-        gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
-                              fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                              mean_performance=self.gprmodel.performanceData.mean())
         p=np.zeros(len(self.timeSplitTrials['avatar']))
         
         # Try to load DTW alignment path that would have been calculated with regularization.
@@ -1239,9 +1252,21 @@ class BuggyVRTrial3_5(VRTrial3_1):
                 else:
                     frac.append( (windowSpec[1]-windowSpec[0])/windowSpec[1] )
                     dur.append( windowSpec[1] )
-
         assert ((1>p)&(p>0)).all()
-        gprmodel.update( self.gprmodel.ilogistic(p),np.array(dur),np.array(frac) )
+
+        print "Forcing tmin to be that of the data."
+        tmin=min(dur)
+        print "Forcing tmax to be that of the data."
+        tmax=max(dur)
+        fmin=fmin or self.gprmodel.fmin
+        fmax=fmax or self.gprmodel.fmax
+        performanceData=performanceData if not performanceData is None else self.gprmodel.performanceData
+ 
+        gprmodel=GPREllipsoid(tmin=tmin,tmax=tmax,
+                              fmin=fmin,fmax=fmax,
+                              mean_performance=performanceData.mean())
+
+        gprmodel.update( ilogistic(p),np.array(dur),np.array(frac) )
         self.gprmodel=gprmodel
 
     def pickle_trial_dicts(self,disp=False):
