@@ -4,13 +4,12 @@
 # 
 # Author: Eddie Lee edl56@cornell.edu
 # ================================================================================================ # 
-
 from __future__ import division
-from utils import *
+from .utils import *
+from .coherence import GPR
 import os
 import cPickle as pickle
 from warnings import warn
-
 
 
 def subject_settings_v3(index,return_list=True):
@@ -198,9 +197,9 @@ def subject_settings_v3_3(index,hand,return_list=True):
                  'reverse':[True,False],
                  'usable':[True,True]},
                 ][index]
-    dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
+    dr='../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
-        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+        rotAngle=pickle.load(open('%s/%s'%(dr,'gpr1.p'),'rb'))['rotAngle']
     except IOError:
         rotAngle=np.nan
     reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
@@ -282,7 +281,7 @@ def subject_settings_v3_4(index,hand,return_list=True):
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
-        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr1.p'),'rb'))['rotAngle']
     except IOError:
         rotAngle=np.nan
     reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
@@ -368,7 +367,7 @@ def subject_settings_v3_5(index,hand,return_list=True):
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
-        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr1.p'),'rb'))['rotAngle']
         # In the case where the final save in HandSyncExperiment.run_vr did not complete, the
         # rotAngle will be a list.
         if type(rotAngle) is list:
@@ -447,7 +446,7 @@ def subject_settings_v3_6(index,hand,return_list=True):
                 ][index]
     dr = '../data/UE4_Experiments/%s/%s'%(settings['person'],hand)
     try:
-        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr.p'),'rb'))['rotAngle']
+        rotAngle = pickle.load(open('%s/%s'%(dr,'gpr1.p'),'rb'))['rotAngle']
     except IOError:
         rotAngle=np.nan
     reverse=settings['reverse'][0] if hand=='left' else settings['reverse'][1]
@@ -506,10 +505,10 @@ class VRTrial3_1(object):
         self.reverse = reverse
 
         # Load gpr data points.
-        savedData = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
-        self.gprmodel = savedData['gprmodel']
+        savedData=pickle.load(open('%s/%s'%(self.dr,'gpr1.p'),'rb'))
+        self.gprmodel=None
         self.pause=savedData['pause'],savedData['unpause']
-        self.trialTypes = ['avatar']
+        self.trialTypes=['avatar']
         
         try:
             data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
@@ -525,7 +524,13 @@ class VRTrial3_1(object):
         self.windowsByPart = data['windowsByPart']
         
         if retrain:
-            self.retrain_gprmodel()
+            self.retrain_gprmodel(savedData['gprdata']['tmin'],
+                                  savedData['gprdata']['tmax'],
+                                  savedData['gprdata']['fmin'],
+                                  savedData['gprdata']['fmax'],
+                                  savedData['gprdata']['fractions'],
+                                  savedData['gprdata']['durations'],
+                                  savedData['gprdata']['performanceData'])
     
     def info(self):
         print "Person %s"%self.person
@@ -799,7 +804,12 @@ class VRTrial3_1(object):
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         return dphase
 
-    def retrain_gprmodel(self,**gpr_kwargs):
+    def retrain_gprmodel(self,
+                         tmin=None,tmax=None,
+                         fmin=None,fmax=None,
+                         fractions=None,durations=None,
+                         performanceData=None,
+                         **gpr_kwargs):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
@@ -808,18 +818,36 @@ class VRTrial3_1(object):
 
         Parameters
         ----------
+        tmin
+        tmax
+        fmin
+        fmax
+        fractions
+        durations
+        performanceData
         **gpr_kwargs
         """
         print "Retraining model..."
-        from coherence import DTWPerformance,GPREllipsoid
+        from .coherence import DTWPerformance,GPREllipsoid
+        from .experiment import ilogistic
+
+        tmin=tmin or self.gprmodel.tmin
+        tmax=tmax or self.gprmodel.tmax
+        fmin=fmin or self.gprmodel.fmin
+        fmax=fmax or self.gprmodel.fmax
+        fractions=fractions if not fractions is None else self.gprmodel.fractions
+        durations=durations if not durations is None else self.gprmodel.durations
+        performanceData=performanceData if not performanceData is None else self.gprmodel.performanceData
+        
         perfEval=DTWPerformance(dt_threshold=.68)
-        gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
-                              fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                              mean_performance=self.gprmodel.performanceData.mean(),
+        gprmodel=GPREllipsoid(tmin=tmin,tmax=tmax,
+                              fmin=fmin,fmax=fmax,
+                              mean_performance=performanceData.mean(),
                               **gpr_kwargs)
         p=np.zeros(len(self.timeSplitTrials['avatar']))
         
-        # Try to load DTW alignment path that would have been calculated with regularization.
+        # Try to load DTW alignment path that would have been calculated with regularization. If you
+        # cannot load this, then do a comparison using just the fastdtw algorithm.
         version=self.person[-3:]
         homedr=os.path.expanduser('~')
         f=homedr+'/Dropbox/Research/tango/py/cache/dtw_v%s.p'%version
@@ -842,7 +870,7 @@ class VRTrial3_1(object):
                 p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],dt=t[1]-t[0],bds=[1,t.max()-1])
                
         assert ((1>p)&(p>0)).all()
-        gprmodel.update(self.gprmodel.ilogistic(p),self.gprmodel.durations,self.gprmodel.fractions)
+        gprmodel.update(ilogistic(p),durations,fractions)
         self.gprmodel=gprmodel
 
     def _find_subject_settings_index(self):
@@ -1100,7 +1128,9 @@ class VRTrial3_1(object):
             # The first time point is when the file was written which we can throw out. The second pair of
             # times are when the trial counter is updated immediately after the first fully visible trial. The
             # remaining points are the following trials.
-            dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
+            dataDict=pickle.load(open('%s/%s'%(self.dr,'gpr1.p'),'rb'))
+            fractions=dataDict['gprdata']['fractions']
+            durations=dataDict['gprdata']['durations']
             if reload_trial_times:
                 t0,t1=infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr)
                 trialStartTimes,trialEndTimes=t0,t1
@@ -1109,14 +1139,14 @@ class VRTrial3_1(object):
                 trialEndTimes = self._remove_pauses(dataDict['trialEndTimes'])
             windowSpecs = []
             windowStart,windowEnd = [],[]
-            for i in xrange(len(self.gprmodel.fractions)):
+            for i in xrange(len(fractions)):
                 if i==0:
                     windowSpecs.append((0,0))
                     windowStart.append(visible[0])
                     windowEnd.append(trialStartTimes[1])
                 else:
-                    invDur = (1-self.gprmodel.fractions[i])*self.gprmodel.durations[i]
-                    winDur = self.gprmodel.durations[i]
+                    invDur = (1-fractions[i])*durations
+                    winDur = durations
                     windowSpecs.append((invDur,winDur))
 
                     windowStart.append(trialStartTimes[i+1])
