@@ -1416,7 +1416,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
             # The first time point is when the file was written which we can throw out. The second pair of
             # times are when the trial counter is updated immediately after the first fully visible trial. The
             # remaining points are the following trials.
-            dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
+            dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr1.p'),'rb'))
             if self.person=='Subject01_3_5':
                 # Exception for anomalous trial.
                 t0,t1,invDur,windowDur = infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr,
