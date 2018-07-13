@@ -808,8 +808,7 @@ class VRTrial3_1(object):
                          tmin=None,tmax=None,
                          fmin=None,fmax=None,
                          fractions=None,durations=None,
-                         performanceData=None,
-                         **gpr_kwargs):
+                         performanceData=None):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
@@ -825,7 +824,6 @@ class VRTrial3_1(object):
         fractions
         durations
         performanceData
-        **gpr_kwargs
         """
         print "Retraining model..."
         from .coherence import DTWPerformance,GPREllipsoid
@@ -842,8 +840,7 @@ class VRTrial3_1(object):
         perfEval=DTWPerformance(dt_threshold=.68)
         gprmodel=GPREllipsoid(tmin=tmin,tmax=tmax,
                               fmin=fmin,fmax=fmax,
-                              mean_performance=performanceData.mean(),
-                              **gpr_kwargs)
+                              mean_performance=performanceData.mean())
         p=np.zeros(len(self.timeSplitTrials['avatar']))
         
         # Try to load DTW alignment path that would have been calculated with regularization. If you
@@ -1185,7 +1182,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
     #    self.templateSplitTrials=self.templateSplitTrials['avatar'][1:]
     #    self.windowsByPart=self.windowsByPart['avatar'][1:]
 
-    def retrain_gprmodel(self,**gpr_kwargs):
+    def retrain_gprmodel(self):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
@@ -1194,15 +1191,13 @@ class BuggyVRTrial3_5(VRTrial3_1):
 
         Parameters
         ----------
-        **gpr_kwargs
         """
         print "Retraining model..."
         from coherence import DTWPerformance,GPREllipsoid
         perfEval=DTWPerformance(dt_threshold=.68)
         gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
                               fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                              mean_performance=self.gprmodel.performanceData.mean(),
-                              **gpr_kwargs)
+                              mean_performance=self.gprmodel.performanceData.mean())
         p=np.zeros(len(self.timeSplitTrials['avatar']))
         
         # Try to load DTW alignment path that would have been calculated with regularization.

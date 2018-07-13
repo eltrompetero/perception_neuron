@@ -10,7 +10,7 @@ from scipy.signal import coherence
 from sklearn import gaussian_process
 from sklearn.gaussian_process.kernels import RBF,ConstantKernel
 from warnings import warn
-from gaussian_process.regressor import GaussianProcessRegressor
+from gaussian_process.regressor import GaussianProcessRegressor,Sphere
 import multiprocess as mp
 
 
@@ -1055,348 +1055,101 @@ class GPR(object):
 #end GPR
 
 
+def remap_fraction(func):
+    def wrapper(X):
+        X=X.copy()
+        X[:,1]*=np.pi
+        return fun(X)
+    return wrapper
 
-class GPREllipsoid(GPR):
-    def __init__(self,*args,**kwargs):
+class GPREllipsoid(Sphere):
+    """
+    Modeling performance landscape to live on the surface of a sphere.
+    """
+    def __init__(self,
+                 tmin=.5,tmax=2.,
+                 fmin=.1,fmax=1.,
+                 tstep=.1,fstep=.1,
+                 mean_performance=0.):
         """
-        Modeling performance landscape to live on the surface of an ellipsoid. For now, it is
-        assumed that it is a sphere because optimization with the major and minor axes seems
-        difficult.
-        But that may have had to do with a bad form of the kernel.
+        Parameters
+        ----------
+        tmin : float,.5
+        tmax : float,2.
+        fmin : float,.1
+        fmax : float,1.
+        mean_performance : float,0.
         """
-        from geographiclib.geodesic import Geodesic
-        super(GPREllipsoid,self).__init__(*args,**kwargs)
-        self.DEFAULT_LENGTH_SCALE=100
-        self._geodesic=Geodesic(self.DEFAULT_LENGTH_SCALE,0)
+        super(GPREllipsoid,self).__init__(.1,1)
         
-        if self.alpha<1:
-            self.alpha=1  # make this big to improve hyperparameter search
-        self.length_scale=self.DEFAULT_LENGTH_SCALE
-        self.dist_power=1.
-        self._update_kernel(self.theta,self.length_scale)
+        # Variables for storing configuration.
+        self.tmin=tmin
+        self.tmax=tmax
+        self.tstep=tstep
+        self.fmin=fmin
+        self.fmax=fmax
+        self.fstep=fstep
+        self.meanPerformance=mean_performance
+        self.durations=np.zeros(0)
+        self.fractions=np.zeros(0)
+        self.performanceData=np.zeros(0)
 
-    def _search_hyperparams_no_length_scale(self,n_restarts=1,
-                                            initial_guess=None,
-                                            alpha_bds=(0,np.inf),
-                                            coeff_bds=(0,np.inf)):
-        """Find the hyperparameters alpha, mu, theta that maximize the log likelihood of the data.
-        These are the noise std, mean performance, and kernel coefficient.
+        # Create two grids for t and f.
+        self.tRange=np.arange(self.tmin,self.tmax+self.tstep/2,self.tstep)
+        self.fRange=np.arange(self.fmin,self.fmax+self.fstep/2,self.fstep)
+        self.meshPoints=np.meshgrid(self.tRange,self.fRange)
+        # Flatten t and f grids and stack them into an Nx2 array.
+        self.meshPoints=np.vstack([x.ravel() for x in self.meshPoints]).T
+        
+        self.performanceGrid = 0  # [-inf,inf]
+        self.std_pred = 0
+        
+    # Redefine methods to account for proper linear mapping of fractions. ==========================
+    def train(self,X,Y):
+        X=X.copy()
+        X[:,1]*=np.pi
+        X[X[:,0]==0,0]=1
+        assert X.max()<=np.pi,X
+
+        return super(GPREllipsoid,self).train(X,Y)
+
+    def predict(self,X=None):
+        X=X if not X is None else self.meshPoints
+        X=X.copy()
+        X[:,1]*=np.pi
+        X[X[:,0]==0,0]=1
+        assert X.max()<=np.pi
+
+        return super(GPREllipsoid,self).predict(X)
+
+    def optimize_hyperparams(self,verbose=False,**kwargs):
+        # This calls train which will rescale fractions.
+        X=np.vstack((self.durations,self.fractions)).T
+        Y=self.performanceData
+        return super(GPREllipsoid,self).optimize_hyperparams(X,Y,**kwargs)
+
+    def update(self,new_performance,window_dur,vis_fraction):
+        """
+        This is called to add a new data point to prediction.
 
         Parameters
         ----------
-        n_restarts : int,1
-        initial_guess : list
-        alpha_bds : tuple
-            Lower and upper bounds on alpha.
+        new_performance : float
+        window_dur : float
+        vis_fraction : float
         """
-        from scipy.optimize import minimize
-        if initial_guess is None:
-            initial_guess=np.array([self.alpha,self.mean_performance,self.theta])
+        if type(window_dur) is float:
+            window_dur=np.array(window_dur)
+            vis_fraction=np.array(vis_fraction)
+        assert ( ((self.tmin<=window_dur)&(window_dur<=self.tmax))|(window_dur==0) ).all(),window_dur
+        assert ( (self.fmin<=vis_fraction)&(vis_fraction<=self.fmax) ).all(),vis_fraction
 
-        def train_new_gpr(params):
-            alpha,mean_performance,coeff=params
-            
-            kernel=self.define_kernel(coeff,self.length_scale)
-            gp=GaussianProcessRegressor(kernel,alpha**-2)
-            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
-            return gp
-
-        def f(params):
-            if not alpha_bds[0]<params[0]<alpha_bds[1]: return 1e30
-            if not coeff_bds[0]<params[2]<coeff_bds[1]: return 1e30
-
-            gp=train_new_gpr(params)
-            return -gp.log_likelihood()
+        self.performanceData=np.append(self.performanceData,new_performance)
+        self.durations=np.append(self.durations,window_dur)
+        self.fractions=np.append(self.fractions,vis_fraction)
         
-        # Parameters are noise std, mean perf
-        if n_restarts>1:
-            initial_guess=np.vstack((initial_guess,
-                                    np.vstack((np.random.exponential(size=n_restarts-1),
-                                               np.random.normal(size=n_restarts-1),
-                                               np.random.exponential(size=n_restarts-1))).T ))
-            pool=mp.Pool(mp.cpu_count())
-            soln=pool.map( lambda x:minimize(f,x),initial_guess )
-            pool.close()
-        else:
-            soln=[minimize(f,initial_guess)]
-
-        if len(soln)>1:
-            minNegLikIx=np.argmin([s['fun'] for s in soln])
-            soln=[soln[minNegLikIx]]
-        return soln[0]
-
-    def _search_hyperparams(self,n_restarts=1,
-                            initial_guess=None,
-                            alpha_bds=(1e-3,np.inf),
-                            coeff_bds=(0,np.inf),
-                            min_ocv=False):
-        """Find the hyperparameters that maximize the log likelihood of the data including length
-        scale parameters on the surface of ellipsoid.
-        
-        Must run several times for good results with minimizing length scale parameters.
-
-        Parameters
-        ----------
-        n_restarts : int,1
-        initial_guess : list,None
-
-        Returns
-        -------
-        soln : dict
-            As returned by scipy.optimize.minimize.
-        """
-        from scipy.optimize import minimize
-        if initial_guess is None:
-            initial_guess=np.array([self.alpha,self.mean_performance,self.theta,self.length_scale])
-
-        def train_new_gpr(params):
-            alpha,mean_performance,coeff,length_scale=params
-            
-            kernel=self.define_kernel(coeff,length_scale)
-            gp=GaussianProcessRegressor(kernel,alpha**-2)
-            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
-            return gp
-
-        def f(params):
-            if not alpha_bds[0]<params[0]<alpha_bds[1]: return 1e30
-            if not coeff_bds[0]<params[2]<coeff_bds[1]: return 1e30
-
-            # Bound length_scale to be above certain value.
-            if params[3]<=10: return 1e30
-
-            gp=train_new_gpr(params)
-            predMu,predStd=gp.predict(gp.X,return_std=True)
-            if np.isnan(predStd).any():
-                return 1e30
-            try:
-                if min_ocv:
-                    return gp.ocv_error()
-                return -gp.log_likelihood()
-            except AssertionError:
-                # This is printed when the determinant of the covariance matrix is not positive.
-                print "Bad parameter values %f, %f, %f, %f"%tuple(params)
-                return 1e30
-        
-        # Parameters are noise std, mean perf, equatorial radius, oblateness.
-        if n_restarts>1:
-            initial_guess=np.vstack((initial_guess,
-                np.vstack((np.random.exponential(size=n_restarts-1),
-                           np.random.normal(size=n_restarts-1),
-                           np.random.exponential(size=n_restarts-1,),
-                           np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE)+10)).T ))
-            pool=mp.Pool(mp.cpu_count())
-            soln=pool.map( lambda x:minimize(f,x),initial_guess )
-            pool.close()
-        else:
-            soln=[minimize(f,initial_guess)]
-
-        if len(soln)>1:
-            minNegLikIx=np.argmin([s['fun'] for s in soln])
-            soln=[soln[minNegLikIx]]
-        return soln[0]
-
-    def _search_hyperparams_no_mean(self,n_restarts=1,
-                                    initial_guess=None,
-                                    alpha_bds=(1e-3,np.inf),
-                                    coeff_bds=(0,np.inf),
-                                    min_ocv=False):
-        """Find the hyperparameters that maximize the log likelihood of the data while fixing the
-        mean.
-        
-        Parameters
-        ----------
-        n_restarts : int,1
-        initial_guess : list,None
-
-        Returns
-        -------
-        soln : dict
-            As returned by scipy.optimize.minimize.
-        """
-        from scipy.optimize import minimize
-        if initial_guess is None:
-            initial_guess=np.array([self.alpha,self.theta,self.length_scale])
-        else: assert len(initial_guess)==3
-        mean_performance=self.mean_performance
-
-        def train_new_gpr(params):
-            alpha,coeff,length_scale=params
-            
-            kernel=self.define_kernel(coeff,length_scale)
-            gp=GaussianProcessRegressor(kernel,alpha**-2)
-            gp.fit( np.vstack((self.durations,self.fractions)).T,self.performanceData-mean_performance )
-            return gp
-
-        def f(params):
-            if not alpha_bds[0]<params[0]<alpha_bds[1]: return 1e30
-            if not coeff_bds[0]<params[1]<coeff_bds[1]: return 1e30
-
-            # Bound length_scale to be above certain value.
-            if params[2]<=10: return 1e30
-
-            gp=train_new_gpr(params)
-            predMu,predStd=gp.predict(gp.X,return_std=True)
-            if np.isnan(predStd).any():
-                return 1e30
-            try:
-                if min_ocv:
-                    return gp.ocv_error()
-                return -gp.log_likelihood()
-            except AssertionError:
-                # This is printed when the determinant of the covariance matrix is not positive.
-                print "Bad parameter values %f, %f, %f"%tuple(params)
-                return 1e30
-        
-        # Parameters are noise std, mean perf, equatorial radius, oblateness.
-        if n_restarts>1:
-            initial_guess=np.vstack((initial_guess,
-                np.vstack((np.random.exponential(size=n_restarts-1),
-                           np.random.exponential(size=n_restarts-1,),
-                           np.random.exponential(size=n_restarts-1,scale=self.DEFAULT_LENGTH_SCALE)+10)).T ))
-            pool=mp.Pool(mp.cpu_count())
-            soln=pool.map( lambda x:minimize(f,x),initial_guess )
-            pool.close()
-        else:
-            soln=[minimize(f,initial_guess)]
-
-        if len(soln)>1:
-            minNegLikIx=np.argmin([s['fun'] for s in soln])
-            soln=[soln[minNegLikIx]]
-        return soln[0]
-
-    def optimize_hyperparams(self,verbose=False,
-                             exclude_parameter=None,
-                             initial_guess=None,
-                             n_restarts=4,
-                             use_ocv=False):
-        """Find the hyperparameters that optimize the log likelihood and reset the kernel and the
-        GPR landscape.
-
-        Parameters
-        ----------
-        verbose : bool,False
-        exclude_parameter : str,None
-            Name of the parameter to exclude from optimization. Can be 'length_scale',
-            'mean_performance'.
-        initial_guess : ndarray,None
-        n_restarts : int,4
-        use_ocv : bool,False
-            If True, minimize the OCV error instead of maximizing log likelihood.
-
-        Returns
-        -------
-        logLikelihood : float
-            Log likelihood of the data given the found parameters.
-        """
-        # Optimize all parameters.
-        if exclude_parameter is None:
-            if initial_guess is None:
-                initial_guess=[self.alpha,self.mean_performance,self.theta,self.length_scale]
-
-            soln=self._search_hyperparams(n_restarts=n_restarts,
-                                          initial_guess=initial_guess,
-                                          alpha_bds=(2e-1,1e3),
-                                          coeff_bds=(.1,10),
-                                          min_ocv=use_ocv)
-            if verbose:
-                print( "Optimal hyperparameters are\n"+
-                       "alpha=%1.2f, mu=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
-            self.alpha,self.mean_performance,self.theta,self.length_scale=soln['x']
-        # Do not optimize mean performance.
-        elif exclude_parameter=='mean_performance':
-            if initial_guess is None:
-                initial_guess=[self.alpha,self.theta,self.length_scale]
-
-            soln=self._search_hyperparams_no_mean(n_restarts=n_restarts,
-                                                  initial_guess=initial_guess,
-                                                  alpha_bds=(2e-1,1e3),
-                                                  coeff_bds=(.1,10),
-                                                  min_ocv=use_ocv)
-            if verbose:
-                print( "Optimal hyperparameters are\n"+
-                       "alpha=%1.2f, coeff=%1.2f, length_scale=%1.2f"%tuple(soln['x']) )
-            self.alpha,self.theta,self.length_scale=soln['x']
-        # Do not optimize length scale."
-        elif exclude_parameter=='length_scale':
-            if initial_guess is None:
-                initial_guess=[self.alpha,self.mean_performance,self.theta,self.length_scale]
-
-            soln=self._search_hyperparams_no_length_scale(n_restarts=n_restarts,
-                                                          initial_guess=initial_guess,
-                                                          alpha_bds=(2e-1,1e3),
-                                                          coeff_bds=(.1,10))
-            if verbose:
-                print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%tuple(soln['x'])
-            self.alpha,self.mean_performance,self.theta=soln['x']
-
-        else: raise Exception("Unrecognized parameter to exclude.")
-
-        # Refresh kernel.
-        self._update_kernel(self.theta,self.length_scale)
+        self.train(np.vstack((self.durations,self.fractions)).T,self.performanceData)
         self.predict()
-
-        return soln['fun']
-
-    def print_parameters(self):
-        print "Noise parameter alpha = %1.2f"%self.alpha
-        print "Mean performance mu = %1.2f"%self.mean_performance
-        print "Kernel coeff theta = %1.2f"%self.theta
-        print "Kernel length scale el = %1.2f"%self.length_scale
-        print "Kernel exponent = %1.2f"%self.dist_power
-    
-    @staticmethod
-    def _kernel(_geodesic,tmin,tmax,coeff,length_scale,dist_power):
-        """Return kernel function as defined with given parameters.
-        """
-        assert tmax>tmin
-        assert length_scale>0
-
-        def kernel_function(tfx,tfy):
-            """Takes in pairs (t,f) where t is duration and f is fraction."""
-            # Account for cases where f=1.
-            if tfx[0]==0:
-                lon0=0
-            else:
-                lon0=(tfx[0]-.5)*180/(tmax-tmin)
-
-            if tfy[0]==0:
-                lon1=0
-            else:
-                lon1=(tfy[0]-.5)*180/(tmax-tmin)
-
-            lat0=(tfx[1]-.5)*180
-            lat1=(tfy[1]-.5)*180
-            return coeff*np.exp( -_geodesic.Inverse(lat0,lon0,lat1,lon1)['s12']**dist_power/length_scale )
-        return kernel_function
-
-    def define_kernel(self,coeff,length_scale,dist_power=None):
-        """Define new Geodesic within given parameters and wrap it nicely.
-
-        Parameters
-        ----------
-        coeff : float
-            Coefficient in front of kernel.
-        length_scale : float
-            Length scale used in the kernel.
-        """
-        dist_power=dist_power or self.dist_power
-        return self._kernel(self._geodesic,self.tmin,self.tmax,coeff,length_scale,dist_power)
-
-    def _update_kernel(self,coeff,length_scale,dist_power=None):
-        """Update instance Geodesic kernel parameters and wrap it nicely.
-
-        Performance grid is not updated. Must run self.predict() if you wish to do that.
-
-        Parameters
-        ----------
-        coeff : float
-            Coefficient in front of kernel.
-        length_scale : float
-            Length scale used in the kernel.
-        """
-        dist_power=dist_power or self.dist_power
-        self.kernel=self._kernel( self._geodesic,self.tmin,self.tmax,coeff,length_scale,dist_power )
-        self.gp=GaussianProcessRegressor( self.kernel,self.alpha**-2 )
 #end GPREllipsoid
 
 
