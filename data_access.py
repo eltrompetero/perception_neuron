@@ -1044,9 +1044,6 @@ class VRTrial3_1(object):
         -------
         ix : list of ints
         """
-        for w in self.windowsByPart[trial_type]:
-            print w[0]
-
         trialWindows = np.array([w[0] for w in self.windowsByPart[trial_type]])
         i = 0  # counter
 
