@@ -847,10 +847,12 @@ class VRTrial3_1(object):
         # cannot load this, then do a comparison using just the fastdtw algorithm.
         version=self.person[-3:]
         homedr=os.path.expanduser('~')
-        f=homedr+'/Dropbox/Research/tango/py/cache/dtw_v%s.p'%version
+        f=homedr+'/Dropbox/Research/tango/py/cache/dtw_%s.p'%version
         if os.path.isfile(f):
             print "Using cached DTW path file."
-            pathList=pickle.load(open(f,'rb'))['pathList'][self._find_subject_settings_index()]
+            # The list of paths for a particular individual.
+            pathList=pickle.load(open(f,'rb'))['path'][self._find_subject_settings_index()]
+            pathList=[path[-1] for path in pathList]
             assert len(self.templateSplitTrials['avatar'])==len(pathList)
 
             for i,(t,sv,avv,path) in enumerate(zip(self.timeSplitTrials['avatar'],
@@ -858,7 +860,7 @@ class VRTrial3_1(object):
                                                    self.templateSplitTrials['avatar'],
                                                    pathList)):
                 p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],
-                                                  dt=1/30,#t[1]-t[0],
+                                                  dt=1/30,
                                                   path=path)
         else:
             for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
