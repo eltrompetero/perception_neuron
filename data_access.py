@@ -808,8 +808,7 @@ class VRTrial3_1(object):
                          tmin=None,tmax=None,
                          fmin=None,fmax=None,
                          fractions=None,durations=None,
-                         performanceData=None,
-                         **gpr_kwargs):
+                         performanceData=None):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
@@ -825,7 +824,6 @@ class VRTrial3_1(object):
         fractions
         durations
         performanceData
-        **gpr_kwargs
         """
         print "Retraining model..."
         from .coherence import DTWPerformance,GPREllipsoid
@@ -842,18 +840,19 @@ class VRTrial3_1(object):
         perfEval=DTWPerformance(dt_threshold=.68)
         gprmodel=GPREllipsoid(tmin=tmin,tmax=tmax,
                               fmin=fmin,fmax=fmax,
-                              mean_performance=performanceData.mean(),
-                              **gpr_kwargs)
+                              mean_performance=performanceData.mean())
         p=np.zeros(len(self.timeSplitTrials['avatar']))
         
         # Try to load DTW alignment path that would have been calculated with regularization. If you
         # cannot load this, then do a comparison using just the fastdtw algorithm.
         version=self.person[-3:]
         homedr=os.path.expanduser('~')
-        f=homedr+'/Dropbox/Research/tango/py/cache/dtw_v%s.p'%version
+        f=homedr+'/Dropbox/Research/tango/py/cache/dtw_%s.p'%version
         if os.path.isfile(f):
             print "Using cached DTW path file."
-            pathList=pickle.load(open(f,'rb'))['pathList'][self._find_subject_settings_index()]
+            # The list of paths for a particular individual.
+            pathList=pickle.load(open(f,'rb'))['path'][self._find_subject_settings_index()]
+            pathList=[path[-1] for path in pathList]
             assert len(self.templateSplitTrials['avatar'])==len(pathList)
 
             for i,(t,sv,avv,path) in enumerate(zip(self.timeSplitTrials['avatar'],
@@ -861,7 +860,7 @@ class VRTrial3_1(object):
                                                    self.templateSplitTrials['avatar'],
                                                    pathList)):
                 p[i]=perfEval.time_average_binary(avv[:,1:],sv[:,1:],
-                                                  dt=1/30,#t[1]-t[0],
+                                                  dt=1/30,
                                                   path=path)
         else:
             for i,(t,sv,avv) in enumerate(zip(self.timeSplitTrials['avatar'],
@@ -1145,8 +1144,8 @@ class VRTrial3_1(object):
                     windowStart.append(visible[0])
                     windowEnd.append(trialStartTimes[1])
                 else:
-                    invDur = (1-fractions[i])*durations
-                    winDur = durations
+                    invDur = (1-fractions[i])*durations[i]
+                    winDur = durations[i]
                     windowSpecs.append((invDur,winDur))
 
                     windowStart.append(trialStartTimes[i+1])
@@ -1185,7 +1184,11 @@ class BuggyVRTrial3_5(VRTrial3_1):
     #    self.templateSplitTrials=self.templateSplitTrials['avatar'][1:]
     #    self.windowsByPart=self.windowsByPart['avatar'][1:]
 
-    def retrain_gprmodel(self,**gpr_kwargs):
+    def retrain_gprmodel(self,
+                         tmin=None,tmax=None,
+                         fmin=None,fmax=None,
+                         fractions=None,durations=None,
+                         performanceData=None):
         """Train gprmodel again. This is usually necessary when the GPR class is modified and the performance
         values need to be calculated again.
 
@@ -1194,15 +1197,19 @@ class BuggyVRTrial3_5(VRTrial3_1):
 
         Parameters
         ----------
-        **gpr_kwargs
+        tmin
+        tmax
+        fmin
+        fmax
+        fractions
+        durations
+        performanceData
         """
         print "Retraining model..."
-        from coherence import DTWPerformance,GPREllipsoid
+        from .coherence import DTWPerformance,GPREllipsoid
+        from .experiment import ilogistic
+
         perfEval=DTWPerformance(dt_threshold=.68)
-        gprmodel=GPREllipsoid(tmin=self.gprmodel.tmin,tmax=self.gprmodel.tmax,
-                              fmin=self.gprmodel.fmin,fmax=self.gprmodel.fmax,
-                              mean_performance=self.gprmodel.performanceData.mean(),
-                              **gpr_kwargs)
         p=np.zeros(len(self.timeSplitTrials['avatar']))
         
         # Try to load DTW alignment path that would have been calculated with regularization.
@@ -1244,9 +1251,21 @@ class BuggyVRTrial3_5(VRTrial3_1):
                 else:
                     frac.append( (windowSpec[1]-windowSpec[0])/windowSpec[1] )
                     dur.append( windowSpec[1] )
-
         assert ((1>p)&(p>0)).all()
-        gprmodel.update( self.gprmodel.ilogistic(p),np.array(dur),np.array(frac) )
+
+        print "Forcing tmin to be that of the data."
+        tmin=min(dur)
+        print "Forcing tmax to be that of the data."
+        tmax=max(dur)
+        fmin=fmin or self.gprmodel.fmin
+        fmax=fmax or self.gprmodel.fmax
+        performanceData=performanceData if not performanceData is None else self.gprmodel.performanceData
+ 
+        gprmodel=GPREllipsoid(tmin=tmin,tmax=tmax,
+                              fmin=fmin,fmax=fmax,
+                              mean_performance=performanceData.mean())
+
+        gprmodel.update( ilogistic(p),np.array(dur),np.array(frac) )
         self.gprmodel=gprmodel
 
     def pickle_trial_dicts(self,disp=False):
@@ -1421,7 +1440,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
             # The first time point is when the file was written which we can throw out. The second pair of
             # times are when the trial counter is updated immediately after the first fully visible trial. The
             # remaining points are the following trials.
-            dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr.p'),'rb'))
+            dataDict = pickle.load(open('%s/%s'%(self.dr,'gpr1.p'),'rb'))
             if self.person=='Subject01_3_5':
                 # Exception for anomalous trial.
                 t0,t1,invDur,windowDur = infer_trial_times_from_visibility(self.pause[0],self.pause[1],self.dr,
