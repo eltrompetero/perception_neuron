@@ -1254,7 +1254,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
         assert ((1>p)&(p>0)).all()
 
         print "Forcing tmin to be that of the data."
-        tmin=min(dur)
+        tmin=min(dur[dur>0])
         print "Forcing tmax to be that of the data."
         tmax=max(dur)
         fmin=fmin or self.gprmodel.fmin
