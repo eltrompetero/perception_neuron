@@ -5,9 +5,9 @@
 # Email: edl56@cornell.edu
 # ================================================================================================ # 
 
-from __future__ import division
-from utils import *
-import cPickle as pickle
+
+from .utils import *
+import pickle as pickle
 import os
 
 def extract_AN_port(df,modelhand,rotation_angle=0):
@@ -28,7 +28,7 @@ def extract_AN_port(df,modelhand,rotation_angle=0):
     """
     from datetime import datetime
 
-    anT = np.array(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9))
+    anT = np.array(list(map(datetime.utcfromtimestamp,df['Timestamp'].values.astype(datetime)/1e9)))
     
     # Extract only necessary body part from the dataframe.
     # extract_calc_solo handles reorientation of axes into standard coordinate system and rotation
@@ -318,7 +318,7 @@ def extract_calc_solo(fname='',
     
     if leaderdf is None:
         # Read position, velocity and acceleration data from files.
-        print "Loading file %s"%fname
+        print("Loading file %s"%fname)
         leaderdf,leaderzd = load_calc('%s/%s.calc'%(dr,fname),
                                       cols='XVA',
                                       read_csv_kwargs=read_csv_kwargs)
@@ -434,7 +434,7 @@ def extract_calc(fname,dr,bodyparts,dt,
     skeleton = calc_file_body_parts()
 
     # Read position, velocity and acceleration data from files.
-    print "Loading file %s"%fname
+    print("Loading file %s"%fname)
     leaderix = 1 if ('F' in fname.split(' ')[1]) else 0
     if not 'leaderdf' in globals():
         characters = [fname.split(' ')[0],fname.split(' ')[2]]
@@ -464,7 +464,7 @@ def extract_calc(fname,dr,bodyparts,dt,
         if usezd:
             bodyvec=[leaderzd,followerzd]
         else:
-            from utils import initial_orientation
+            from .utils import initial_orientation
             bodyvec = [initial_orientation(leaderdf),initial_orientation(followerdf)]
 
     # Select out the body parts that we want.

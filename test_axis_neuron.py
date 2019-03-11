@@ -1,4 +1,4 @@
-from axis_neuron import *
+from .axis_neuron import *
 import pandas as pd
 
 def test_extract_AN_port():

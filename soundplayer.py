@@ -116,7 +116,7 @@ class SoundPlayer():
         if not os.path.exists(self.directory) : os.mkdir(self.directory)
 
         freq_transform, factor = self.function_dict[key]
-        print("freq_transform %s with factor %f"%(key,factor))
+        print(("freq_transform %s with factor %f"%(key,factor)))
 
         # Revision for speed and correct scaling of frequency.
         t=np.arange(int(duration*WAV_SAMPLERATE))/WAV_SAMPLERATE/2
@@ -128,7 +128,7 @@ class SoundPlayer():
         amp=np.sin(phase*2.0*np.pi)
         
         # opening wav file that we will write to
-        print("creating file with %f seconds"%duration)
+        print(("creating file with %f seconds"%duration))
         wavef = wave.open(os.path.join(self.directory,'_'.join([filename,key,self.direction])+'.wav'),'w')
         wavef.setnchannels(2)
         wavef.setsampwidth(2) 

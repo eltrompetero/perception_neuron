@@ -2,13 +2,13 @@
 # Module for reading and processing data from Axis Neuron broadcast port.
 # Author: Eddie Lee edl56@cornell.edu
 # ================================================================================== #
-from __future__ import division
-from utils import *
+
+from .utils import *
 from datetime import datetime,timedelta
 import time
 import socket
 import shutil
-from axis_neuron import calc_file_headers
+from .axis_neuron import calc_file_headers
 import threading
 
 HOST = '127.0.0.1'   # use '' to expose to all networks
@@ -34,7 +34,7 @@ def forward_AN_port(ports,
     """
     # Check that recording has started as given by presence of lock file.
     while not os.path.isfile('%s/%s'%(DATADR,start_file)):
-        print "Waiting for %s..."%start_file
+        print("Waiting for %s..."%start_file)
         time.sleep(1)
     
     try:
@@ -71,7 +71,7 @@ def _test_forward_timing(nIters=1000):
         # Listen to server and record time.
         listenSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
         listenSock.bind(('127.0.0.1',7001))
-        for i in xrange(nIters):
+        for i in range(nIters):
             whenSent = listenSock.recv(54)
             whenRec = datetime.now()
 
@@ -89,10 +89,10 @@ def _test_forward_timing(nIters=1000):
         servSock.close()
         listenSock.close()
     
-    print "For %d samples, the delay is"
-    print "Mean: %1.5f"%dt.mean()
-    print "Min,max: %1.5f,%1.5f"%(dt.min(),dt.max())
-    print "Std: %1.5f"%dt.std()
+    print("For %d samples, the delay is")
+    print("Mean: %1.5f"%dt.mean())
+    print("Min,max: %1.5f,%1.5f"%(dt.min(),dt.max()))
+    print("Std: %1.5f"%dt.std())
     return dt
 
 def record_AN_port(fname,port,
@@ -122,10 +122,10 @@ def record_AN_port(fname,port,
 
     # Check that recording has started as given by presence of lock file.
     while not os.path.isfile('%s/%s'%(savedr,start_file)):
-        print "Waiting for start..."
+        print("Waiting for start...")
         time.sleep(1)
 
-    reader = ANReader(2,range(946),port=port,host=host,port_buffer_size=buffer_size)
+    reader = ANReader(2,list(range(946)),port=port,host=host,port_buffer_size=buffer_size)
     try:
         reader.setup_port()
         while not os.path.isfile('%s/%s'%(savedr,stop_file)):
@@ -257,12 +257,12 @@ class ANReader(object):
     
     def __enter__(self):
         if self.verbose:
-            print "Setting port up."
+            print("Setting port up.")
         self.setup_port()
 
         # Start listening to port.
         if self.verbose:
-            print "Listening"
+            print("Listening")
         self.readThread = threading.Thread(target=self.listen_port)
         self.readThread.start()
 
@@ -270,13 +270,13 @@ class ANReader(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.verbose:
-            print "Initiating cleanup..."
+            print("Initiating cleanup...")
         self.stopEvent.set()
         if self.verbose:
-            print "Waiting for thread to join..."
+            print("Waiting for thread to join...")
         self.readThread.join()
         if self.verbose:
-            print "Closing socket."
+            print("Closing socket.")
         self.sock.close()
 
     def empty_buffer(self):
@@ -361,9 +361,9 @@ class ANReader(object):
     def setup_port(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        print "Trying to bind to host (%s,%d)"%(self.host,self.port)
+        print("Trying to bind to host (%s,%d)"%(self.host,self.port))
         self.sock.bind((self.host,self.port))
-        print "Bound."
+        print("Bound.")
         self.rawData = []
 
     def read_port(self):
@@ -390,7 +390,7 @@ class ANReader(object):
         # Take the longest read and split it by space delimiter.
         rawData = rawData[nBytes.index(max(nBytes))].split()
         if len(rawData)!=946:  # number of cols in calc file
-            print "%d cols in calc output"%len(rawData)
+            print("%d cols in calc output"%len(rawData))
             return []
         
         # Take time to the mean of the first and last read times. Read times seem to typically fall
@@ -414,7 +414,7 @@ class ANReader(object):
                 if len(data)>0:
                     v = [float(data[0][ix]) for ix in self.partsIx]
             except ValueError:
-                    print "%s. Invalid float. Reading port again."%data[1].isoformat()
+                    print("%s. Invalid float. Reading port again."%data[1].isoformat())
         return v,data[1]
 
     def listen_port(self):
@@ -445,7 +445,7 @@ class ANReader(object):
         """Clear stored arrays including history."""
         self.stopEvent.set()
         if self.verbose:
-            print "Waiting for thread to join..."
+            print("Waiting for thread to join...")
         self.readThread.join()
 
         self.stopEvent.clear()
@@ -482,7 +482,7 @@ class ANReader(object):
         dt : float,1/30
             Time spacing for interpolation.
         """
-        from utils import MultiUnivariateSpline
+        from .utils import MultiUnivariateSpline
         from scipy.interpolate import interp1d
         assert len(t)==len(v)
 
@@ -495,7 +495,7 @@ class ANReader(object):
 
         # sync datetimes with linearly spaced seconds.
         if not tdate is None:
-            tdate = np.array([tdate[0]+timedelta(0,i*dt) for i in xrange(len(t))])
+            tdate = np.array([tdate[0]+timedelta(0,i*dt) for i in range(len(t))])
             return t,v,tdate
         return t,v
 # end ANReader
@@ -548,7 +548,7 @@ class DataBroadcaster(object):
             sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             sock.connect((self.host,self.port))
         except:
-            print "Connection to %s:%d could not be established."%(self.host,self.port)
+            print("Connection to %s:%d could not be established."%(self.host,self.port))
             return 
         
         # try to send data
@@ -556,13 +556,13 @@ class DataBroadcaster(object):
             while not self.stopEvent.is_set():
                 nBytesSent = sock.send(self._payload)
                     
-                if verbose: print '%d bytes sent, %s'%(nBytesSent,self._payload)
+                if verbose: print('%d bytes sent, %s'%(nBytesSent,self._payload))
                 time.sleep(pause)  # if this pause goes immediately after connect, data transmission
                                    # is interrupted
         except:
-            print "Connection closed unexpectedly."
+            print("Connection closed unexpectedly.")
         finally:
             sock.close()
         
-        print "DataBroadcaster thread stopped"
+        print("DataBroadcaster thread stopped")
 #end DataBroadcaster

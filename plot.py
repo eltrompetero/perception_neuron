@@ -3,11 +3,11 @@
 # Edward Lee edl56@cornell.edu
 # 2017-03-10
 
-from __future__ import division
+
 try:
     import matplotlib.pyplot as plt
 except ImportError:
-    print "Could not import matplotlib."
+    print("Could not import matplotlib.")
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -18,7 +18,7 @@ from scipy.interpolate import LSQUnivariateSpline,UnivariateSpline
 import entropy.entropy as info
 from scipy.signal import fftconvolve
 from misc.utils import unique_rows
-import data_access,utils
+from . import data_access,utils
 
 
 
@@ -125,7 +125,7 @@ def hist_dphase(delay,freq,ylim='low',laplace_counting=False):
             n += 1
         p = n/n.sum()
         
-        ax.plot( x[:-1]+(x[1]-x[0])/2,n/n.sum(),'o-',alpha=1,c=c.next() )
+        ax.plot( x[:-1]+(x[1]-x[0])/2,n/n.sum(),'o-',alpha=1,c=next(c) )
         phaseLagPeaks.append( x[np.argmax(n)]+(x[1]-x[0])/2 )
     
     if ylim=='high':
@@ -162,9 +162,9 @@ def cdf_dphase(delay,freq,title='Histogram of phase lag',xscale='f'):
     for freqix in range(len(freq)):
         ecdf = ECDF( delay[freqix] )
         if xscale=='t':
-            ax.plot( ecdf.x/(2*np.pi)/freq[freqix],ecdf.y,'-',alpha=1,c=c.next(),lw=2 )
+            ax.plot( ecdf.x/(2*np.pi)/freq[freqix],ecdf.y,'-',alpha=1,c=next(c),lw=2 )
         else:
-            ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=c.next(),lw=2 )
+            ax.plot( ecdf.x,ecdf.y,'-',alpha=1,c=next(c),lw=2 )
     
     if xscale=='t':
         xlim = [-1/freq[0],1/freq[0]]
@@ -196,7 +196,7 @@ def phase(T,v1,v2,phase,phasexyz,title='',maxshift=60,windowlength=100):
     """
     fig = plt.figure(figsize=(15,16))
     gs = gridspec.GridSpec(7,1)
-    ax = [fig.add_subplot(gs[i]) for i in xrange(7)]
+    ax = [fig.add_subplot(gs[i]) for i in range(7)]
 
     # Velocity plots.
     h = []
@@ -218,7 +218,7 @@ def phase(T,v1,v2,phase,phasexyz,title='',maxshift=60,windowlength=100):
     ax[2].grid()
 
     # Phase lag plots.
-    for i in xrange(3):
+    for i in range(3):
         ax[i+3].plot(T[maxshift:-maxshift-windowlength],phasexyz[i])
         ax[i+3].fill_between([T[0],T[-1]],-.25,.25,color='k',alpha=.1)
         ax[i+3].hlines(0,0,T[-1])
@@ -264,7 +264,7 @@ def a_of_t(t,v1,v2,fig=None,ax=None):
     if ax is None:
         fig,ax = plt.subplots(figsize=(15,8),sharex=True,sharey=True,nrows=3)
     
-    for i in xrange(3):
+    for i in range(3):
         if i==2:
             ax[i].plot(t,v1[:,i]-1,'b-')
             ax[i].plot(t,v2[:,i]-1,'r-')
@@ -294,7 +294,7 @@ def v_of_t(t,v1,v2,fig=None,ax=None):
     if ax is None:
         fig,ax = plt.subplots(figsize=(15,8),sharex=True,sharey=True,nrows=3)
     
-    for i in xrange(3):
+    for i in range(3):
         ax[i].plot(t,v1[:,i],'b-')
         ax[i].plot(t,v2[:,i],'r-')
         ax[i].set(ylabel='Vel')
@@ -373,8 +373,8 @@ def plot_hips_drift(hips,dt):
     ax[2].set(xlabel='time (s)',xlim=[0,tmax],ylabel='sideways')
     [l.set_fontsize(10) for l in ax[2].get_yticklabels()]
     
-    print "Drift front-back: %1.3f m"%( (hips['xx'].iloc[-1]-hips['xx'].iloc[0])/100 )
-    print "Drift sideways: %1.3f m"%( -(hips['zz'].iloc[-1]-hips['zz'].iloc[0])/100 )
+    print("Drift front-back: %1.3f m"%( (hips['xx'].iloc[-1]-hips['xx'].iloc[0])/100 ))
+    print("Drift sideways: %1.3f m"%( -(hips['zz'].iloc[-1]-hips['zz'].iloc[0])/100 ))
     
     return fig
 

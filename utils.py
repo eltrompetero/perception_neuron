@@ -6,11 +6,11 @@
 # 2017-03-28
 # ================================================================================================ # 
 
-from __future__ import division
+
 try:
     import matplotlib.pyplot as plt
 except ImportError:
-    print "Could not import matplotlib."
+    print("Could not import matplotlib.")
 from matplotlib import gridspec
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -59,30 +59,30 @@ class MultiUnivariateSpline(object):
         self.knot_spacing = knot_spacing
         
         if fit_type=='LSQ':
-            for i in xrange(x.shape[1]):
+            for i in range(x.shape[1]):
                 self.splines.append(LSQUnivariateSpline(t,x[:,i],
                                         np.linspace(t[1],t[-2],int(np.floor(t[-2]-t[1])/knot_spacing)),
                                         **kwargs))
         elif fit_type=='Uni':
-            for i in xrange(x.shape[1]):
+            for i in range(x.shape[1]):
                 self.splines.append(UnivariateSpline(t,x[:,i],**kwargs))
         else:
             raise NotImplementedError
 
     def __call__(self,t):
         xSpline = np.zeros((len(t),len(self.splines)))
-        for i in xrange(len(self.splines)):
+        for i in range(len(self.splines)):
             xSpline[:,i] = self.splines[i](t)
         return xSpline
 
     def derivative(self):
         self.dsplines = []
-        for i in xrange(len(self.splines)):
+        for i in range(len(self.splines)):
             self.dsplines.append(self.splines[i].derivative())
         
         def f(t):
             xSpline = np.zeros((len(t),len(self.splines)))
-            for i in xrange(len(self.splines)):
+            for i in range(len(self.splines)):
                 xSpline[:,i] = self.dsplines[i](t)
             return xSpline
         return f
@@ -126,14 +126,14 @@ def compare_specs(x,y,precision):
             y=x_
 
         comparison=np.zeros(len(y),dtype=bool)
-        for i in xrange(len(y)):
+        for i in range(len(y)):
             comparison[i]=compare_specs(x,y[i],precision)
 
     # Case with both lists.
     elif type(x) is list and type(y) is list:
         assert len(x)==len(y)
         comparison=np.zeros(len(y),dtype=bool)
-        for i in xrange(len(y)):
+        for i in range(len(y)):
             comparison[i]=compare_specs(x[i],y[i],precision)
     
     else:
@@ -358,7 +358,7 @@ def optimal_time_shift_freq(dphase,dphase_bds=[-pi/10,pi/10],
     #cc = colorcycle(len(freqs))
 
     # Iterate over subtracting temporal delays from different frequencies.
-    for i in xrange(len(freqs)):
+    for i in range(len(freqs)):
         shifteddphase = subtract_freq_phase(i,freqs,dphase)
         if weights is None:
             weights_ = np.ones(len(freqs)-1)/(len(freqs)-1)
@@ -530,7 +530,7 @@ def find_closest_dtheta(t1,t2,window=101,dt=1):
     assert (window%2)==1
     
     mnix = np.zeros((len(t1)-window),dtype=int)
-    for i,tix in enumerate(xrange(window//2,len(t1)-window//2-1)):
+    for i,tix in enumerate(range(window//2,len(t1)-window//2-1)):
         mnix[i] = np.argmin(abs(t2[tix]-t1[tix-window//2:tix+window//2]))-window//2
     return mnix*dt
 
@@ -749,7 +749,7 @@ def spec_and_phase(X,noverlap,
     phase (ndarray)
         Array of phases for each frequency.
     """
-    from filter import spectrogram
+    from .filter import spectrogram
     from scipy.signal import get_window
 
     assert noverlap<1
@@ -852,8 +852,8 @@ def optimize_time(t1,x1,t2,x2,
             output = [offset[minix]]
         else:
             cost = np.zeros_like(offset)
-            for i in xrange(scale.shape[0]):
-                for j in xrange(offset.shape[1]):
+            for i in range(scale.shape[0]):
+                for j in range(offset.shape[1]):
                     scale,offset = scale[i,j],offset[i,j]
                     cost[i,j] = f(offset,scale)
             minix = np.argmin(cost)
@@ -931,7 +931,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
             overlapcost=np.zeros((2*maxshift))  # average overlap between the two velocity time series
 
             # Shift background.
-            for j in xrange(maxshift*2):
+            for j in range(maxshift*2):
                 background = v1[i-maxshift+j:i-maxshift+windowlength+j]
                 dotprod = (window*background).sum(1)
                 dotprod[dotprod>1] = 1  # thresholded 0 vectors should be perfectly aligned as defined by 1
@@ -944,7 +944,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
             return phase,overlaperror
 
         p = mp.Pool(mp.cpu_count())
-        phase,overlaperror = zip(*p.map(f,range(maxshift,len(v1)-maxshift-windowlength)))
+        phase,overlaperror = list(zip(*p.map(f,list(range(maxshift,len(v1)-maxshift-windowlength)))))
         phase,overlaperror = np.array(phase),np.array(overlaperror)
         p.close()
 
@@ -959,7 +959,7 @@ def phase_lag(v1,v2,maxshift,windowlength,dt=1,measure='dot',window=None,v_thres
             L = windowlength+maxshift*2
             
             counter = 0
-            for i in xrange(maxshift,len(v1)-maxshift-windowlength):
+            for i in range(maxshift,len(v1)-maxshift-windowlength):
                 window = v2[i:i+windowlength]
                 background = v1[i-maxshift:i+maxshift+windowlength]
                 overlapcost = crosscorr(background,window)
@@ -1010,11 +1010,11 @@ def fftconvolve_md(x,args=[],axis=0):
         if axis==0:
             conv = np.zeros_like(x)
             if args[0].ndim>1:
-                for i in xrange(x.shape[1]):
+                for i in range(x.shape[1]):
                     conv[:,i] = fftconvolve(x[:,i],args[0][:,i],mode='same')
                 return conv
             else:
-                for i in xrange(x.shape[1]):
+                for i in range(x.shape[1]):
                     conv[:,i] = fftconvolve(x[:,i],args[0],mode='same')
                 return conv
         else:
@@ -1121,7 +1121,7 @@ def find_neighbors(samples,distThresh,neighborsSep=30):
     from numpy.linalg import norm
 
     neighbors = []
-    for i in xrange(len(samples)):
+    for i in range(len(samples)):
         ix = np.argwhere(norm(samples[i][None,:]-samples,axis=1)<distThresh).ravel()
         if len(ix)>0:
             ix = np.concatenate([[ix[0]],ix[np.argwhere(np.diff(ix)>neighborsSep).ravel()+1]])
@@ -1143,7 +1143,7 @@ def sliding_sample(X,windowlen,):
         Width of sampling window.
     """
     samples = np.zeros((len(X)-windowlen,X.shape[1]*windowlen))
-    for i in xrange(len(X)-windowlen):
+    for i in range(len(X)-windowlen):
         samples[i] = X[i:i+windowlen].ravel()
     return samples
 
@@ -1173,7 +1173,7 @@ def initial_orientation(df):
     midpoint = ( df.iloc[:10,handsIx[1]*9:handsIx[1]*9+3].mean(0).values+
                  df.iloc[:10,handsIx[0]*9:handsIx[0]*9+3].mean(0).values )/2
     midpoint[-1] = 0
-    for i in xrange(upperix):
+    for i in range(upperix):
         # Only need to subtract midpoint from X values which are the first three cols of each set.
         df.values[:,i*9:i*9+3] -= midpoint[None,:]
 
@@ -1194,7 +1194,7 @@ def moving_mean_smooth(x,filtDuration=12):
     """
     if x.ndim>1:
         y = np.zeros_like(x)
-        for i in xrange(x.shape[1]):
+        for i in range(x.shape[1]):
             y[:,i] = fftconvolve( x[:,i],np.ones((filtDuration)),mode='same' )
         return y
     return fftconvolve(x,np.ones((filtDuration)),mode='same')
@@ -1402,13 +1402,13 @@ def rotate_by_angles(v0,a,b,c,*args):
 
     v = np.zeros((len(a),3))
     if len(args)>0:
-        for i in xrange(len(a)):
+        for i in range(len(a)):
             R = Ryxz(a[i],b[i],c[i])
-            for j in xrange(len(args)//3):
+            for j in range(len(args)//3):
                 R = R.dot(Ryxz(args[j*3][i],args[j*3+1][i],args[j*3+2][i]))
             v[i] = v0.dot(R)
     else:
-        for i in xrange(len(a)):
+        for i in range(len(a)):
             v[i] = v0.dot(Ryxz(a[i],b[i],c[i]))
 
     return v
@@ -1513,7 +1513,7 @@ def train_cal_noise(leaderW,followerW,dv,nTrainSamples=None):
     assert 0<nTrainSamples<=len(X)
    
     randix = np.zeros((len(X)))==1
-    randix[np.random.choice(range(len(X)),size=nTrainSamples)] = True
+    randix[np.random.choice(list(range(len(X))),size=nTrainSamples)] = True
     trainX = X[randix]
     testX = X[randix==0]
     trainY = Y[randix]

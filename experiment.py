@@ -2,12 +2,12 @@
 # Class for running synchronization experiments.
 # Author: Eddie Lee edl56@cornell.edu
 # ==================================================================== #
-from __future__ import division
-from utils import *
+
+from .utils import *
 import time
 from datetime import datetime
-from axis_neuron import left_hand_col_indices,right_hand_col_indices
-from port import *
+from .axis_neuron import left_hand_col_indices,right_hand_col_indices
+from .port import *
 import dill
 from subprocess import call
 
@@ -73,7 +73,7 @@ class HandSyncExperiment(object):
         from shutil import rmtree
         affirm='x'
         while not affirm in 'yn':
-            affirm=raw_input("Directory is not empty. Delete files? y/[n]")
+            affirm=input("Directory is not empty. Delete files? y/[n]")
         if affirm=='y':
             for f in os.listdir('./'):
                 try:
@@ -109,7 +109,7 @@ class HandSyncExperiment(object):
         avatar : dict
             Dictionary of avatar interpolation splines.
         """
-        from pipeline import extract_motionbuilder_model2
+        from .pipeline import extract_motionbuilder_model2
 
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
@@ -120,7 +120,7 @@ class HandSyncExperiment(object):
         elif handedness=='right':
             v = extract_motionbuilder_model2('avatar',0,'Left',return_time=False)
         else:
-            print handedness
+            print(handedness)
             raise Exception
 
         return v
@@ -139,8 +139,8 @@ class HandSyncExperiment(object):
         avatar : dict
             Dictionary of avatar interpolation splines.
         """
-        from data_access import subject_settings_v3 as subject_settings
-        from data_access import VRTrial3_1 as VRTrial
+        from .data_access import subject_settings_v3 as subject_settings
+        from .data_access import VRTrial3_1 as VRTrial
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
         # NOTE: This relies on the fact that these experiments took data from these avatar trials, but you
@@ -150,7 +150,7 @@ class HandSyncExperiment(object):
         elif handedness=='right':
             person,modelhandedness,rotation,dr = subject_settings(2)
         else:
-            print handedness
+            print(handedness)
             raise Exception
 
         trial = VRTrial(person,modelhandedness,rotation,dr)
@@ -177,7 +177,7 @@ class HandSyncExperiment(object):
         avatar : dict
             Dictionary of avatar interpolation splines.
         """
-        from pipeline import extract_motionbuilder_model3_3
+        from .pipeline import extract_motionbuilder_model3_3
         handedness = open('%s/%s'%(DATADR,'left_or_right')).readline().rstrip()
         
         if handedness=='left':
@@ -185,7 +185,7 @@ class HandSyncExperiment(object):
         elif handedness=='right':
             v,t = extract_motionbuilder_model3_3('Left',reverse_time=reverse_time)
         else:
-            print handedness
+            print(handedness)
             raise Exception
 
         return v
@@ -278,10 +278,10 @@ class HandSyncExperiment(object):
                 notDeleted = False
             except OSError:
                 if (datetime.now()-t0).total_seconds()>max_wait_time:
-                    print "Failed to delete %s."%fname
+                    print("Failed to delete %s."%fname)
                     return False
                 time.sleep(dt)
-        print "%s deleted."%fname
+        print("%s deleted."%fname)
         return True
     
     def define_update_broadcaster(self,reader,stopEvent,pauseEvent,
@@ -317,7 +317,7 @@ class HandSyncExperiment(object):
                         v[:,1:] *= -1
                         v[:,:2] = rotate_xy(v[:,:2],rotAngle)
 
-                        tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),zip(self.pause,self.unpause))
+                        tAsDate,_ = remove_pause_intervals(tAsDate.tolist(),list(zip(self.pause,self.unpause)))
                         avv = fetch_matching_avatar_vel(avatar,np.array(tAsDate),t0)
                         
                         # Calculate performance metric.
@@ -326,7 +326,7 @@ class HandSyncExperiment(object):
                         # Update performance.
                         broadcast.update_payload('%1.2f'%performance[-1])
                         if self.verbose=='detailed':
-                            print "new coherence is %s"%broadcast._payload
+                            print("new coherence is %s"%broadcast._payload)
 
                         if export:
                             if not os.path.isdir('realtime_velocities'):
@@ -336,7 +336,7 @@ class HandSyncExperiment(object):
                             export+=1
                     time.sleep(0.2)
             finally:
-                print "updateBroadcastThread stopped"
+                print("updateBroadcastThread stopped")
         return update_broadcaster
 
     def run_cal(self,verbose=False,min_v=0.3,pause_before_run=0.):
@@ -364,7 +364,7 @@ class HandSyncExperiment(object):
                 fname = 'an_port_cal_%s.txt'%(str(counter).zfill(2))
                 counter+=1
             
-            raw_input("Press Enter to calibrate...")
+            input("Press Enter to calibrate...")
 
             # Setup thread for recording port data.
             recordThread = threading.Thread(target=record_AN_port,
@@ -372,7 +372,7 @@ class HandSyncExperiment(object):
                                             kwargs={'start_file':'start_cal','stop_file':'stop_cal'})
             time.sleep(pause_before_run)
 
-            print "Running calibration."
+            print("Running calibration.")
             recordThread.start()
 
             # Run calibration for a few seconds to give people a chance to move their hands.
@@ -385,7 +385,7 @@ class HandSyncExperiment(object):
             time.sleep(.5)
 
             # Delete signal files.
-            print "Done with calibration."
+            print("Done with calibration.")
             self.delete_file('start_cal')
             self.delete_file('stop_cal')
             recordThread.join()
@@ -413,13 +413,13 @@ class HandSyncExperiment(object):
 
                 calSuccess = True
             except AssertionError:
-                print "Retry calibration."
+                print("Retry calibration.")
 
         self.rotAngle = [-angleLeft,-angleRight]
-        print "Rotation angle to center left hand about x-axis is %1.1f degrees."%(
-                self.rotAngle[0]*180/np.pi)
-        print "Rotation angle to center right hand about x-axis is %1.1f degrees."%(
-                self.rotAngle[1]*180/np.pi)
+        print("Rotation angle to center left hand about x-axis is %1.1f degrees."%(
+                self.rotAngle[0]*180/np.pi))
+        print("Rotation angle to center right hand about x-axis is %1.1f degrees."%(
+                self.rotAngle[1]*180/np.pi))
     
     @staticmethod
     def read_cal(fname,min_v):
@@ -532,9 +532,9 @@ class HandSyncExperiment(object):
 
         When end is written, experiment ends.
         """
-        from data_access import subject_settings_v3
-        from data_access import VRTrial3_1 as VRTrial
-        from coherence import GPREllipsoid,DTWPerformance
+        from .data_access import subject_settings_v3
+        from .data_access import VRTrial3_1 as VRTrial
+        from .coherence import GPREllipsoid,DTWPerformance
         self.wait_for_start()
         
         # Setup routines for calculating coherence.
@@ -602,7 +602,7 @@ class HandSyncExperiment(object):
                 
                 # Update next trial settings and refresh reader history.
                 if os.path.isfile('%s/%s'%(DATADR,'run_gpr')):
-                    print "successfully read run_gpr"
+                    print("successfully read run_gpr")
                     # Fetch user movement during trial.
                     v,t,tdateHistory=reader.copy_history()
                     # Put output from Axis Neuron into comparable coordinate system accounting for reflection
@@ -610,7 +610,7 @@ class HandSyncExperiment(object):
                     v[:,1:]*=-1
                     v[:,:2]=rotate_xy(v[:,:2],rotAngle)
                     tdateHistory,_=remove_pause_intervals( tdateHistory.tolist(),
-                                                           zip(self.pause,self.unpause) )
+                                                           list(zip(self.pause,self.unpause)) )
                     avv=fetch_matching_avatar_vel(avatar,np.array(tdateHistory),t0)
                     
                     # Update GPR with this trial's data.
@@ -631,19 +631,19 @@ class HandSyncExperiment(object):
                     nextDuration,nextFraction=gprmodel.max_uncertainty()
                     if verbose:
                         #print call("ls --time-style='+%d-%m-%Y %H:%M:%S' -l this_setting",shell=True)
-                        print "thisDuration: %1.1f\tthisFraction: %1.1f"%(thisDuration,thisFraction)
-                        print "nextDuration: %1.1f\tnextFraction: %1.1f"%(nextDuration,nextFraction)
+                        print("thisDuration: %1.1f\tthisFraction: %1.1f"%(thisDuration,thisFraction))
+                        print("nextDuration: %1.1f\tnextFraction: %1.1f"%(nextDuration,nextFraction))
                     open('%s/next_setting'%DATADR,'w').write('%1.1f,%1.1f'%(nextDuration,nextFraction))
                     
                     # Refresh history.
                     self.broadcast.update_payload('-1.0')
-                    if verbose:print "Refreshing reader history (update_settings)."
+                    if verbose:print("Refreshing reader history (update_settings).")
                     reader.refresh()
                     
                     # Optimize hyperparameters of GPR given the latest trial data.
                     # NOTE: This has to finish running before the trial ends. Right now, there is no guarantee
                     # that it will.
-                    if verbose:print "Running GPR on this trial..."
+                    if verbose:print("Running GPR on this trial...")
                     gprmodel.optimize_hyperparams(verbose=verbose,n_restarts=1)
                     
                     # Cleanup.
@@ -659,7 +659,7 @@ class HandSyncExperiment(object):
         # Wait til start_time has been written to start experiment.
         t0 = self.wait_for_start_time()
 
-        if verbose:print "Starting threads."
+        if verbose:print("Starting threads.")
         recordThread.start()
         with ANReader(self.duration,self.subPartsIx,
                       port=7011,
@@ -674,7 +674,7 @@ class HandSyncExperiment(object):
                     args=(performance,export_realtime_velocities,) )
 
             while reader.len_history()<windowsInIndexUnits:
-                if verbose:print "Waiting to collect more data...(%d)"%reader.len_history()
+                if verbose:print("Waiting to collect more data...(%d)"%reader.len_history())
                 self.broadcast.update_payload('-1.0')
                 time.sleep(.25)
             updateBroadcastThread.start()
@@ -687,7 +687,7 @@ class HandSyncExperiment(object):
                 # If UE4 has been paused
                 if os.path.isfile('%s/%s'%(DATADR,'pause_time')):
                     pauseEvent.clear()
-                    if verbose:print "Paused."
+                    if verbose:print("Paused.")
                     self.read_pause()
                     self.delete_file('pause_time')
                     while not os.path.isfile('%s/%s'%(DATADR,'unpause_time')):
@@ -702,17 +702,17 @@ class HandSyncExperiment(object):
                                 self.unpause.append( datetime.strptime(f.readline(),'%Y-%m-%dT%H:%M:%S.%f') )
                             success = True
                             pauseEvent.set()
-                            if verbose:print "Unpaused."
+                            if verbose:print("Unpaused.")
                         except IOError:
                             pass
                     self.delete_file('unpause_time')
                     
-                    if verbose:print "Refreshing reader history (pause)."
+                    if verbose:print("Refreshing reader history (pause).")
                     reader.refresh()
                 
                 time.sleep(.1)
          
-        if verbose:print "Ending threads..."
+        if verbose:print("Ending threads...")
         self.stop()
         updateBroadcastThread.join()
         broadcastThread.join()
@@ -725,7 +725,7 @@ class HandSyncExperiment(object):
         # Read in last trial setting.
         self.read_this_setting() 
         
-        if verbose:print "Saving GPR."
+        if verbose:print("Saving GPR.")
         dill.dump({'gprmodel':gprmodel,'performance':performance,
                    'pause':self.pause,'unpause':self.unpause,
                    'trialStartTimes':self.trialStartTimes,
@@ -776,7 +776,7 @@ def fetch_matching_avatar_vel(avatar,t,t0=None,verbose=False):
         t = np.array([i.total_seconds() for i in t-t0])
         assert (t>=0).all()
     if verbose:
-        print "Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1])
+        print("Getting avatar times between %1.1fs and %1.1fs."%(t[0],t[-1]))
 
     # Return part of avatar's trajectory that agrees with the stipulated time bounds.
     return avatar(t)
@@ -807,7 +807,7 @@ def remove_pause_intervals(t,pause_intervals,return_removed_ix=False):
     t = t[:]
     pause_intervals = pause_intervals[:]
     removedIx=[]
-    rangeT=range(len(t))
+    rangeT=list(range(len(t)))
 
     for dtix,(t0,t1) in enumerate(pause_intervals):
         assert t0<t1
@@ -829,9 +829,9 @@ def remove_pause_intervals(t,pause_intervals,return_removed_ix=False):
         
         # Subtract the duration of the removed pause interval from the remaining data.
         if counter<len(t):
-            for counter in xrange(counter-1,len(t)):
+            for counter in range(counter-1,len(t)):
                 t[counter] -= dt
-            for dtix in xrange(dtix+1,len(pause_intervals)):
+            for dtix in range(dtix+1,len(pause_intervals)):
                 pause_intervals[dtix] = (pause_intervals[dtix][0]-dt,pause_intervals[dtix][1]-dt)
     if return_removed_ix:
         return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])]),removedIx

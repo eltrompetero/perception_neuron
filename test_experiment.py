@@ -1,6 +1,6 @@
-from __future__ import division
-from experiment import *
-from coherence import DTWPerformance
+
+from .experiment import *
+from .coherence import DTWPerformance
 
 
 def test_extract_rot_angle():
@@ -11,13 +11,13 @@ def test_extract_rot_angle():
     v = np.zeros((4,2))
     try:
         angle = extract_rot_angle(v,min_points=0)
-    except AssertionError,err:
+    except AssertionError as err:
         assert err.args[0]=="Zero velocities not allowed."
     
     v[:,1] = 1.
     try:
         angle = extract_rot_angle(v,min_points=0)
-    except AssertionError,err:
+    except AssertionError as err:
         assert err.args[0]=="Failed to get both forward and backward directions."
 
     # Forwards-backwards motion.
@@ -52,7 +52,7 @@ def test_remove_pause_intervals():
     tdate,t=remove_pause_intervals([datetime.now()],[])
     
     t0=datetime.now()
-    t=[t0+timedelta(seconds=.01*i) for i in xrange(20)]
+    t=[t0+timedelta(seconds=.01*i) for i in range(20)]
 
     # Case where nothing falls within pauses but entries should still be time shifted.
     pause=[(t0+timedelta(seconds=.055),t0+timedelta(seconds=.058))]

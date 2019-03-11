@@ -1,14 +1,14 @@
 # Module for quick access to analysis pipelines.
 # These are functions that iterate over multiple individuals or trials.
 # 2017-03-31
-from __future__ import division
+
 import pickle
 import numpy as np
 import os
-from data_access import *
-from axis_neuron import *
-from utils import *
-from filter import *
+from .data_access import *
+from .axis_neuron import *
+from .utils import *
+from .filter import *
 from numpy import pi
 
 
@@ -100,8 +100,8 @@ def _compare_dtw(trial,windows,trial_types,precisions,
         #assert (len(subjectv)==1200) and (len(templatev)==1200)
 
         if disp:
-            print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
-                                                                     tspec[0],tspec[1])
+            print("Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
+                                                                     tspec[0],tspec[1]))
         
         if len(subjectv)==0:
             return
@@ -110,15 +110,15 @@ def _compare_dtw(trial,windows,trial_types,precisions,
         dtwdist,path = fastdtw(subjectv,templatev)
         path = np.vstack(path)
         dist = np.zeros((len(path),4))
-        for dimIx in xrange(3):
+        for dimIx in range(3):
             dist[:,dimIx] = subjectv[path[:,0],dimIx]-templatev[path[:,1],dimIx]
         dist[:,3] = ( (subjectv[path[:,0]]*templatev[path[:,1]]).sum(1) /
                       np.linalg.norm(subjectv[path[:,0]],axis=1)/np.linalg.norm(templatev[path[:,1]],axis=1) )
         return dist,path
-    except Exception,err:
+    except Exception as err:
         if disp:
-            print "No data for window spec (%1.1f,%1.1f)."%(windows[0][0],
-                                                            windows[0][1])
+            print("No data for window spec (%1.1f,%1.1f)."%(windows[0][0],
+                                                            windows[0][1]))
         return
 
 def pipeline_phase_lag(v1,v2,dt,
@@ -138,10 +138,10 @@ def pipeline_phase_lag(v1,v2,dt,
     v_threshold (float=.03)
     save (str='temp.p')
     """
-    import cPickle as pickle
+    import pickle as pickle
 
     phasexyz,overlapcostxyz = [],[]
-    for i in xrange(3):
+    for i in range(3):
         p,o = phase_lag(v1[:,i],v2[:,i],maxshift,windowlength,
                         measure=measure,dt=dt)
         phasexyz.append(p)
@@ -150,7 +150,7 @@ def pipeline_phase_lag(v1,v2,dt,
                                   measure=measure,dt=dt)
     
     if save:
-        print "Pickling results as %s"%save
+        print("Pickling results as %s"%save)
         pickle.dump({'phase':phase,'overlapcost':overlapcost,
                      'phasexyz':phasexyz,'overlapcostxyz':overlapcostxyz,
                      'maxshift':maxshift,'windowlength':windowlength,
@@ -186,7 +186,7 @@ def max_coherence(windowSpec,trials):
 
             # coherence as graphs are time shifted.
             cohdtShifts = np.zeros(3)
-            for i in xrange(3):
+            for i in range(3):
                 cohdtShifts[i] = max_coh_time_shift(subv[:,i],temv[:,i],
                                                  disp=False,dtgrid=np.linspace(-1,1,100))
 
@@ -596,8 +596,8 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
         assert (len(subjectv)==1200) and (len(templatev)==1200)
 
         if disp:
-            print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
-                                                                     tspec[0],tspec[1])
+            print("Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
+                                                                     tspec[0],tspec[1]))
         
         if len(subjectv)==0:
             return
@@ -606,7 +606,7 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
         cxy = np.zeros(4)  # averaged coherence
         noverlap,nperseg = 30,90
         nfft = nperseg*2
-        for dimIx in xrange(3):
+        for dimIx in range(3):
             if cwt:
                 f,cxy_ = cwt_coherence(subjectv[:,dimIx],templatev[:,dimIx],noverlap)
                 cxy_ *= -1
@@ -626,10 +626,10 @@ def _compare_coherence(trial,windows,trial_types,precisions,mx_freq,
                                fs=60,nperseg=nperseg,noverlap=noverlap,nfft=nfft)
         cxy[3] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
         return f,cxy
-    except Exception,err:
+    except Exception as err:
         if disp:
-            print "No data for window spec (%1.1f,%1.1f)."%(windows[0][0],
-                                                            windows[0][1])
+            print("No data for window spec (%1.1f,%1.1f)."%(windows[0][0],
+                                                            windows[0][1]))
         return
 
 def _compare_coherence_vis(trial,window,trial_type,precision,mx_freq,
@@ -673,15 +673,15 @@ def _compare_coherence_vis(trial,window,trial_type,precision,mx_freq,
         assert (len(visibility)==1200) and (len(templatev)==1200)
 
         if disp:
-            print "Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
-                                                                     tspec[0],tspec[1])
+            print("Subject: (%1.1f,%1.1f), Template: (%1.1f,%1.1f)"%(sspec[0],sspec[1],
+                                                                     tspec[0],tspec[1]))
         
         if len(visibility)==0:
             return
 
         # Calculate coherence for each dimension.
         cxy = np.zeros(4)
-        for dimIx in xrange(3):
+        for dimIx in range(3):
             f,cxy_ = coherence(visibility,templatev[:,dimIx],
                                 fs=60,nperseg=120)
             cxy[dimIx] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
@@ -692,9 +692,9 @@ def _compare_coherence_vis(trial,window,trial_type,precision,mx_freq,
                            fs=60,nperseg=120)
         cxy[3] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
         return f,cxy
-    except Exception,err:
+    except Exception as err:
         if disp:
-            print "No data for window spec (%1.1f,%1.1f)."%window
+            print("No data for window spec (%1.1f,%1.1f)."%window)
         return
 
 def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,mx_freq,
@@ -732,14 +732,14 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
         assert (len(subjectv)==1200) and (len(templatev)==1200)
 
         if disp:
-            print "Template: (%1.1f,%1.1f)"%(tspec[0],tspec[1])
+            print("Template: (%1.1f,%1.1f)"%(tspec[0],tspec[1]))
         
         if len(subjectv)==0:
             return
         
         # Calculate coherence for each dimension.
         cxy = np.zeros(4)
-        for dimIx in xrange(3):
+        for dimIx in range(3):
             f,cxy_ = coherence(subjectv[:,dimIx],templatev[:,dimIx],
                                fs=60,nperseg=120)
             cxy[dimIx] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
@@ -750,10 +750,10 @@ def _compare_coherence_given_vel(trial,window,trial_type,precision,test_signal,m
                            fs=60,nperseg=120)
         cxy[3] = np.trapz( cxy_[f<mx_freq],x=f[f<mx_freq] )/(f[f<mx_freq].max()-f[f<mx_freq].min())
         return f,cxy
-    except Exception,err:
+    except Exception as err:
         if disp:
-            print "No data for window spec (%1.1f,%1.1f)."%(window[0],
-                                                            window[1])
+            print("No data for window spec (%1.1f,%1.1f)."%(window[0],
+                                                            window[1]))
         return
 
 def extract_motionbuilder_test(hand,
@@ -787,7 +787,7 @@ def extract_motionbuilder_test(hand,
         Number of seconds since the beginning of the avatar motion file.
     """
     from datetime import datetime,timedelta
-    import cPickle as pickle
+    import pickle as pickle
     from scipy.interpolate import interp1d
     assert hand=='Left' or hand=='Right'
 
@@ -796,7 +796,7 @@ def extract_motionbuilder_test(hand,
            'Simple_MB_Test' )
 
     if (not os.path.exists('%s/%s.p'%(dr,fname))) or clear_pickle:
-        from axis_neuron import load_csv
+        from .axis_neuron import load_csv
         mbdf = load_csv('%s/%s.csv'%(dr,fname))
         mbdf.to_pickle('%s/%s.p'%(dr,fname))
 
@@ -845,7 +845,7 @@ def extract_motionbuilder_model3_3(hand,
         Number of seconds since the beginning of the avatar motion file.
     """
     from datetime import datetime,timedelta
-    import cPickle as pickle
+    import pickle as pickle
     from scipy.interpolate import interp1d
     assert hand=='Left' or hand=='Right'
 
@@ -853,13 +853,13 @@ def extract_motionbuilder_model3_3(hand,
     
     # Create pickle if it doesn't already exist.
     if not os.path.exists('%s/%s.p'%(dr,fname)):
-        from axis_neuron import load_csv
+        from .axis_neuron import load_csv
         mbdf = load_csv('%s/%s.csv'%(dr,fname))
         mbdf.to_pickle('%s/%s.p'%(dr,fname))
 
     mbdf = pickle.load(open('%s/%s.p'%(dr,fname),'rb'))
     mbT = mbdf['Time'].values.astype(float)
-    print "MB start and end times: %1.2f and %1.2f"%(mbT[0],mbT[-1])
+    print("MB start and end times: %1.2f and %1.2f"%(mbT[0],mbT[-1]))
     mbT -= mbT[0]
     mbV = savgol_filter( mbdf['%sHand'%hand].values,31,3,deriv=1,axis=0,delta=1/60 )/1000  # units of m/s
     mbV[:,:] = mbV[:,[1,0,2]]
@@ -912,7 +912,7 @@ def extract_motionbuilder_Eddie_Grid_Model_2(hand,
         Number of seconds since the beginning of the avatar motion file.
     """
     from datetime import datetime,timedelta
-    import cPickle as pickle
+    import pickle as pickle
     from scipy.interpolate import interp1d
     assert hand=='Left' or hand=='Right'
 
@@ -920,7 +920,7 @@ def extract_motionbuilder_Eddie_Grid_Model_2(hand,
     
     # Create pickle if it doesn't already exist.
     if not os.path.exists('%s/%s.p'%(dr,fname)):
-        from axis_neuron import load_csv
+        from .axis_neuron import load_csv
         mbdf = load_csv('%s/%s.csv'%(dr,fname))
         mbdf.to_pickle('%s/%s.p'%(dr,fname))
 
@@ -976,7 +976,7 @@ def extract_motionbuilder_model3(hand,
         Number of seconds since the beginning of the avatar motion file.
     """
     from datetime import datetime,timedelta
-    import cPickle as pickle
+    import pickle as pickle
     from scipy.interpolate import interp1d
     assert hand=='Left' or hand=='Right'
 
@@ -986,7 +986,7 @@ def extract_motionbuilder_model3(hand,
     
     # Create pickle if it doesn't already exist.
     if not os.path.exists('%s/%s.p'%(dr,fname)):
-        from axis_neuron import load_csv
+        from .axis_neuron import load_csv
         mbdf = load_csv('%s/%s.csv'%(dr,fname))
         mbdf.to_pickle('%s/%s.p'%(dr,fname))
 
@@ -1127,8 +1127,8 @@ def quick_load(fileix,dt=1/120,negate_x=False,negate_y=False,disp=True):
     if negate_y:
         v2[:,1] *= -1
     if disp:
-        print np.corrcoef(v1[:,0],v2[:,0])[0,1]
-        print np.corrcoef(v1[:,1],v2[:,1])[0,1]
+        print(np.corrcoef(v1[:,0],v2[:,0])[0,1])
+        print(np.corrcoef(v1[:,1],v2[:,1])[0,1])
 
     # Detrending necessary in some cases.
     if fileix in [51,52,53]:
@@ -1171,7 +1171,7 @@ def pipeline_phase_calc(fileixs=[],
     if len(fileixs)>0:
         counter = 0
         for fileix in fileixs:
-            print "Starting file %d..."%fileix
+            print("Starting file %d..."%fileix)
             T,v1,v2 = quick_load(fileix,dt=1/int(phase_calc_kwargs['sample_freq']))
             if down_sample:
                 T = T[::2]
@@ -1181,7 +1181,7 @@ def pipeline_phase_calc(fileixs=[],
             phases,vs = phase_calc(fs,v1,v2,**phase_calc_kwargs) 
 
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},open('%s/%s.p'%(dr,file_names[counter]),'wb'),-1)
-            print "Done with file %d."%fileix
+            print("Done with file %d."%fileix)
             counter += 1
     else:
         counter = 0
@@ -1199,7 +1199,7 @@ def pipeline_phase_calc(fileixs=[],
             
             pickle.dump({'phases':phases,'vs':vs,'fs':fs},
                         open('%s/%s.p'%(dr,file_names[counter]),'wb'),-1)
-            print "Done with file %d."%counter
+            print("Done with file %d."%counter)
             counter += 1
 
 def phase_calc(fs,v1,v2=None,
@@ -1288,8 +1288,8 @@ def filter_hand_trials(filesToFilter,dt=1/60,
     filterparams (str='default')
         Choose between 'default' and '120'. Filter parameters for butterworth filter as in utils.smooth()
     """
-    from filter import smooth
-    import cPickle as pickle
+    from .filter import smooth
+    import pickle as pickle
     
     bodyparts = [['RightHand','LeftHand'],
                  ['LeftHand','RightHand']]
@@ -1325,7 +1325,7 @@ def filter_hand_trials(filesToFilter,dt=1/60,
         
         # Save into same directory as calc file.
         savedr = '%s/%s%s.p'%(get_dr(fname,date),fname,suffix)
-        print "Saving as %s"%savedr
+        print("Saving as %s"%savedr)
         pickle.dump({'T':T,
                      'leaderX':leaderX,'followerX':followerX,
                      'leaderV':leaderV,'followerV':followerV,

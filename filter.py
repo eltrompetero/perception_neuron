@@ -1,6 +1,6 @@
 # Filtering functions.
-from __future__ import division
-from data_access import *
+
+from .data_access import *
 import numpy as np
 import multiprocess as mp
 from numpy import fft
@@ -44,7 +44,7 @@ def spectrogram(s,window,shift,fs=1,npadding=0,padval=0.):
     # Remember that the offset should be kept at lw//2 when padded because the only thing that the padding
     # does is to shift the beginning of the windowing over but you still want a full window to fit at the left
     # and right boundaries.
-    for counter,i in enumerate(xrange(lw//2,len(s)-lw//2,shift)):
+    for counter,i in enumerate(range(lw//2,len(s)-lw//2,shift)):
         spec[:,counter] = fft.fft( window_signal(i,window,s) )
 
     return f,t,spec
@@ -125,17 +125,17 @@ def _shifted_window_view(window,shift,T,offset=None):
     elif type(offset) is int:
         offset = [offset]*2
     
-    for i in xrange(offset[0],lw//2,shift):
+    for i in range(offset[0],lw//2,shift):
         swindow = np.zeros((T))
         swindow[:i+lw//2+1] = window[-(i-lw//2):]
         views.append( swindow )
 
-    for i in xrange(lw//2+(lw//2)%shift,T-lw//2,shift):
+    for i in range(lw//2+(lw//2)%shift,T-lw//2,shift):
         swindow = np.zeros((T))
         swindow[i-lw//2:i+lw//2+1] = window
         views.append( swindow )
 
-    for i in xrange(T-lw//2+(lw//2)%shift,T-offset[1]):
+    for i in range(T-lw//2+(lw//2)%shift,T-offset[1]):
         swindow = np.zeros((T))
         swindow[i-lw//2:] = window[:-(lw//2-(T-i))-1]
         views.append( swindow )
@@ -164,13 +164,13 @@ def shifted_window_weights(window,shift,T,offset=None):
     elif type(offset) is int:
         offset = [offset]*2
     # Off by one index error on smaller arrays...358. wnorm is too small by one. or rather window is too large by one.
-    for i in xrange(offset[0],lw//2,shift):
+    for i in range(offset[0],lw//2,shift):
         wnorm[:i+lw//2+1] += window[-(i-lw//2):]
 
-    for i in xrange(lw//2+(lw//2)%shift,T-lw//2,shift):
+    for i in range(lw//2+(lw//2)%shift,T-lw//2,shift):
         wnorm[i-lw//2:i+lw//2+1] += window
 
-    for i in xrange(T-lw//2+(lw//2)%shift,T-offset[1]):
+    for i in range(T-lw//2+(lw//2)%shift,T-offset[1]):
         wnorm[i-lw//2:] += window[:-(lw//2-(T-i))-1]
 
     return wnorm
@@ -294,13 +294,13 @@ def _moving_freq_filt(s,
     # Given memory constraints, don't filter everything at once.
     pool = mp.Pool(mp.cpu_count())
     swindow = np.zeros((T))
-    for i in xrange(0,T-mx_filter_rows,mx_filter_rows):
-        swindow += np.vstack( pool.map(f,range(i,i+mx_filter_rows)) ).sum(0)
+    for i in range(0,T-mx_filter_rows,mx_filter_rows):
+        swindow += np.vstack( pool.map(f,list(range(i,i+mx_filter_rows))) ).sum(0)
     if (i+mx_filter_rows)<(T-1):
         if (i+mx_filter_rows)==(T-1):
-            swindow += pool.map(f,range(i+mx_filter_rows,T))
+            swindow += pool.map(f,list(range(i+mx_filter_rows,T)))
         else:
-            swindow += np.vstack( pool.map(f,range(i+mx_filter_rows,T)) ).sum(0)
+            swindow += np.vstack( pool.map(f,list(range(i+mx_filter_rows,T))) ).sum(0)
     pool.close()
 
     return swindow/windowWeights
@@ -401,7 +401,7 @@ def smooth(x,filtertype='moving_butter',filterparams='default',
                                  filterparams['window'],filterparams['order'])
         
         xfiltered=np.zeros_like(x)
-        for i in xrange(x.shape[1]):
+        for i in range(x.shape[1]):
             xfiltered[:,i]=savgol_filter(x[:,i],window,order)
     elif filtertype=='butter':
         if type(filterparams) is str:

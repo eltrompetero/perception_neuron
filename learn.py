@@ -22,7 +22,7 @@ class LinearModel(object):
                 
         # A simple linear model.
         linCoeffs = np.zeros((ndimX+1,3))
-        for i in xrange(Y.shape[1]):
+        for i in range(Y.shape[1]):
             def f(params):
                 return ( (Y[:,i] - np.hstack((X,np.ones((nSamples,1)))).dot(params))**2 ).sum()
 
@@ -47,7 +47,7 @@ def pca(Y,grouped=False):
     """
     if grouped:
         L,v,c = [],[],[]
-        for i in xrange(Y.shape[1]//grouped):
+        for i in range(Y.shape[1]//grouped):
             result = pca(Y[:,i*grouped:(i+1)*grouped])
             L.append(result[0])
             v.append(result[1])

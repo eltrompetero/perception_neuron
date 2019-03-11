@@ -2,8 +2,8 @@
 # Reading and cleaning data from UE4.
 # ================================================================================================ # 
 
-from __future__ import division
-from utils import *
+
+from .utils import *
 
 
 
@@ -127,7 +127,7 @@ def window_specs(person,dr):
         start = np.zeros((len(visible)+len(invisible)),dtype=object)
         start[::2] = visible
         start[1::2] = invisible
-        start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+        start = np.array([t.total_seconds() for t in np.diff(start)])
         start = np.cumsum(start)
         invisibleStart = start[::2]
         visibleStart = start[1::2]
@@ -141,7 +141,7 @@ def window_specs(person,dr):
         # Identify the different types of windows that we have.
         windowSpecs = []
         windowIx = []
-        for ix,i,w in zip(range(len(windowDur)),invDur[:-1],windowDur):
+        for ix,i,w in zip(list(range(len(windowDur))),invDur[:-1],windowDur):
             if not (i,w) in windowSpecs:
                 windowSpecs.append((i,w))
                 windowIx.append([])
@@ -167,7 +167,7 @@ def window_specs(person,dr):
             windowStart.append(invisible[windowIx[ix][0]])
             windowEnd.append(visible[windowIx[ix][-1]])
 
-        windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
+        windowsByPart[part] = list(zip(windowSpecs,list(zip(windowStart,windowEnd))))
 
         # In buggy trials where animation did not stop properly, there is a segment at the end that
         # needs to be removed, corresponding to when the avatar was flashing very quickly.

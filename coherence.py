@@ -4,7 +4,7 @@
 #          Ted Esposito
 # ================================================================================================ # 
 
-from __future__ import division
+
 import numpy as np
 from scipy.signal import coherence
 from sklearn import gaussian_process
@@ -53,7 +53,7 @@ def precompute_coherence_nulls(v,t0,windowDuration,pool,
         
         # Coherence null values for each axis independently.
         Cnullx,Cnully,Cnullz = [],[],[]
-        for i in xrange(n_iters):
+        for i in range(n_iters):
             fx,cwtcohx = cwt_coherence_auto_nskip(v_[:,0],np.random.normal(size=len(v_)),
                                          sampling_period=1/sampling_rate,period_multiple=3)
             fy,cwtcohy = cwt_coherence_auto_nskip(v_[:,1],np.random.normal(size=len(v_)),
@@ -73,7 +73,7 @@ def precompute_coherence_nulls(v,t0,windowDuration,pool,
         
         return fx,fy,fz,mux,muy,muz,stdx,stdy,stdz
 
-    fx,fy,fz,cohmux,cohmuy,cohmuz,cohstdx,cohstdy,cohstdz = zip(*pool.map(f,t0))
+    fx,fy,fz,cohmux,cohmuy,cohmuz,cohstdx,cohstdy,cohstdz = list(zip(*pool.map(f,t0)))
     
     return ( (fx[0],np.vstack(cohmux),np.vstack(cohstdx)),
              (fy[0],np.vstack(cohmuy),np.vstack(cohstdy)),
@@ -393,7 +393,7 @@ def max_coh_time_shift(subv,temv,
     if subv.ndim==1:
         coh = _calc_coh(subv,temv)
     else:
-        coh = np.vstack([_calc_coh(subv[:,i],temv[:,i]) for i in xrange(subv.shape[1])]).mean(1)
+        coh = np.vstack([_calc_coh(subv[:,i],temv[:,i]) for i in range(subv.shape[1])]).mean(1)
     shiftix = np.argmax(coh)
     
     if disp:
@@ -465,7 +465,7 @@ class DTWPerformance(object):
             path = np.vstack(path)
         except ValueError:
             warn("fastdtw could not align. Possible because subject data is flat.")
-            path=range(len(x))
+            path=list(range(len(x)))
         keepIx=((path[:,0]*dt)>=bds[0])&((path[:,0]*dt)<=bds[1])
 
         normx = norm(x[path[:,0]],axis=1)+np.nextafter(0,1)
@@ -524,7 +524,7 @@ class DTWPerformance(object):
                 path = np.vstack(path)
             except ValueError:
                 warn("fastdtw could not align. Possible because subject data is flat.")
-                path=range(len(x))
+                path=list(range(len(x)))
         keepIx=((path[:,0]*dt)>=bds[0])&((path[:,0]*dt)<=bds[1])
         dt = np.diff(path,axis=1) * dt
 
@@ -968,7 +968,7 @@ class GPR(object):
         
         soln=[]
         soln.append( minimize(f,initial_guess) )
-        for i in xrange(1,n_restarts):
+        for i in range(1,n_restarts):
             initial_guess=np.array([np.random.exponential(),np.random.normal(),np.random.exponential()])
             soln.append( minimize(f,initial_guess) )
 
@@ -997,7 +997,7 @@ class GPR(object):
         t0=datetime.now()
         soln=self._search_hyperparams(initial_guess)
         if verbose:
-            print "Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%(soln['x'][0],soln['x'][1])
+            print("Optimal hyperparameters are\nalpha=%1.2f, mu=%1.2f"%(soln['x'][0],soln['x'][1]))
         self.alpha,self.mean_performance,self.theta=soln['x']
         
         # Refresh kernel.

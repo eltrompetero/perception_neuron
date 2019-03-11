@@ -4,11 +4,11 @@
 # 
 # Author: Eddie Lee edl56@cornell.edu
 # ================================================================================================ # 
-from __future__ import division
+
 from .utils import *
 from .coherence import GPR
 import os
-import cPickle as pickle
+import pickle as pickle
 from warnings import warn
 
 
@@ -373,7 +373,7 @@ def subject_settings_v3_5(index,hand,return_list=True):
         if type(rotAngle) is list:
             rotAngle=rotAngle[0] if hand=='left' else rotAngle[1]
     except KeyError:
-        from experiment import HandSyncExperiment
+        from .experiment import HandSyncExperiment
 
         # Need to reload data from file.
         f=[f for f in os.listdir('%s'%dr) if 'an_port_cal' in f]
@@ -533,12 +533,12 @@ class VRTrial3_1(object):
                                   savedData['gprdata']['performanceData'])
     
     def info(self):
-        print "Person %s"%self.person
-        print "Trials available:"
+        print("Person %s"%self.person)
+        print("Trials available:")
         for part in self.trialTypes:
-            print "%s\tInvisible\tTotal"%part
+            print("%s\tInvisible\tTotal"%part)
             for spec,_ in self.windowsByPart[part]:
-                print "\t%1.2f\t\t%1.2f"%(spec[0],spec[1])
+                print("\t%1.2f\t\t%1.2f"%(spec[0],spec[1]))
     
     def subject_by_window_dur(self,windowDur,part):
         """
@@ -703,7 +703,7 @@ class VRTrial3_1(object):
                 phases = [np.vstack(p) for p in phases]
                 selection.append(( self.windowsByPart[trialType][i][0],phases ))
             except IOError:
-                print "Trial %d in trial type %s not found."%(i,trialType)
+                print("Trial %d in trial type %s not found."%(i,trialType))
         return selection
 
     def phase_by_window_spec(self,source,windowSpec,trial_type):
@@ -733,7 +733,7 @@ class VRTrial3_1(object):
                     phases = [np.vstack(p) for p in phases]
                     selection.append(( self.windowsByPart[trial_type][ix[0]][0],phases ))
                 except IOError:
-                    print "Trial %d in trial type %s not found."%(ix[0],trial_type)
+                    print("Trial %d in trial type %s not found."%(ix[0],trial_type))
 
             # Iterate also through hand0 or avatar0, which contains the other hand.
             if trial_type.isalpha():
@@ -782,7 +782,7 @@ class VRTrial3_1(object):
         templatePhase = self.phase_by_window_dur('t',windowDur,trialType)
         dphase = []
         
-        for i in xrange(len(subjectPhase)):
+        for i in range(len(subjectPhase)):
             dphase.append(( subjectPhase[i][0], 
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         if trialType.isalpha():
@@ -799,7 +799,7 @@ class VRTrial3_1(object):
         templatePhase = self.phase_by_window_spec('t',windowSpec,trialType)
         dphase = []
             
-        for i in xrange(len(subjectPhase)):
+        for i in range(len(subjectPhase)):
             dphase.append(( subjectPhase[i][0], 
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         return dphase
@@ -825,7 +825,7 @@ class VRTrial3_1(object):
         durations
         performanceData
         """
-        print "Retraining model..."
+        print("Retraining model...")
         from .coherence import DTWPerformance,GPREllipsoid
         from .experiment import ilogistic
 
@@ -849,7 +849,7 @@ class VRTrial3_1(object):
         homedr=os.path.expanduser('~')
         f=homedr+'/Dropbox/Research/tango/py/cache/dtw_%s.p'%version
         if os.path.isfile(f):
-            print "Using cached DTW path file."
+            print("Using cached DTW path file.")
             # The list of paths for a particular individual.
             pathList=pickle.load(open(f,'rb'))['path'][self._find_subject_settings_index()]
             pathList=[path[-1] for path in pathList]
@@ -923,12 +923,12 @@ class VRTrial3_1(object):
         ----------
         disp : bool,False
         """
-        from axis_neuron import extract_AN_port
-        from pipeline import extract_motionbuilder_model3_3
-        from utils import match_time
-        from ue4 import load_visibility
+        from .axis_neuron import extract_AN_port
+        from .pipeline import extract_motionbuilder_model3_3
+        from .utils import match_time
+        from .ue4 import load_visibility
         import dill as pickle
-        from experiment import remove_pause_intervals
+        from .experiment import remove_pause_intervals
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
@@ -942,15 +942,15 @@ class VRTrial3_1(object):
 
         for trialno,part in enumerate(self.trialTypes):
             if disp:
-                print "Processing %s..."%part
+                print("Processing %s..."%part)
 
             # Load visibility time points saved by UE4 and remove pause intervals.
             if part.isalpha():
                 visible,invisible = load_visibility(part+'_visibility',self.dr)
             else:
                 visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
-            visible,_=remove_pause_intervals(visible.tolist(),zip(*self.pause))
-            invisible,_=remove_pause_intervals(invisible.tolist(),zip(*self.pause))
+            visible,_=remove_pause_intervals(visible.tolist(),list(zip(*self.pause)))
+            invisible,_=remove_pause_intervals(invisible.tolist(),list(zip(*self.pause)))
             visible,invisible=np.array(visible),np.array(invisible)
             
             # Start and end times counting only the time the simulation is running (and not paused).
@@ -967,7 +967,7 @@ class VRTrial3_1(object):
             anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
                                                rotation_angle=self.rotation )
             # Remove pauses.
-            anT,_,removeIx=remove_pause_intervals(anT.tolist(),zip(*self.pause),True)
+            anT,_,removeIx=remove_pause_intervals(anT.tolist(),list(zip(*self.pause)),True)
             anT=np.array(anT)
             anV=np.delete(anV[0],removeIx,axis=0)
             # Remove parts that extend beyond trial.
@@ -990,7 +990,7 @@ class VRTrial3_1(object):
             start[::2] = visible
             start[1::2] = invisible
             # Units of seconds.
-            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.array([t.total_seconds() for t in np.diff(start)])
             start = np.cumsum(start)
             invisibleStart = start[::2]  # as seconds
             visibleStart = start[1::2]  # as seconds
@@ -1097,7 +1097,7 @@ class VRTrial3_1(object):
             window),(window start, window end)) Window type is a tuple
             (inv_duration,window_duration)
         """
-        from ue4 import load_visibility 
+        from .ue4 import load_visibility 
 
         # Load AN subject data.
         df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
@@ -1118,7 +1118,7 @@ class VRTrial3_1(object):
             start = np.zeros((len(visible)+len(invisible)),dtype=object)
             start[::2] = visible
             start[1::2] = invisible
-            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.array([t.total_seconds() for t in np.diff(start)])
             start = np.cumsum(start)
             invisibleStart = start[::2]
             visibleStart = start[1::2]
@@ -1138,7 +1138,7 @@ class VRTrial3_1(object):
                 trialEndTimes = self._remove_pauses(dataDict['trialEndTimes'])
             windowSpecs = []
             windowStart,windowEnd = [],[]
-            for i in xrange(len(fractions)):
+            for i in range(len(fractions)):
                 if i==0:
                     windowSpecs.append((0,0))
                     windowStart.append(visible[0])
@@ -1151,7 +1151,7 @@ class VRTrial3_1(object):
                     windowStart.append(trialStartTimes[i+1])
                     windowEnd.append(trialEndTimes[i+1])
 
-            windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
+            windowsByPart[part] = list(zip(windowSpecs,list(zip(windowStart,windowEnd))))
 
             # Get the duration of the invisible and visible windows in the time series.
             mxLen = min([len(visibleStart),len(invisibleStart)])
@@ -1162,11 +1162,11 @@ class VRTrial3_1(object):
 
     def _remove_pauses(self,x):
         """Wrapper around experiment.remove_pause_intervals."""
-        from experiment import remove_pause_intervals
+        from .experiment import remove_pause_intervals
         if type(x) is list:
-            x,_=remove_pause_intervals(x,zip(*self.pause))
+            x,_=remove_pause_intervals(x,list(zip(*self.pause)))
             return x
-        x,_=remove_pause_intervals(x.tolist(),zip(*self.pause))
+        x,_=remove_pause_intervals(x.tolist(),list(zip(*self.pause)))
         return np.array(x)
 #end VRTrial3_1
 
@@ -1205,7 +1205,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
         durations
         performanceData
         """
-        print "Retraining model..."
+        print("Retraining model...")
         from .coherence import DTWPerformance,GPREllipsoid
         from .experiment import ilogistic
 
@@ -1218,7 +1218,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
         f=homedr+'/Dropbox/Research/tango/py/cache/dtw_v%s.p'%version
         frac,dur=[],[]
         if os.path.isfile(f):
-            print "Using cached DTW path file."
+            print("Using cached DTW path file.")
             pathList=pickle.load(open(f,'rb'))['pathList'][self._find_subject_settings_index()]
             assert len(self.templateSplitTrials['avatar'])==len(pathList)
 
@@ -1253,9 +1253,9 @@ class BuggyVRTrial3_5(VRTrial3_1):
                     dur.append( windowSpec[1] )
         assert ((1>p)&(p>0)).all()
 
-        print "Forcing tmin to be that of the data."
+        print("Forcing tmin to be that of the data.")
         tmin=min(dur[dur>0])
-        print "Forcing tmax to be that of the data."
+        print("Forcing tmax to be that of the data.")
         tmax=max(dur)
         fmin=fmin or self.gprmodel.fmin
         fmax=fmax or self.gprmodel.fmax
@@ -1277,12 +1277,12 @@ class BuggyVRTrial3_5(VRTrial3_1):
         ----------
         disp : bool,False
         """
-        from axis_neuron import extract_AN_port
-        from pipeline import extract_motionbuilder_model3_3
-        from utils import match_time
-        from ue4 import load_visibility
+        from .axis_neuron import extract_AN_port
+        from .pipeline import extract_motionbuilder_model3_3
+        from .utils import match_time
+        from .ue4 import load_visibility
         import dill as pickle
-        from experiment import remove_pause_intervals
+        from .experiment import remove_pause_intervals
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
@@ -1296,15 +1296,15 @@ class BuggyVRTrial3_5(VRTrial3_1):
 
         for trialno,part in enumerate(self.trialTypes):
             if disp:
-                print "Processing %s..."%part
+                print("Processing %s..."%part)
 
             # Load visibility time points saved by UE4 and remove pause intervals.
             if part.isalpha():
                 visible,invisible = load_visibility(part+'_visibility',self.dr)
             else:
                 visible,invisible = load_visibility(part[:-1]+'_visibility_0',self.dr)
-            visible,_=remove_pause_intervals(visible.tolist(),zip(*self.pause))
-            invisible,_=remove_pause_intervals(invisible.tolist(),zip(*self.pause))
+            visible,_=remove_pause_intervals(visible.tolist(),list(zip(*self.pause)))
+            invisible,_=remove_pause_intervals(invisible.tolist(),list(zip(*self.pause)))
             visible,invisible=np.array(visible),np.array(invisible)
             
             # Start and end times counting only the time the simulation is running (and not paused).
@@ -1321,7 +1321,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
             anT,anX,anV,anA = extract_AN_port( df,self.modelhandedness[trialno],
                                                rotation_angle=self.rotation )
             # Remove pauses.
-            anT,_,removeIx=remove_pause_intervals(anT.tolist(),zip(*self.pause),True)
+            anT,_,removeIx=remove_pause_intervals(anT.tolist(),list(zip(*self.pause)),True)
             anT=np.array(anT)
             anV=np.delete(anV[0],removeIx,axis=0)
             # Remove parts that extend beyond trial.
@@ -1344,7 +1344,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
             start[::2] = visible
             start[1::2] = invisible
             # Units of seconds.
-            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.array([t.total_seconds() for t in np.diff(start)])
             start = np.cumsum(start)
             invisibleStart = start[::2]  # as seconds
             visibleStart = start[1::2]  # as seconds
@@ -1410,7 +1410,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
             window),(window start, window end)) Window type is a tuple
             (inv_duration,window_duration)
         """
-        from ue4 import load_visibility 
+        from .ue4 import load_visibility 
 
         # Load AN subject data.
         df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
@@ -1431,7 +1431,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
             start = np.zeros((len(visible)+len(invisible)),dtype=object)
             start[::2] = visible
             start[1::2] = invisible
-            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.array([t.total_seconds() for t in np.diff(start)])
             start = np.cumsum(start)
             invisibleStart = start[::2]
             visibleStart = start[1::2]
@@ -1451,7 +1451,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
 
             windowSpecs = []
             windowStart,windowEnd = [],[]
-            for i in xrange(len(trialStartTimes)):
+            for i in range(len(trialStartTimes)):
                 if i==0:
                     windowSpecs.append((0,0))
                 else:
@@ -1460,7 +1460,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
                 windowStart.append(trialStartTimes[i])
                 windowEnd.append(trialEndTimes[i])
 
-            windowsByPart[part] = zip(windowSpecs,zip(windowStart,windowEnd))
+            windowsByPart[part] = list(zip(windowSpecs,list(zip(windowStart,windowEnd))))
 
             # Get the duration of the invisible and visible windows in the time series.
             mxLen = min([len(visibleStart),len(invisibleStart)])
@@ -1524,12 +1524,12 @@ class VRTrial3(object):
         self.windowsByPart = data['windowsByPart']
 
     def info(self):
-        print "Person %s"%self.person
-        print "Trials available:"
+        print("Person %s"%self.person)
+        print("Trials available:")
         for part in ['avatar','avatar0','hand','hand0']:
-            print "%s\tInvisible\tTotal"%part
+            print("%s\tInvisible\tTotal"%part)
             for spec,_ in self.windowsByPart[part]:
-                print "\t%1.2f\t\t%1.2f"%(spec[0],spec[1])
+                print("\t%1.2f\t\t%1.2f"%(spec[0],spec[1]))
     
     def subject_by_window_dur(self,windowDur,part):
         """
@@ -1694,7 +1694,7 @@ class VRTrial3(object):
                 phases = [np.vstack(p) for p in phases]
                 selection.append(( self.windowsByPart[trialType][i][0],phases ))
             except IOError:
-                print "Trial %d in trial type %s not found."%(i,trialType)
+                print("Trial %d in trial type %s not found."%(i,trialType))
         return selection
 
     def phase_by_window_spec(self,source,windowSpec,trial_type):
@@ -1724,7 +1724,7 @@ class VRTrial3(object):
                     phases = [np.vstack(p) for p in phases]
                     selection.append(( self.windowsByPart[trial_type][ix[0]][0],phases ))
                 except IOError:
-                    print "Trial %d in trial type %s not found."%(ix[0],trial_type)
+                    print("Trial %d in trial type %s not found."%(ix[0],trial_type))
 
             # Iterate also through hand0 or avatar0, which contains the other hand.
             if trial_type.isalpha():
@@ -1773,7 +1773,7 @@ class VRTrial3(object):
         templatePhase = self.phase_by_window_dur('t',windowDur,trialType)
         dphase = []
         
-        for i in xrange(len(subjectPhase)):
+        for i in range(len(subjectPhase)):
             dphase.append(( subjectPhase[i][0], 
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         if trialType.isalpha():
@@ -1790,7 +1790,7 @@ class VRTrial3(object):
         templatePhase = self.phase_by_window_spec('t',windowSpec,trialType)
         dphase = []
             
-        for i in xrange(len(subjectPhase)):
+        for i in range(len(subjectPhase)):
             dphase.append(( subjectPhase[i][0], 
                             [mod_angle( s-t ) for s,t in zip(subjectPhase[i][1],templatePhase[i][1])] ))
         return dphase
@@ -1800,8 +1800,8 @@ class VRTrial3(object):
         Put data for analysis into easily accessible pickles. Right now, I extract only visibility
         and hand velocities for AN port data and avatar's motionbuilder files.
         """
-        from pipeline import extract_motionbuilder_model2,extract_AN_port
-        from utils import match_time
+        from .pipeline import extract_motionbuilder_model2,extract_AN_port
+        from .utils import match_time
 
         # Load AN data.
         df = pickle.load(open('%s/%s'%(self.dr,'quickload_an_port_vr.p'),'rb'))['df']
@@ -1814,7 +1814,7 @@ class VRTrial3(object):
 
         for trialno,part in enumerate(['avatar','avatar0','hand','hand0']):
             if disp:
-                print "Processing %s..."%part
+                print("Processing %s..."%part)
             # Select time interval during which the trial happened.
             if part.isalpha():
                 visible,invisible = load_visibility(part+'_visibility.txt',self.dr)
@@ -1834,10 +1834,10 @@ class VRTrial3(object):
             subjectTrial[part+'T'],subjectTrial[part+'V'] = anT[showIx],anV[0][showIx]
             
             if disp:
-                print ("For trial %s, template ends at %s and subject at "+
+                print(("For trial %s, template ends at %s and subject at "+
                         "%s.")%(part,
                                 str(templateTrial[part+'T'][-1])[11:],
-                                str(subjectTrial[part+'T'][-1])[11:])
+                                str(subjectTrial[part+'T'][-1])[11:]))
 
             # Put trajectories on the same time samples so we can pipeline our regular computation.
             # Since the AN trial starts after the mbTrial...the offset is positive.
@@ -1857,7 +1857,7 @@ class VRTrial3(object):
             start[::2] = visible
             start[1::2] = invisible
             # Units of seconds.
-            start = np.array(map(lambda t:t.total_seconds(),np.diff(start)))
+            start = np.array([t.total_seconds() for t in np.diff(start)])
             start = np.cumsum(start)
             invisibleStart = start[::2]  # as seconds
             visibleStart = start[1::2]  # as seconds
@@ -1916,7 +1916,7 @@ class VRTrial3(object):
         """
         Calculate bandpass filtered phase and pickle.
         """
-        from pipeline import pipeline_phase_calc
+        from .pipeline import pipeline_phase_calc
         
         for part in trial_types:
             nTrials = len(self.windowsByPart[part])  # number of trials for that part
@@ -1924,7 +1924,7 @@ class VRTrial3(object):
             # Subject.
             toProcess = []
             trialNumbers = []
-            for i in xrange(nTrials):
+            for i in range(nTrials):
                 # Only run process if we have data points. Some trials are missing data points.
                 # NOTE: At some point the min length should made to correspond to the min window
                 # size in the windowing function for filtering.
@@ -1935,15 +1935,15 @@ class VRTrial3(object):
                                         self.subjectSplitTrials[part][i][:,1],
                                         self.subjectSplitTrials[part][i][:,2])) )
                 else:
-                    print "Ignoring %s trial no %d with windowspec (%1.1f,%1.1f)."%(part,i,
-                        self.windowsByPart[part][i][0][0],self.windowsByPart[part][i][0][1])
+                    print("Ignoring %s trial no %d with windowspec (%1.1f,%1.1f)."%(part,i,
+                        self.windowsByPart[part][i][0][0],self.windowsByPart[part][i][0][1]))
             pipeline_phase_calc(trajs=toProcess,dr=self.dr,
                                 file_names=['subject_phase_%s_%d'%(part,i)
                                             for i in trialNumbers])
             # Template.
             toProcess = []
             trialNumbers = []
-            for i in xrange(nTrials):
+            for i in range(nTrials):
                 if len(self.timeSplitTrials[part][i])>501:
                     trialNumbers.append(i)
                     toProcess.append( (self.timeSplitTrials[part][i],
@@ -2038,7 +2038,7 @@ class Tree(object):
                     self.adjacency[i,names.index(c)] = 1
         
     def print_tree(self):
-        print self.adjacency
+        print(self.adjacency)
     
     def parents(self,node):
         """
@@ -2090,16 +2090,16 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
     from perceptionneuron.experiment import remove_pause_intervals
 
     visible,invisible=load_visibility('%s/%s'%(dr,'avatar_visibility'))
-    visible,_=remove_pause_intervals(visible,zip(pause,unpause))
-    invisible,_=remove_pause_intervals(invisible,zip(pause,unpause))
+    visible,_=remove_pause_intervals(visible,list(zip(pause,unpause)))
+    invisible,_=remove_pause_intervals(invisible,list(zip(pause,unpause)))
     visible=visible.tolist()
     invisible=invisible.tolist()
 
     # Duration of each visibility cycle.
     dt=[i.total_seconds() 
-        for i in np.diff( np.vstack(zip(visible,invisible)),1 ).ravel()]
+        for i in np.diff( np.vstack(list(zip(visible,invisible))),1 ).ravel()]
     dt2=[i.total_seconds() 
-         for i in np.diff( np.vstack(zip(invisible[:-1],visible[1:])),1 ).ravel()]
+         for i in np.diff( np.vstack(list(zip(invisible[:-1],visible[1:]))),1 ).ravel()]
     assert (np.array(dt)>0).all()
     if not (np.around(dt[0])==30 and np.around(dt[-1])==30, (dt[0],dt[-1])):
         msg="Initial and final trials are not 30s: %1.2f and %1.2f."%(dt[0],dt[-1])
@@ -2162,7 +2162,7 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
         warn(msg)
     # Check that trials are all 30+/-1 seconds long.
     if not (np.abs(np.around([i.total_seconds() 
-                              for i in np.diff( np.vstack(zip(trialStartTimes,trialEndTimes)),
+                              for i in np.diff( np.vstack(list(zip(trialStartTimes,trialEndTimes))),
                                   axis=1 ).ravel()])-30)<=1).all():
         warn("The trials are not all 30s long.")
     return trialStartTimes,trialEndTimes,invDur,windowDur

@@ -3,7 +3,7 @@
 # Node, Tree
 # 2016-08-11
 
-from __future__ import division
+
 import pandas as pd
 import numpy as np
 
@@ -138,5 +138,5 @@ class Tree(object):
                     self.adjacency[i,names.index(c)] = 1
         
     def print_tree(self):
-        print self.adjacency
+        print(self.adjacency)
 
