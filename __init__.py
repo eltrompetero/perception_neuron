@@ -1,3 +1,4 @@
+# Author: Eddie Lee, edl56@cornell.edu
 from .utils import *
 from .axis_neuron import *
 from .ue4 import *

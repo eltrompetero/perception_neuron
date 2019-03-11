@@ -2,12 +2,11 @@
 # Class for running synchronization experiments.
 # Author: Eddie Lee edl56@cornell.edu
 # ==================================================================== #
-from __future__ import division
-from utils import *
+from .utils import *
 import time
 from datetime import datetime
-from axis_neuron import left_hand_col_indices,right_hand_col_indices
-from port import *
+from .axis_neuron import left_hand_col_indices,right_hand_col_indices
+from .port import *
 import dill
 from subprocess import call
 
@@ -807,7 +806,7 @@ def remove_pause_intervals(t,pause_intervals,return_removed_ix=False):
     t = t[:]
     pause_intervals = pause_intervals[:]
     removedIx=[]
-    rangeT=range(len(t))
+    rangeT = list(range(len(t)))
 
     for dtix,(t0,t1) in enumerate(pause_intervals):
         assert t0<t1
@@ -829,9 +828,9 @@ def remove_pause_intervals(t,pause_intervals,return_removed_ix=False):
         
         # Subtract the duration of the removed pause interval from the remaining data.
         if counter<len(t):
-            for counter in xrange(counter-1,len(t)):
+            for counter in range(counter-1,len(t)):
                 t[counter] -= dt
-            for dtix in xrange(dtix+1,len(pause_intervals)):
+            for dtix in range(dtix+1,len(pause_intervals)):
                 pause_intervals[dtix] = (pause_intervals[dtix][0]-dt,pause_intervals[dtix][1]-dt)
     if return_removed_ix:
         return t,np.concatenate([[0],np.cumsum([i.total_seconds() for i in np.diff(t)])]),removedIx

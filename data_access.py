@@ -505,10 +505,10 @@ class VRTrial3_1(object):
         self.reverse = reverse
 
         # Load gpr data points.
-        savedData=pickle.load(open('%s/%s'%(self.dr,'gpr1.p'),'rb'))
-        self.gprmodel=None
-        self.pause=savedData['pause'],savedData['unpause']
-        self.trialTypes=['avatar']
+        savedData = pickle.load(open('%s/%s'%(self.dr,'gpr1.p'),'rb'))
+        self.gprmodel = None
+        self.pause = savedData['pause'],savedData['unpause']
+        self.trialTypes = ['avatar']
         
         try:
             data = pickle.load(open('%s/%s'%(self.dr,fname),'rb'))
@@ -847,7 +847,7 @@ class VRTrial3_1(object):
         # cannot load this, then do a comparison using just the fastdtw algorithm.
         version=self.person[-3:]
         homedr=os.path.expanduser('~')
-        f=homedr+'/Dropbox/Research/tango/py/cache/dtw_%s.p'%version
+        f = homedr+'/Dropbox/Research/tango/py/cache/dtw_%s.p'%version
         if os.path.isfile(f):
             print("Using cached DTW path file.")
             # The list of paths for a particular individual.
@@ -1100,7 +1100,7 @@ class VRTrial3_1(object):
         from .ue4 import load_visibility 
 
         # Load AN subject data.
-        df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
+        df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'rb'))['df']
 
         windowsByPart = {}
         
@@ -1252,7 +1252,8 @@ class BuggyVRTrial3_5(VRTrial3_1):
                     frac.append( (windowSpec[1]-windowSpec[0])/windowSpec[1] )
                     dur.append( windowSpec[1] )
         assert ((1>p)&(p>0)).all()
-
+        
+        dur = np.array(dur)
         print("Forcing tmin to be that of the data.")
         tmin=min(dur[dur>0])
         print("Forcing tmax to be that of the data.")
@@ -1413,7 +1414,7 @@ class BuggyVRTrial3_5(VRTrial3_1):
         from .ue4 import load_visibility 
 
         # Load AN subject data.
-        df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'r'))['df']
+        df = pickle.load(open('%s/%s'%(dr,'quickload_an_port_vr.p'),'rb'))['df']
 
         windowsByPart = {}
         
@@ -2086,8 +2087,8 @@ def infer_trial_times_from_visibility(pause,unpause,dr,
         Total window duration for this set of trials as pulled from the first window in this trial.
     """
     from datetime import timedelta
-    from perceptionneuron.ue4 import load_visibility
-    from perceptionneuron.experiment import remove_pause_intervals
+    from perception_neuron.ue4 import load_visibility
+    from perception_neuron.experiment import remove_pause_intervals
 
     visible,invisible=load_visibility('%s/%s'%(dr,'avatar_visibility'))
     visible,_=remove_pause_intervals(visible,list(zip(pause,unpause)))

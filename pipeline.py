@@ -41,7 +41,7 @@ def distance_dtw(spec_list,trial_type,trials,
     dtmat = np.zeros((len(trials),len(spec_list),4))
     
     for itrial,trial in enumerate(trials):
-	for specix,spec in enumerate(spec_list):
+        for specix,spec in enumerate(spec_list):
             # Get subject and template velocities.
             output = _compare_dtw(trial,[spec]*2,[trial_type]*2,[precision]*2,
                                   firstix=firstix,disp=disp)
@@ -237,7 +237,7 @@ def coherence(spec_list,trial_type,trials,
     cohmat = np.zeros((len(trials),len(spec_list),4))
     
     for itrial,trial in enumerate(trials):
-	for specix,spec in enumerate(spec_list):
+        for specix,spec in enumerate(spec_list):
             # Get subject and template velocities.
             cohOutput = _compare_coherence(trial,[spec]*2,[trial_type]*2,[precision]*2,mx_freq,
                                            firstix=firstix,disp=disp,offset=offset,cwt=cwt)
@@ -287,7 +287,7 @@ def coherence_null_visible(spec_list,trial_type,trials,
     cohmat = np.zeros((len(trials),len(spec_list),4))
     
     for itrial,trial in enumerate(trials):
-	for specix,spec in enumerate(spec_list):
+        for specix,spec in enumerate(spec_list):
             cohOutput = _compare_coherence_vis(trial,spec,trial_type,
                                                precision,mx_freq,
                                                firstix,disp,offset)
@@ -336,7 +336,7 @@ def coherence_null_time_shift(spec_list,trial_type,trials,
     cohmat = np.zeros((len(trials),len(spec_list),4))
     
     for itrial,trial in enumerate(trials):
-	for specix,spec in enumerate(spec_list):
+        for specix,spec in enumerate(spec_list):
             cohOutput = _compare_coherence(trial,[spec,spec],[trial_type]*2,
                                            [precision]*2,mx_freq,
                                            firstix,disp,offset,template_only=True)
@@ -386,7 +386,7 @@ def coherence_null(spec_list,trial_type,trials,test_signal,
     cohmat = np.zeros((len(trials),len(spec_list),4))
 
     for itrial,trial in enumerate(trials):
-	for specix,spec in enumerate(spec_list):
+        for specix,spec in enumerate(spec_list):
             cohOutput = _compare_coherence_given_vel(trial,spec,trial_type,
                                                      precision,test_signal,
                                                      mx_freq,
@@ -437,11 +437,11 @@ def _coherence_null(ignore_spec,trial_type,trials,
     cohmaterr = []
 
     for itrial,trial in enumerate(trials):
-	counter = 0 
+        counter = 0 
         spec_list = [w[0] for w in trial.windowsByPart[trial_type] if not
                 isclose(w[0],ignore_spec,precision)]
         cohmat.append( np.zeros((len(spec_list),4)) )
-	for specix,spec in enumerate(spec_list):
+        for specix,spec in enumerate(spec_list):
             cohOutput = _compare_coherence(trial,[ignore_spec,spec],[trial_type]*2,
                                            [precision]*2,mx_freq,
                                            firstix,disp,offset)
@@ -450,7 +450,7 @@ def _coherence_null(ignore_spec,trial_type,trials,
                 f,cxy = cohOutput
                 for dimIx,c in enumerate(cxy):
                     cohmat[-1][specix,dimIx] += c
-	    counter += 1
+            counter += 1
 
         ntrialmat = (cohmat[-1]!=0).sum(0)  # number of trials available for each window spec
                                         # used for normalization
@@ -505,11 +505,11 @@ def coherence_null_null(ignore_spec,trial_type,trials,
     cohmaterr = []
 
     for itrial,trial in enumerate(trials):
-	counter = 0 
+        counter = 0 
         spec_list = [w[0] for w in trial.windowsByPart[trial_type] if not
                 isclose(w[0],ignore_spec,precision)]
         cohmat.append( np.zeros((len(spec_list),4)) )
-	for specix,spec in enumerate(spec_list):
+        for specix,spec in enumerate(spec_list):
             cohOutput = _compare_coherence(trial,[ignore_spec,spec],[trial_type]*2,
                                            [precision]*2,mx_freq,
                                            firstix,disp,offset,template_only=True)
@@ -518,7 +518,7 @@ def coherence_null_null(ignore_spec,trial_type,trials,
                 f,cxy = cohOutput
                 for dimIx,c in enumerate(cxy):
                     cohmat[-1][specix,dimIx] += c
-	    counter += 1
+            counter += 1
 
         ntrialmat = (cohmat[-1]!=0).sum(0)  # number of trials available for each window spec
                                         # used for normalization
